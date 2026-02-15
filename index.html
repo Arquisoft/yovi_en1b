@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="generator" content="Asciidoctor 2.0.23">
-<title>yovi_0</title>
+<meta name="generator" content="Asciidoctor 2.0.26">
+<title>yovi_en1b</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
 <style>
 /*! Asciidoctor default stylesheet | MIT License | https://asciidoctor.org */
@@ -116,7 +116,6 @@ h1 strong,h2 strong,h3 strong,#toctitle strong,.sidebarblock>.content>.title str
 :not(pre):not([class^=L])>code{font-size:.9375em;font-style:normal!important;letter-spacing:0;padding:.1em .5ex;word-spacing:-.15em;background:#f7f7f8;border-radius:4px;line-height:1.45;text-rendering:optimizeSpeed}
 pre{color:rgba(0,0,0,.9);font-family:"Droid Sans Mono","DejaVu Sans Mono",monospace;line-height:1.45;text-rendering:optimizeSpeed}
 pre code,pre pre{color:inherit;font-size:inherit;line-height:inherit}
-pre>code{display:block}
 pre.nowrap,pre.nowrap pre{white-space:pre;word-wrap:normal}
 em em{font-style:normal}
 strong strong{font-weight:400}
@@ -219,6 +218,7 @@ table.tableblock.fit-content>caption.title{white-space:nowrap;width:0}
 .literalblock pre,.listingblock>.content>pre:not(.highlight),.listingblock>.content>pre[class=highlight],.listingblock>.content>pre[class^="highlight "]{background:#f7f7f8}
 .literalblock.output pre{color:#f7f7f8;background:rgba(0,0,0,.9)}
 .listingblock>.content{position:relative}
+.listingblock pre>code{display:block}
 .listingblock code[data-lang]::before{display:none;content:attr(data-lang);position:absolute;font-size:.75em;top:.425rem;right:.5rem;line-height:1;text-transform:uppercase;color:inherit;opacity:.5}
 .listingblock:hover code[data-lang]::before{display:block}
 .listingblock.terminal pre .command::before{content:attr(data-prompt);padding-right:.5em;color:inherit;opacity:.5}
@@ -436,7 +436,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </head>
 <body class="article">
 <div id="header">
-<h1><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> yovi_0</h1>
+<h1><span class="image"><img src="./images/arc42-logo.png" alt="arc42"></span> yovi_en1b</h1>
 <div class="details">
 <span id="revnumber">version 8.2 EN,</span>
 <span id="revdate">January 2023</span>
@@ -459,7 +459,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_technical_context">3.2. Technical Context</a></li>
 </ul>
 </li>
-<li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
+<li><a href="#section-solution-strategy">4. Solution Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_technology_decisions">4.1. Technology decisions</a></li>
+<li><a href="#_quality_goals_2">4.2. Quality goals</a></li>
+</ul>
+</li>
 <li><a href="#section-building-block-view">5. Building Block View</a>
 <ul class="sectlevel2">
 <li><a href="#_whitebox_overall_system">5.1. Whitebox Overall System</a></li>
@@ -469,10 +474,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#section-runtime-view">6. Runtime View</a>
 <ul class="sectlevel2">
-<li><a href="#_runtime_scenario_1">6.1. &lt;Runtime Scenario 1&gt;</a></li>
-<li><a href="#_runtime_scenario_2">6.2. &lt;Runtime Scenario 2&gt;</a></li>
-<li><a href="#">6.3. &#8230;&#8203;</a></li>
-<li><a href="#_runtime_scenario_n">6.4. &lt;Runtime Scenario n&gt;</a></li>
+<li><a href="#_player_makes_a_move">6.1. Player Makes a Move</a></li>
+<li><a href="#_game_initialization_matchmaking">6.2. Game Initialization (Matchmaking)</a></li>
+<li><a href="#_win_condition_detection">6.3. Win Condition Detection</a></li>
+<li><a href="#_player_reconnection_after_disconnect">6.4. Player Reconnection After Disconnect</a></li>
 </ul>
 </li>
 <li><a href="#section-deployment-view">7. Deployment View</a>
@@ -841,6 +846,36 @@ together with a mapping table showing the relationships between channels and inp
 <div class="sect1">
 <h2 id="section-solution-strategy">4. Solution Strategy</h2>
 <div class="sectionbody">
+<div class="paragraph">
+<p>The GameY project follows a layered structured divided into UI, game logic and backend user handling</p>
+</div>
+<div class="sect2">
+<h3 id="_technology_decisions">4.1. Technology decisions</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>The UI will be develop using React, Vite and TypeScript due to requirements</p>
+</li>
+<li>
+<p>The logic will consist of a Rust application due to requirements</p>
+</li>
+<li>
+<p>The users will be handle by a database which is still in debate</p>
+</li>
+<li>
+<p>Github will be used as the cloud platform to work</p>
+</li>
+<li>
+<p>Docker will be used to deploy the application</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_goals_2">4.2. Quality goals</h3>
+<div class="paragraph">
+<p>Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project</p>
+</div>
 <div class="sidebarblock arc42help">
 <div class="content">
 <div class="paragraph">
@@ -883,6 +918,7 @@ Refer to details in the following sections.</p>
 </div>
 </div>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -1253,38 +1289,273 @@ You will mainly capture scenarios in your documentation to communicate your arch
 </div>
 </div>
 </div>
+<div class="paragraph">
+<p>Here are the main runtime scenarios that demonstrate how Game Y&#8217;s components interact during gameplay.</p>
+</div>
 <div class="sect2">
-<h3 id="_runtime_scenario_1">6.1. &lt;Runtime Scenario 1&gt;</h3>
+<h3 id="_player_makes_a_move">6.1. Player Makes a Move</h3>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
+@startuml
+actor Player1
+participant "React Frontend" as FE
+participant "WebSocket Server" as WS
+participant "Game Logic" as GL
+participant "Game State Manager" as GSM
+participant "MongoDB" as DB
+actor Player2
+
+Player1 -&gt; FE: Clicks on hexagonal cell
+FE -&gt; FE: Validates cell is empty
+alt Cell already occupied
+    FE --&gt; Player1: Show error notification
+else Cell is empty (valid move)
+    FE -&gt; WS: Send move (cellId, playerId)
+    WS -&gt; GL: Process move request
+    GL -&gt; GSM: Get current game state
+    GSM --&gt; GL: Return game state
+    GL -&gt; GL: Apply move to board
+    GL -&gt; GL: Update player's territory
+    GL -&gt; GL: Check if all 3 sides touched
+    GL -&gt; GSM: Update game state
+    GSM -&gt; DB: Persist game state
+    DB --&gt; GSM: Confirmation
+    GSM --&gt; GL: State updated
+    GL --&gt; WS: Move confirmed + updated board
+    WS --&gt; FE: Broadcast board update
+    FE --&gt; Player1: Update UI (cell color)
+    WS --&gt; Player2: Broadcast board update
+    Player2 &lt;- FE: Update UI (cell color)
+    alt All 3 sides touched
+        FE --&gt; Player1: Display victory
+        FE --&gt; Player2: Display defeat
+    else Game continues
+        FE --&gt; Player2: Your turn notification
+    end
+end
+@enduml</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Notable aspects:</strong></p>
+</div>
 <div class="ulist">
 <ul>
 <li>
-<p><em>&lt;insert runtime diagram or textual description of the scenario&gt;</em></p>
+<p>The frontend performs client-side validation to provide immediate feedback</p>
 </li>
 <li>
-<p><em>&lt;insert description of the notable aspects of the interactions between the
-building block instances depicted in this diagram.&gt;</em></p>
+<p>WebSocket ensures real-time communication between both players</p>
+</li>
+<li>
+<p>Game Logic validates all moves server-side to prevent cheating</p>
+</li>
+<li>
+<p>The triangular board consists of hexagonal cells arranged in a triangular shape</p>
+</li>
+<li>
+<p>Win condition checks if a player&#8217;s colored cells touch all three sides of the triangle</p>
+</li>
+<li>
+<p>Game state is persisted to MongoDB for game history and reconnection support</p>
+</li>
+<li>
+<p>Both players receive simultaneous updates through WebSocket broadcasting</p>
 </li>
 </ul>
 </div>
-<div class="paragraph">
-<p>It is possible to use a sequence diagram:</p>
 </div>
-<div class="imageblock">
+<div class="sect2">
+<h3 id="_game_initialization_matchmaking">6.2. Game Initialization (Matchmaking)</h3>
+<div class="listingblock">
 <div class="content">
-<img src="./images/Sequence%20diagram.png" alt="Sequence diagram" width="332" height="335">
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_runtime_scenario_2">6.2. &lt;Runtime Scenario 2&gt;</h3>
+<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
+@startuml
+actor Player1
+actor Player2
+participant "Frontend" as FE1
+participant "Frontend" as FE2
+participant "Matchmaking Service" as MM
+participant "Game Creator" as GC
+participant "WebSocket Server" as WS
+participant "MongoDB" as DB
 
+Player1 -&gt; FE1: Click "Find Match"
+FE1 -&gt; MM: Request match
+MM -&gt; MM: Add to waiting queue
+Player2 -&gt; FE2: Click "Find Match"
+FE2 -&gt; MM: Request match
+MM -&gt; MM: Match players
+MM -&gt; GC: Create new game
+GC -&gt; GC: Initialize triangular board\nwith hexagonal cells
+GC -&gt; GC: Randomly assign colors
+GC -&gt; DB: Save initial game state
+DB --&gt; GC: Game created (gameId)
+GC --&gt; MM: Game ready (gameId)
+MM -&gt; WS: Establish game room
+WS --&gt; FE1: Game found (gameId, color, opponent)
+WS --&gt; FE2: Game found (gameId, color, opponent)
+FE1 --&gt; Player1: Navigate to game board
+FE2 --&gt; Player2: Navigate to game board
+FE1 -&gt; WS: Join game room
+FE2 -&gt; WS: Join game room
+WS --&gt; FE1: Initial board state
+WS --&gt; FE2: Initial board state
+FE1 --&gt; Player1: Display hexagonal board (waiting/your turn)
+FE2 --&gt; Player2: Display hexagonal board (waiting/your turn)
+@enduml</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Notable aspects:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Matchmaking service maintains a queue of waiting players</p>
+</li>
+<li>
+<p>Players are matched on a first-come, first-served basis</p>
+</li>
+<li>
+<p>Each player is randomly assigned a color to ensure fairness</p>
+</li>
+<li>
+<p>The triangular board is composed of hexagonal cells arranged in a triangular pattern</p>
+</li>
+<li>
+<p>Both players connect to the same WebSocket room for real-time updates</p>
+</li>
+<li>
+<p>Initial game state is persisted before players enter the game</p>
+</li>
+<li>
+<p>Players receive notification about whose turn it is (textual or visual)</p>
+</li>
+</ul>
+</div>
 </div>
 <div class="sect2">
-<h3 id="">6.3. &#8230;&#8203;</h3>
+<h3 id="_win_condition_detection">6.3. Win Condition Detection</h3>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
+@startuml
+participant "Game Logic" as GL
+participant "Board Analyzer" as BA
+participant "Path Finder" as PF
+participant "Game State Manager" as GSM
 
+GL -&gt; BA: Check win condition (playerId)
+BA -&gt; BA: Get all cells of player's color
+BA -&gt; PF: Find connected path touching all 3 sides
+PF -&gt; PF: Build graph of adjacent hexagonal cells\nof player's color
+PF -&gt; PF: Execute graph traversal algorithm\n(DFS/BFS from edge cells)
+PF -&gt; PF: Check if connected component\ntouches all 3 triangle sides
+alt Connected path touches all 3 sides
+    PF --&gt; BA: Winning chain found
+    BA --&gt; GL: Player has won
+    GL -&gt; GSM: Set game status = "finished"
+    GL -&gt; GSM: Set winner = playerId
+    GSM -&gt; GSM: Record game result
+else No complete chain
+    PF --&gt; BA: Chain incomplete (touching only [X] side(s))
+    BA --&gt; GL: Game continues
+end
+@enduml</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Notable aspects:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Win condition checked after every move</p>
+</li>
+<li>
+<p>Player wins when a connected chain of their colored cells touches all three sides of the triangular board</p>
+</li>
+<li>
+<p>Uses graph traversal (DFS/BFS) to detect connected components in the hexagonal grid</p>
+</li>
+<li>
+<p>Hexagonal cells have up to 6 adjacent neighbors for connectivity checking</p>
+</li>
+<li>
+<p>Efficient algorithm analyzes only the moving player&#8217;s cells</p>
+</li>
+</ul>
+</div>
 </div>
 <div class="sect2">
-<h3 id="_runtime_scenario_n">6.4. &lt;Runtime Scenario n&gt;</h3>
+<h3 id="_player_reconnection_after_disconnect">6.4. Player Reconnection After Disconnect</h3>
+<div class="listingblock">
+<div class="content">
+<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
+@startuml
+actor Player1
+participant "React Frontend" as FE
+participant "WebSocket Server" as WS
+participant "Backend API" as API
+participant "MongoDB" as DB
+actor Player2
+
+note over Player1,WS: Connection Lost
+WS -&gt; WS: Detect disconnection
+WS -&gt; Player2: Notify: opponent disconnected
+Player2 &lt;- FE: Display "Waiting for opponent..."
+
+note over Player1: Player reopens application
+Player1 -&gt; FE: Login
+FE -&gt; API: GET /api/games/active
+API -&gt; DB: Query active games for user
+DB --&gt; API: Return active games list
+API --&gt; FE: Active games
+FE --&gt; Player1: Show "Resume Game" option
+Player1 -&gt; FE: Click "Resume Game"
+FE -&gt; WS: Reconnect to game room (gameId)
+WS -&gt; API: Request current game state
+API -&gt; DB: Retrieve game state
+DB --&gt; API: Current board state
+API --&gt; WS: Full game state
+WS --&gt; FE: Board state + turn info
+FE --&gt; Player1: Restore game UI
+WS -&gt; Player2: Notify: opponent reconnected
+Player2 &lt;- FE: Update status "Opponent back"
+note over Player1,Player2: Game resumes
+@enduml</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Notable aspects:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Game state persists in the database even if players disconnect</p>
+</li>
+<li>
+<p>Players can rejoin games in progress</p>
+</li>
+<li>
+<p>The system distinguishes between temporary disconnections and game abandonment</p>
+</li>
+<li>
+<p>After a timeout period (e.g., 1 minutes), the game may be forfeited</p>
+</li>
+<li>
+<p>WebSocket connection is re-established seamlessly</p>
+</li>
+<li>
+<p>The complete hexagonal board state is preserved and restored</p>
+</li>
+<li>
+<p>Opponent receives real-time notifications about connection status</p>
+</li>
+</ul>
+</div>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -1804,7 +2075,7 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-02-09 12:15:33 +0100
+Last updated 2026-02-15 23:07:43 +0100
 </div>
 </div>
 </body>
