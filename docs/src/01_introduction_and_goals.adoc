@@ -19,83 +19,68 @@ endif::arc42help[]
 
 === Requirements Overview
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-Short description of the functional requirements, driving forces, extract (or abstract)
-of requirements. Link to (hopefully existing) requirements documents
-(with version number and information where to find it).
+The **YOVI_EN1B** project represents an evolving multi service platform developed for the Software Architecture course at the University of Oviedo. It serves as a fundamental benchmark for the construction of scalable, maintainable, and observable distributed systems, with a specific focus on turn based game logic.
 
-.Motivation
-From the point of view of the end users a system is created or modified to
-improve support of a business activity and/or improve the quality.
+The following context diagram illustrates the primary boundaries of the system and its interactions with external actors and infrastructure:
 
-.Form
-Short textual description, probably in tabular use-case format.
-If requirements documents exist this overview should refer to these documents.
+[plantuml, context_diagram, png]
+----
+@startuml
+!theme plain
+skinparam componentStyle uml2
 
-Keep these excerpts as short as possible. Balance readability of this document with potential redundancy w.r.t to requirements documents.
+actor "Player" as user
 
+package "YOVI_EN1B System" {
+    component "Web Application" as webapp
+    component "Users Service" as users_src
+    component "Gamey Engine" as gamey
+}
 
-.Further Information
+database "Database" as db
+component "Monitoring (Prometheus/Grafana)" as monitor
 
-See https://docs.arc42.org/section-1/[Introduction and Goals] in the arc42 documentation.
+user --> webapp : "Plays game / Registers"
 
-****
-endif::arc42help[]
+webapp <-> users_src : "Authentication"
+webapp <-> gamey : "Game actions via WebSocket"
+
+gamey <-> db : "State persistence"
+users_src --> db : "User data"
+
+gamey --> monitor : "Metrics"
+users_src --> monitor : "Metrics"
+@enduml
+----
+
+The functional scope encompasses several critical architectural domains:
+
+*   **User Identity Management**: A centralized system for registration and authentication, providing secure access to the platform ecosystem. This component ensures the integrity of user credentials and session management.
+*   **Hexagonal Game Logic Engine**: A high performance application core, implemented in Rust, that governs spatial operations on a triangular board consisting of hexagonal cells. This includes move validation based on spatial adjacency, distributed state synchronization, and win condition detection via specialized graph traversal algorithms such as Depth First Search.
+*   **State Persistence and Resilience**: Integration with MongoDB to ensure that all game sessions are preserved. This mechanism enables the system to survive service interruptions and allows participants to resume active sessions without loss of progress. It is a critical component for maintaining system availability and reliability.
+*   **Operational Intelligence**: A comprehensive monitoring infrastructure using Prometheus and Grafana to provide real time visibility into system health and performance metrics. This allows for automated alerting and detailed analysis of system behavior under load.
 
 === Quality Goals
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-The top three (max five) quality goals for the architecture whose fulfillment is of highest importance to the major stakeholders. 
-We really mean quality goals for the architecture. Don't confuse them with project goals.
-They are not necessarily identical.
+The architecture of YOVI_EN1B is governed by a technical quality tree rooted in the ISO 25010 standard. These high priority requirements ensure the technical integrity and operational success of the platform:
 
-Consider this overview of potential topics (based upon the ISO 25010 standard):
-
-image::01_2_iso-25010-topics-EN.drawio.png["Categories of Quality Requirements"]
-
-.Motivation
-You should know the quality goals of your most important stakeholders, since they will influence fundamental architectural decisions. 
-Make sure to be very concrete about these qualities, avoid buzzwords.
-If you as an architect do not know how the quality of your work will be judged...
-
-.Form
-A table with quality goals and concrete scenarios, ordered by priorities
-****
-endif::arc42help[]
+[options="header",cols="1,2,3,4"]
+|===
+|Priority|Goal|Architectural Attribute|Operational Scenario
+|1|**Maintainability**|Modularity|The system architecture facilitates the replacement of individual components, such as the user service, without necessitating modifications to the web application or the game engine core. This decoupling ensures long term project sustainability.
+|2|**Reliability**|Fault Tolerance|The persistence layer ensures that in the event of a service restart, the complete game state is recovered from the database within two seconds, ensuring zero data loss for active sessions.
+|3|**Performance**|Efficiency|The core game logic executes spatial analysis and win condition detection in under two milliseconds. This performance target must be maintained even as the triangular grid size increases, ensuring immediate system response times.
+|4|**Security**|Data Integrity|The platform enforces strict validation of all incoming requests to prevent unauthorized actions. Every transaction is recorded to maintain a full audit trail for accountability and evaluation purposes.
+|5|**Usability**|Accessibility|The user interface provides immediate clarity regarding system state and gameplay progression. It adheres to modern standards to ensure that the complex hexagonal grid remains intuitive for all users.
+|===
 
 === Stakeholders
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-Explicit overview of stakeholders of the system, i.e. all person, roles or organizations that
+The following individuals have a significant interest in the architectural success and technical implementation of the YOVI_EN1B system:
 
-* should know the architecture
-* have to be convinced of the architecture
-* have to work with the architecture or with code
-* need the documentation of the architecture for their work
-* have to come up with decisions about the system or its development
-
-.Motivation
-You should know all parties involved in development of the system or affected by the system.
-Otherwise, you may get nasty surprises later in the development process.
-These stakeholders determine the extent and the level of detail of your work and its results.
-
-.Form
-Table with role names, person names, and their expectations with respect to the architecture and its documentation.
-****
-endif::arc42help[]
-
-[options="header",cols="1,2,2"]
+[options="header",cols="1,2,3"]
 |===
-|Role/Name|Contact|Expectations
-| _<Role-1>_ | _<Contact-1>_ | _<Expectation-1>_
-| _<Role-2>_ | _<Contact-2>_ | _<Expectation-2>_
+|Role or Name|Contact|Expectations
+|Jose Emilio Labra Gayo|University of Oviedo | 
+|Pablo Gonzalez|University of Oviedo | 
 |===

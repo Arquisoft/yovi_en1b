@@ -5,4 +5,5 @@ lcov.info
 docs/build
 .env
 webapp/.env
+.DS_Store
 .vscode/
