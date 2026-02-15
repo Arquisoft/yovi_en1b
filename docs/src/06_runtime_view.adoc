@@ -39,29 +39,200 @@ See https://docs.arc42.org/section-6/[Runtime View] in the arc42 documentation.
 ****
 endif::arc42help[]
 
-=== <Runtime Scenario 1>
+Here are the main runtime scenarios that demonstrate how Game Y's components interact during gameplay.
 
+=== Player Makes a Move
 
-* _<insert runtime diagram or textual description of the scenario>_
-* _<insert description of the notable aspects of the interactions between the
-building block instances depicted in this diagram.>_
-
-It is possible to use a sequence diagram:
-
-[plantuml,"Sequence diagram",png]
+[plantuml,"player-move-sequence",png]
 ----
-actor Alice
-actor Bob
-database Pod as "Bob's Pod"
-Alice -> Bob: Authentication Request
-Bob --> Alice: Authentication Response
-Alice  --> Pod: Store route
-Alice -> Bob: Another authentication Request
-Alice <-- Bob: another authentication Response
+@startuml
+actor Player1
+participant "React Frontend" as FE
+participant "WebSocket Server" as WS
+participant "Game Logic" as GL
+participant "Game State Manager" as GSM
+participant "MongoDB" as DB
+actor Player2
+
+Player1 -> FE: Clicks on hexagonal cell
+FE -> FE: Validates cell is empty
+alt Cell already occupied
+    FE --> Player1: Show error notification
+else Cell is empty (valid move)
+    FE -> WS: Send move (cellId, playerId)
+    WS -> GL: Process move request
+    GL -> GSM: Get current game state
+    GSM --> GL: Return game state
+    GL -> GL: Apply move to board
+    GL -> GL: Update player's territory
+    GL -> GL: Check if all 3 sides touched
+    GL -> GSM: Update game state
+    GSM -> DB: Persist game state
+    DB --> GSM: Confirmation
+    GSM --> GL: State updated
+    GL --> WS: Move confirmed + updated board
+    WS --> FE: Broadcast board update
+    FE --> Player1: Update UI (cell color)
+    WS --> Player2: Broadcast board update
+    Player2 <- FE: Update UI (cell color)
+    alt All 3 sides touched
+        FE --> Player1: Display victory
+        FE --> Player2: Display defeat
+    else Game continues
+        FE --> Player2: Your turn notification
+    end
+end
+@enduml
 ----
 
-=== <Runtime Scenario 2>
+*Notable aspects:*
 
-=== ...
+* The frontend performs client-side validation to provide immediate feedback
+* WebSocket ensures real-time communication between both players
+* Game Logic validates all moves server-side to prevent cheating
+* The triangular board consists of hexagonal cells arranged in a triangular shape
+* Win condition checks if a player's colored cells touch all three sides of the triangle
+* Game state is persisted to MongoDB for game history and reconnection support
+* Both players receive simultaneous updates through WebSocket broadcasting
 
-=== <Runtime Scenario n>
+
+
+=== Game Initialization (Matchmaking)
+
+[plantuml,"game-init-sequence",png]
+----
+@startuml
+actor Player1
+actor Player2
+participant "Frontend" as FE1
+participant "Frontend" as FE2
+participant "Matchmaking Service" as MM
+participant "Game Creator" as GC
+participant "WebSocket Server" as WS
+participant "MongoDB" as DB
+
+Player1 -> FE1: Click "Find Match"
+FE1 -> MM: Request match
+MM -> MM: Add to waiting queue
+Player2 -> FE2: Click "Find Match"
+FE2 -> MM: Request match
+MM -> MM: Match players
+MM -> GC: Create new game
+GC -> GC: Initialize triangular board\nwith hexagonal cells
+GC -> GC: Randomly assign colors
+GC -> DB: Save initial game state
+DB --> GC: Game created (gameId)
+GC --> MM: Game ready (gameId)
+MM -> WS: Establish game room
+WS --> FE1: Game found (gameId, color, opponent)
+WS --> FE2: Game found (gameId, color, opponent)
+FE1 --> Player1: Navigate to game board
+FE2 --> Player2: Navigate to game board
+FE1 -> WS: Join game room
+FE2 -> WS: Join game room
+WS --> FE1: Initial board state
+WS --> FE2: Initial board state
+FE1 --> Player1: Display hexagonal board (waiting/your turn)
+FE2 --> Player2: Display hexagonal board (waiting/your turn)
+@enduml
+----
+
+*Notable aspects:*
+
+* Matchmaking service maintains a queue of waiting players
+* Players are matched on a first-come, first-served basis
+* Each player is randomly assigned a color to ensure fairness
+* The triangular board is composed of hexagonal cells arranged in a triangular pattern
+* Both players connect to the same WebSocket room for real-time updates
+* Initial game state is persisted before players enter the game
+* Players receive notification about whose turn it is (textual or visual)
+
+
+
+=== Win Condition Detection
+
+[plantuml,"win-detection-sequence",png]
+----
+@startuml
+participant "Game Logic" as GL
+participant "Board Analyzer" as BA
+participant "Path Finder" as PF
+participant "Game State Manager" as GSM
+
+GL -> BA: Check win condition (playerId)
+BA -> BA: Get all cells of player's color
+BA -> PF: Find connected path touching all 3 sides
+PF -> PF: Build graph of adjacent hexagonal cells\nof player's color
+PF -> PF: Execute graph traversal algorithm\n(DFS/BFS from edge cells)
+PF -> PF: Check if connected component\ntouches all 3 triangle sides
+alt Connected path touches all 3 sides
+    PF --> BA: Winning chain found
+    BA --> GL: Player has won
+    GL -> GSM: Set game status = "finished"
+    GL -> GSM: Set winner = playerId
+    GSM -> GSM: Record game result
+else No complete chain
+    PF --> BA: Chain incomplete (touching only [X] side(s))
+    BA --> GL: Game continues
+end
+@enduml
+----
+
+*Notable aspects:*
+
+* Win condition checked after every move
+* Player wins when a connected chain of their colored cells touches all three sides of the triangular board
+* Uses graph traversal (DFS/BFS) to detect connected components in the hexagonal grid
+* Hexagonal cells have up to 6 adjacent neighbors for connectivity checking
+* Efficient algorithm analyzes only the moving player's cells
+
+
+
+=== Player Reconnection After Disconnect
+
+[plantuml,"player-reconnection-sequence",png]
+----
+@startuml
+actor Player1
+participant "React Frontend" as FE
+participant "WebSocket Server" as WS
+participant "Backend API" as API
+participant "MongoDB" as DB
+actor Player2
+
+note over Player1,WS: Connection Lost
+WS -> WS: Detect disconnection
+WS -> Player2: Notify: opponent disconnected
+Player2 <- FE: Display "Waiting for opponent..."
+
+note over Player1: Player reopens application
+Player1 -> FE: Login
+FE -> API: GET /api/games/active
+API -> DB: Query active games for user
+DB --> API: Return active games list
+API --> FE: Active games
+FE --> Player1: Show "Resume Game" option
+Player1 -> FE: Click "Resume Game"
+FE -> WS: Reconnect to game room (gameId)
+WS -> API: Request current game state
+API -> DB: Retrieve game state
+DB --> API: Current board state
+API --> WS: Full game state
+WS --> FE: Board state + turn info
+FE --> Player1: Restore game UI
+WS -> Player2: Notify: opponent reconnected
+Player2 <- FE: Update status "Opponent back"
+note over Player1,Player2: Game resumes
+@enduml
+----
+
+*Notable aspects:*
+
+* Game state persists in the database even if players disconnect
+* Players can rejoin games in progress
+* The system distinguishes between temporary disconnections and game abandonment
+* After a timeout period (e.g., 1 minutes), the game may be forfeited
+* WebSocket connection is re-established seamlessly
+* The complete hexagonal board state is preserved and restored
+* Opponent receives real-time notifications about connection status
+
