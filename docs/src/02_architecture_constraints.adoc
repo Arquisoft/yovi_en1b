@@ -3,7 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-architecture-constraints]]
 == Architecture Constraints
 
-
 ifdef::arc42help[]
 [role="arc42help"]
 ****
@@ -16,14 +15,87 @@ Constraints must always be dealt with; they may be negotiable, though.
 
 .Form
 Simple tables of constraints with explanations.
-If needed you can subdivide them into
-technical constraints, organizational and political constraints and
-conventions (e.g. programming or versioning guidelines, documentation or naming conventions)
-
-
-.Further Information
-
-See https://docs.arc42.org/section-2/[Architecture Constraints] in the arc42 documentation.
-
+If needed you can subdivide them into technical constraints, organizational and political constraints and conventions.
 ****
 endif::arc42help[]
+
+=== Technical Constraints
+
+[cols="1,2,3,3",options="header"]
+|===
+| Constraint ID | Constraint | Impact | Rationale
+
+| TC-01
+| **Mandatory Tech Stack**
+| Web application must use **TypeScript**; core game logic (move validation/generation) must be in **Rust**.
+| Requirement defined by the ASW course to practice polyglot development and language interoperability.
+
+| TC-02
+| **Communication Protocol**
+| Subsystems must communicate via **JSON messages**.
+| Standardizes data exchange between the TypeScript frontend and the Rust backend service.
+
+| TC-03
+| **Game Representation (YEN)**
+| All game states and moves must be represented using the **YEN notation**.
+| Ensures consistency in how the Game Y board is serialized and stored across the system.
+
+| TC-04
+| **Architecture Decomposition**
+| System must be split into at least two subsystems: **Web Application** and **Rust-based web service**.
+| Encourages modularity and demonstrates the ability to integrate different architectural components.
+
+| TC-05
+| **External API**
+| The system must expose a documented API for third-party bots.
+| Facilitates extensibility and allows the game to be played by automated agents.
+
+| TC-06
+| **Public Deployment**
+| The application must be accessible via a public URL.
+| Demonstrates the ability to manage cloud deployment and production environments.
+|===
+
+=== Organizational Constraints
+
+[cols="1,2,3,3",options="header"]
+|===
+| Constraint ID | Constraint | Impact | Rationale
+
+| OC-01
+| **Version Control**
+| All source code and documentation must be hosted in the assigned **GitHub repository** (Arquisoft/yovi_en1b).
+| Enables collaborative development and allows instructors to track progress and contributions.
+
+| OC-02
+| **Automated CI/CD**
+| Deployment and testing must be automated using CI/CD pipelines (e.g., GitHub Actions).
+| Ensures software quality and rapid feedback loops throughout the development lifecycle.
+
+| OC-03
+| **Documentation Standards**
+| Use of the **arc42 template** and **ADRs** (Architectural Decision Records) is mandatory.
+| Provides a standardized structure for architectural documentation and history of key decisions.
+|===
+
+=== Conventions
+
+[cols="1,2,3,3",options="header"]
+|===
+| Constraint ID | Constraint | Impact | Rationale
+
+| C-01
+| **Testing Requirements**
+| Mandatory inclusion of Unit, Integration, E2E, and Load tests.
+| Critical for verifying system reliability and performance under stress.
+
+| C-02
+| **AI Strategy Options**
+| The AI must offer at least two different strategies or difficulty levels.
+| Enhances user experience and demonstrates implementation of different algorithmic approaches.
+
+| C-03
+| **Language**
+| All documentation and code comments should be in **English**.
+| Standard practice in software engineering.
+|===
