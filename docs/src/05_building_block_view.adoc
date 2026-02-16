@@ -1,225 +1,153 @@
-ifndef::imagesdir[:imagesdir: ../images]
-
 [[section-building-block-view]]
-
-
 == Building Block View
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Content
-The building block view shows the static decomposition of the system into building blocks (modules, components, subsystems, classes, interfaces, packages, libraries, frameworks, layers, partitions, tiers, functions, macros, operations, data structures, ...) as well as their dependencies (relationships, associations, ...)
+This section describes the decomposition of the GameY system into its principal building blocks, showing their internal structure and relationships. The system is detailed across two levels: Level 1 shows the overall system components, and Level 2 zooms into the internal structure of each specific component.
 
-This view is mandatory for every architecture documentation.
-In analogy to a house this is the _floor plan_.
+=== Whitebox Overall System (Level 1)
 
-.Motivation
-Maintain an overview of your source code by making its structure understandable through
-abstraction.
+Here we describe the decomposition of the overall GameY system.
 
-This allows you to communicate with your stakeholder on an abstract level without disclosing implementation details.
+*Overview Diagram*
 
-.Form
-The building block view is a hierarchical collection of black boxes and white boxes
-(see figure below) and their descriptions.
+[plantuml, "level-1-overall", "png"]
+----
+@startuml
+actor "User" as user
 
-image::05_building_blocks-EN.png["Hierarchy of building blocks"]
+package "GameY System" {
+  component [webapp\n(React/Vite)] as webapp
+  component [users\n(Node.js/Express)] as users
+  component [gamey\n(Rust Engine)] as gamey
+}
 
-*Level 1* is the white box description of the overall system together with black
-box descriptions of all contained building blocks.
+user --> webapp : Interacts via browser
+webapp --> users : HTTP (Port 3000)
+webapp --> gamey : HTTP (Port 4000)
+@enduml
+----
 
-*Level 2* zooms into some building blocks of level 1.
-Thus it contains the white box description of selected building blocks of level 1, together with black box descriptions of their internal building blocks.
+*Motivation*
 
-*Level 3* zooms into selected building blocks of level 2, and so on.
+The system is decomposed into three main building blocks to separate concerns:
+* The user interface (frontend) is isolated to provide a responsive SPA (Single Page Application).
+* The user handling is separated into its own microservice to independently manage registrations and user logic.
+* The game logic is encapsulated in a high-performance Rust engine, ensuring fast execution for bot AI and game state validation.
 
+*Contained Building Blocks*
 
-.Further Information
-
-See https://docs.arc42.org/section-5/[Building Block View] in the arc42 documentation.
-
-****
-endif::arc42help[]
-
-=== Whitebox Overall System
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you describe the decomposition of the overall system using the following white box template. It contains
-
- * an overview diagram
- * a motivation for the decomposition
- * black box descriptions of the contained building blocks. For these we offer you alternatives:
-
-   ** use _one_ table for a short and pragmatic overview of all contained building blocks and their interfaces
-   ** use a list of black box descriptions of the building blocks according to the black box template (see below).
-   Depending on your choice of tool this list could be sub-chapters (in text files), sub-pages (in a Wiki) or nested elements (in a modeling tool).
-
-
- * (optional:) important interfaces, that are not explained in the black box templates of a building block, but are very important for understanding the white box.
-Since there are so many ways to specify interfaces why do not provide a specific template for them.
- In the worst case you have to specify and describe syntax, semantics, protocols, error handling,
- restrictions, versions, qualities, necessary compatibilities and many things more.
-In the best case you will get away with examples or simple signatures.
-
-****
-endif::arc42help[]
-
-_**<Overview Diagram>**_
-
-Motivation::
-
-_<text explanation>_
-
-
-Contained Building Blocks::
-_<Description of contained building block (black boxes)>_
-
-Important Interfaces::
-_<Description of important interfaces>_
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Insert your explanations of black boxes from level 1:
-
-If you use tabular form you will only describe your black boxes with name and
-responsibility according to the following schema:
-
-[cols="1,2" options="header"]
 |===
-| **Name** | **Responsibility**
-| _<black box 1>_ | _<Text>_
-| _<black box 2>_ | _<Text>_
+| Name | Responsibility
+
+| *webapp*
+| Frontend web application. Renders the user interface, handles form submissions (like RegisterForm), and communicates with backend services to display data.
+
+| *users*
+| Backend REST API service. Currently responsible for handling user registration requests and returning welcome messages.
+
+| *gamey*
+| Core game engine and bot service. Responsible for managing the game state, board coordinates, valid actions, notations, and bot logic.
 |===
-
-
-
-If you use a list of black box descriptions then you fill in a separate black box template for every important building block .
-Its headline is the name of the black box.
-****
-endif::arc42help[]
-
-==== <Name black box 1>
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you describe <black box 1>
-according the the following black box template:
-
-* Purpose/Responsibility
-* Interface(s), when they are not extracted as separate paragraphs. This interfaces may include qualities and performance characteristics.
-* (Optional) Quality-/Performance characteristics of the black box, e.g.availability, run time behavior, ....
-* (Optional) directory/file location
-* (Optional) Fulfilled requirements (if you need traceability to requirements).
-* (Optional) Open issues/problems/risks
-
-****
-endif::arc42help[]
-
-_<Purpose/Responsibility>_
-
-_<Interface(s)>_
-
-_<(Optional) Quality/Performance Characteristics>_
-
-_<(Optional) Directory/File Location>_
-
-_<(Optional) Fulfilled Requirements>_
-
-_<(optional) Open Issues/Problems/Risks>_
-
-
-
-
-==== <Name black box 2>
-
-_<black box template>_
-
-==== <Name black box n>
-
-_<black box template>_
-
-
-==== <Name interface 1>
-
-...
-
-==== <Name interface m>
-
-
 
 === Level 2
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you can specify the inner structure of (some) building blocks from level 1 as white boxes.
+This level zooms into the internal structure of the three main building blocks defined in Level 1.
 
-You have to decide which building blocks of your system are important enough to justify such a detailed description.
-Please prefer relevance over completeness. Specify important, surprising, risky, complex or volatile building blocks.
-Leave out normal, simple, boring or standardized parts of your system
-****
-endif::arc42help[]
+==== Whitebox: webapp
 
-==== White Box _<building block 1>_
+*Overview Diagram*
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-...describes the internal structure of _building block 1_.
-****
-endif::arc42help[]
+[plantuml, "level-2-webapp", "png"]
+----
+@startuml
+package "webapp (React)" {
+  component [App.tsx] as app
+  component [RegisterForm.tsx] as form
+}
 
-_<white box template>_
+app --> form : Renders
+form --> [External:\nusers service] : fetch(/createuser)
+@enduml
+----
 
-==== White Box _<building block 2>_
+*Contained Building Blocks*
 
+|===
+| Name | Responsibility
 
-_<white box template>_
+| *App.tsx*
+| The root React component that serves as the entry point for the frontend application.
 
-...
-
-==== White Box _<building block m>_
-
-
-_<white box template>_
+| *RegisterForm.tsx*
+| A specific UI component that renders the registration form, captures user input (username), and sends the HTTP POST request to the users service API.
+|===
 
 
+==== Whitebox: users
 
-=== Level 3
+*Overview Diagram*
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Here you can specify the inner structure of (some) building blocks from level 2 as white boxes.
+[plantuml, "level-2-users", "png"]
+----
+@startuml
+package "users (Node.js)" {
+  component [users-service.js] as service
+  portin "Port 3000" as port
+}
 
-When you need more detailed levels of your architecture please copy this
-part of arc42 for additional levels.
-****
-endif::arc42help[]
+port --> service : HTTP POST /createuser
+service --> [External:\nwebapp] : JSON Response
+@enduml
+----
 
-==== White Box <_building block x.1_>
+*Contained Building Blocks*
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-Specifies the internal structure of _building block x.1_.
-****
-endif::arc42help[]
+|===
+| Name | Responsibility
 
-_<white box template>_
-
-
-==== White Box <_building block x.2_>
-
-_<white box template>_
+| *users-service.js*
+| The main Express server file. It defines the API endpoints, specifically the /createuser route. It currently simulates a database delay (1000ms) and processes the JSON response sent back to the client.
+|===
 
 
+==== Whitebox: gamey
 
-==== White Box <_building block y.1_>
+*Overview Diagram*
 
-_<white box template>_
+[plantuml, "level-2-gamey", "png"]
+----
+@startuml
+package "gamey (Rust)" {
+  component [main.rs / lib.rs] as main
+  component [web] as web_module
+  component [core] as core_module
+  component [bot] as bot_module
+  component [notation] as notation_module
+}
+
+main --> web_module
+main --> core_module
+core_module <--> bot_module
+core_module <--> notation_module
+@enduml
+----
+
+*Contained Building Blocks*
+
+|===
+| Name | Responsibility
+
+| *main.rs / lib.rs*
+| Entry point and library exports for the Rust application. It initializes the engine (e.g., HTTP server mode on Port 4000).
+
+| *web*
+| Manages the web interface components and server routing.
+
+| *core*
+| Contains the core game logic, including actions, coordinates, game state, and player management.
+
+| *bot*
+| Implements the bot registry and automated player logic.
+
+| *notation*
+| Provides parsers and support for game notation formats (YEN, YGN).
+|===
