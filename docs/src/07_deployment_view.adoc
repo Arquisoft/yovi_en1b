@@ -28,14 +28,7 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.
 
 .Form
 
-Maybe a highest level deployment diagram is already contained in section 3.2. as
-technical context with your own infrastructure as ONE black box. In this section one can
-zoom into this black box using additional deployment diagrams:
-
-* UML offers deployment diagrams to express that view. Use it, probably with nested diagrams,
-when your infrastructure is more complex.
-* When your (hardware) stakeholders prefer other kinds of diagrams rather than a deployment diagram, let them use any kind that is able to show nodes and channels of the infrastructure.
-
+The deployment view uses UML deployment diagrams to express the infrastructure. Nested diagrams show the internal structure of containers when needed.
 
 .Further Information
 
@@ -60,18 +53,57 @@ For multiple environments or alternative deployments please copy and adapt this 
 ****
 endif::arc42help[]
 
-_**<Overview Diagram>**_
+[plantuml,"deployment-overview",png]
+----
+@startuml
+!include <C4/C4_Deployment>
+
+Deployment_Node(client, "Client Device"){
+    Container(browser, "Web Browser", "Runs the React UI")
+}
+
+Deployment_Node(docker, "Docker Environment"){
+    Deployment_Node(frontend, "Frontend Container"){
+        Container(react_app, "React App", "TypeScript, Vite")
+    }
+    
+    Deployment_Node(backend, "Backend Container"){
+        Container(rust_logic, "Game Logic", "Rust")
+    }
+    
+    Deployment_Node(db, "Database Container"){
+        ContainerDb(mongodb, "MongoDB", "Game & user data")
+    }
+}
+
+Rel(browser, react_app, "HTTPS")
+Rel(react_app, rust_logic, "WebSocket")
+Rel(rust_logic, mongodb, "MongoDB Protocol")
+
+@enduml
+----
 
 Motivation::
 
-_<explanation in text form>_
+Game Y uses Docker containers to separate frontend (React/Vite), backend (Rust game logic with WebSocket), and database (MongoDB). This ensures isolation, portability, and independent scaling of components. The containerized approach provides consistency across development and production environments.
 
 Quality and/or Performance Features::
 
-_<explanation in text form>_
+* *Real-time gameplay:* WebSocket enables low-latency bidirectional communication between players
+* *Isolation:* Docker containers prevent component conflicts and ensure clean separation of concerns
+* *Scalability:* Each component can scale independently based on load requirements
+* *Portability:* The application runs consistently across different platforms and environments
+* *Development efficiency:* Docker Compose orchestrates local development setup
 
 Mapping of Building Blocks to Infrastructure::
-_<description of the mapping>_
+
+[options="header"]
+|===
+| Building Block | Container | Technology
+| User Interface | Frontend Container | React + TypeScript + Vite
+| Game Logic & WebSocket | Backend Container | Rust
+| Data Storage | Database Container | MongoDB
+|===
 
 
 === Infrastructure Level 2
@@ -85,16 +117,61 @@ Please copy the structure from level 1 for each selected element.
 ****
 endif::arc42help[]
 
-==== _<Infrastructure Element 1>_
+==== Backend Container
 
-_<diagram + explanation>_
+[plantuml,"backend-detail",png]
+----
+@startuml
+node "Backend Container" {
+    component "Game Engine" as engine
+    component "WebSocket Server" as ws
+    component "Win Checker" as win
+    component "Board Manager" as board
+    component "MongoDB Driver" as db
+}
 
-==== _<Infrastructure Element 2>_
+ws -> engine : Process moves
+engine -> board : Update state
+engine -> win : Check victory
+engine -> db : Persist data
 
-_<diagram + explanation>_
+@enduml
+----
 
-...
+The backend container runs the Rust application handling game logic, real-time WebSocket communication, and database operations. Key components include:
 
-==== _<Infrastructure Element n>_
+* *Game Engine:* Validates moves and enforces game rules
+* *WebSocket Server:* Maintains persistent connections with both players for real-time updates
+* *Win Condition Checker:* Detects when a connected chain of hexagonal cells touches all three sides
+* *Board Manager:* Maintains the state of the hexagonal grid
+* *MongoDB Driver:* Handles all database operations with connection pooling
 
-_<diagram + explanation>_
+==== MongoDB Container
+
+[plantuml,"mongodb-detail",png]
+----
+@startuml
+database "MongoDB" {
+    folder "Collections" {
+        component "users"
+        component "games"
+        component "game_history"
+    }
+}
+
+note right of games
+  Active game states,
+  hexagonal board config,
+  current turn
+end note
+
+@enduml
+----
+
+The MongoDB container stores all persistent data:
+
+* *users collection:* User accounts, authentication credentials, and player statistics
+* *games collection:* Active game sessions with current board state and turn information. The hexagonal board configuration is stored as an array of cell objects, indexed by gameId for quick retrieval
+* *game_history collection:* Archive of completed games including complete move logs for replay and analytics
+
+The database uses indexes on frequently queried fields (email for users, gameId for games) to optimize performance.
