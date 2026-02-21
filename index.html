@@ -453,23 +453,17 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </ul>
 </li>
 <li><a href="#section-architecture-constraints">2. Architecture Constraints</a></li>
-<li><a href="#section-context-and-scope">3. Context and Scope</a>
+<li><a href="#section-system-scope-and-context">3. Context and Scope</a>
 <ul class="sectlevel2">
 <li><a href="#_business_context">3.1. Business Context</a></li>
 <li><a href="#_technical_context">3.2. Technical Context</a></li>
 </ul>
 </li>
-<li><a href="#section-solution-strategy">4. Solution Strategy</a>
-<ul class="sectlevel2">
-<li><a href="#_technology_decisions">4.1. Technology decisions</a></li>
-<li><a href="#_quality_goals_2">4.2. Quality goals</a></li>
-</ul>
-</li>
+<li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
 <li><a href="#section-building-block-view">5. Building Block View</a>
 <ul class="sectlevel2">
-<li><a href="#_whitebox_overall_system">5.1. Whitebox Overall System</a></li>
+<li><a href="#_whitebox_overall_system_level_1">5.1. Whitebox Overall System (Level 1)</a></li>
 <li><a href="#_level_2">5.2. Level 2</a></li>
-<li><a href="#_level_3">5.3. Level 3</a></li>
 </ul>
 </li>
 <li><a href="#section-runtime-view">6. Runtime View</a>
@@ -586,127 +580,119 @@ These include</p>
 </div>
 <div class="sect2">
 <h3 id="_requirements_overview">1.1. Requirements Overview</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Short description of the functional requirements, driving forces, extract (or abstract)
-of requirements. Link to (hopefully existing) requirements documents
-(with version number and information where to find it).</p>
+<p>The <strong>YOVI_EN1B</strong> project represents an evolving multi service platform developed for the Software Architecture course at the University of Oviedo. It serves as a fundamental benchmark for the construction of scalable, maintainable, and observable distributed systems, with a specific focus on turn based game logic.</p>
 </div>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>From the point of view of the end users a system is created or modified to
-improve support of a business activity and/or improve the quality.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Short textual description, probably in tabular use-case format.
-If requirements documents exist this overview should refer to these documents.</p>
-</div>
-<div class="paragraph">
-<p>Keep these excerpts as short as possible. Balance readability of this document with potential redundancy w.r.t to requirements documents.</p>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-1/">Introduction and Goals</a> in the arc42 documentation.</p>
-</div>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_quality_goals">1.2. Quality Goals</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>The top three (max five) quality goals for the architecture whose fulfillment is of highest importance to the major stakeholders.
-We really mean quality goals for the architecture. Don&#8217;t confuse them with project goals.
-They are not necessarily identical.</p>
-</div>
-<div class="paragraph">
-<p>Consider this overview of potential topics (based upon the ISO 25010 standard):</p>
+<p>The following context diagram illustrates the primary boundaries of the system and its interactions with external actors and infrastructure:</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="./images/01_2_iso-25010-topics-EN.drawio.png" alt="Categories of Quality Requirements">
+<img src="./images/context_diagram.png" alt="context diagram" width="736" height="352">
 </div>
 </div>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>You should know the quality goals of your most important stakeholders, since they will influence fundamental architectural decisions.
-Make sure to be very concrete about these qualities, avoid buzzwords.
-If you as an architect do not know how the quality of your work will be judged&#8230;&#8203;</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>A table with quality goals and concrete scenarios, ordered by priorities</p>
-</div>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_stakeholders">1.3. Stakeholders</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>Explicit overview of stakeholders of the system, i.e. all person, roles or organizations that</p>
+<p>The functional scope encompasses several critical architectural domains:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>should know the architecture</p>
+<p><strong>User Identity Management</strong>: A centralized system for registration and authentication, providing secure access to the platform ecosystem. This component ensures the integrity of user credentials and session management.</p>
 </li>
 <li>
-<p>have to be convinced of the architecture</p>
+<p><strong>Hexagonal Game Logic Engine</strong>: A high performance application core, implemented in Rust, that governs spatial operations on a triangular board consisting of hexagonal cells. This includes move validation based on spatial adjacency, distributed state synchronization, and win condition detection via specialized graph traversal algorithms such as Depth First Search.</p>
 </li>
 <li>
-<p>have to work with the architecture or with code</p>
+<p><strong>State Persistence and Resilience</strong>: Integration with MongoDB to ensure that all game sessions are preserved. This mechanism enables the system to survive service interruptions and allows participants to resume active sessions without loss of progress. It is a critical component for maintaining system availability and reliability.</p>
 </li>
 <li>
-<p>need the documentation of the architecture for their work</p>
-</li>
-<li>
-<p>have to come up with decisions about the system or its development</p>
+<p><strong>Operational Intelligence</strong>: A comprehensive monitoring infrastructure using Prometheus and Grafana to provide real time visibility into system health and performance metrics. This allows for automated alerting and detailed analysis of system behavior under load.</p>
 </li>
 </ul>
 </div>
+</div>
+<div class="sect2">
+<h3 id="_quality_goals">1.2. Quality Goals</h3>
 <div class="paragraph">
-<div class="title">Motivation</div>
-<p>You should know all parties involved in development of the system or affected by the system.
-Otherwise, you may get nasty surprises later in the development process.
-These stakeholders determine the extent and the level of detail of your work and its results.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Table with role names, person names, and their expectations with respect to the architecture and its documentation.</p>
-</div>
-</div>
+<p>The architecture of YOVI_EN1B is governed by a technical quality tree rooted in the ISO 25010 standard. These high priority requirements ensure the technical integrity and operational success of the platform:</p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
+<col style="width: 10%;">
 <col style="width: 20%;">
-<col style="width: 40%;">
+<col style="width: 30%;">
 <col style="width: 40%;">
 </colgroup>
 <thead>
 <tr>
-<th class="tableblock halign-left valign-top">Role/Name</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Goal</th>
+<th class="tableblock halign-left valign-top">Architectural Attribute</th>
+<th class="tableblock halign-left valign-top">Operational Scenario</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Modularity</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system architecture facilitates the replacement of individual components, such as the user service, without necessitating modifications to the web application or the game engine core. This decoupling ensures long term project sustainability.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fault Tolerance</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The persistence layer ensures that in the event of a service restart, the complete game state is recovered from the database within two seconds, ensuring zero data loss for active sessions.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Efficiency</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The core game logic executes spatial analysis and win condition detection in under two milliseconds. This performance target must be maintained even as the triangular grid size increases, ensuring immediate system response times.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data Integrity</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The platform enforces strict validation of all incoming requests to prevent unauthorized actions. Every transaction is recorded to maintain a full audit trail for accountability and evaluation purposes.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Usability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accessibility</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The user interface provides immediate clarity regarding system state and gameplay progression. It adheres to modern standards to ensure that the complex hexagonal grid remains intuitive for all users.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_stakeholders">1.3. Stakeholders</h3>
+<div class="paragraph">
+<p>The following individuals have a significant interest in the architectural success and technical implementation of the YOVI_EN1B system:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 33.3333%;">
+<col style="width: 50.0001%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Role or Name</th>
 <th class="tableblock halign-left valign-top">Contact</th>
 <th class="tableblock halign-left valign-top">Expectations</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Role-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Contact-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Expectation-1&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Jose Emilio Labra Gayo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Role-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Contact-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Expectation-2&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pablo Gonzalez</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -745,100 +731,80 @@ conventions (e.g. programming or versioning guidelines, documentation or naming 
 </div>
 </div>
 <div class="sect1">
-<h2 id="section-context-and-scope">3. Context and Scope</h2>
+<h2 id="section-system-scope-and-context">3. Context and Scope</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Context and scope - as the name suggests - delimits your system (i.e. your scope) from all its communication partners
-(neighboring systems and users, i.e. the context of your system). It thereby specifies the external interfaces.</p>
-</div>
-<div class="paragraph">
-<p>If necessary, differentiate the business context (domain specific inputs and outputs) from the technical context (channels, protocols, hardware).</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>The domain interfaces and technical interfaces to communication partners are among your system&#8217;s most critical aspects. Make sure that you completely understand them.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Various options:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Context diagrams</p>
-</li>
-<li>
-<p>Lists of communication partners and their interfaces.</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-3/">Context and Scope</a> in the arc42 documentation.</p>
-</div>
-</div>
+<p>This section delimits the <strong>GameY</strong> system from all its external communication partners. It defines the boundaries and the interfaces between our system and its environment, both from a business/domain perspective and a technical perspective.</p>
 </div>
 <div class="sect2">
 <h3 id="_business_context">3.1. Business Context</h3>
-<div class="sidebarblock arc42help">
+<div class="paragraph">
+<p>The business context focuses on the external entities (actors) that interact with the GameY system from a functional point of view, ignoring technical details.</p>
+</div>
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>Specification of <strong>all</strong> communication partners (users, IT-systems, &#8230;&#8203;) with explanations of domain specific inputs and outputs or interfaces.
-Optionally you can add domain specific formats or communication protocols.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>All stakeholders should understand which data are exchanged with the environment of the system.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>All kinds of diagrams that show the system as a black box and specify the domain interfaces to communication partners.</p>
-</div>
-<div class="paragraph">
-<p>Alternatively (or additionally) you can use a table.
-The title of the table is the name of your system, the three columns contain the name of the communication partner, the inputs, and the outputs.</p>
-</div>
+<img src="./images/business-context.png" alt="business context" width="526" height="67">
 </div>
 </div>
 <div class="paragraph">
-<p><strong>&lt;Diagram or Table&gt;</strong></p>
+<p><strong>Explanation of external domain interfaces:</strong></p>
 </div>
-<div class="paragraph">
-<p><strong>&lt;optionally: Explanation of external domain interfaces&gt;</strong></p>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Communication Partner</th>
+<th class="tableblock halign-left valign-top">Inputs (to the System)</th>
+<th class="tableblock halign-left valign-top">Outputs (from the System)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>User / Player</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Username for registration (RegisterForm), game actions.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Welcome messages, UI rendering.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect2">
 <h3 id="_technical_context">3.2. Technical Context</h3>
-<div class="sidebarblock arc42help">
+<div class="paragraph">
+<p>This section describes the technical interfaces, channels, and transmission media linking the GameY system to its environment. Based on the docker-compose configuration, the project is divided into a frontend application (webapp), a backend for user handling (users), and a game engine (gamey).</p>
+</div>
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>Technical interfaces (channels and transmission media) linking your system to its environment. In addition a mapping of domain specific input/output to the channels, i.e. an explanation which I/O uses which channel.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Many stakeholders make architectural decision based on the technical interfaces between the system and its context. Especially infrastructure or hardware designers decide these technical interfaces.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>E.g. UML deployment diagram describing channels to neighboring systems,
-together with a mapping table showing the relationships between channels and input/output.</p>
-</div>
+<img src="./images/technical-context.png" alt="technical context" width="330" height="374">
 </div>
 </div>
 <div class="paragraph">
-<p><strong>&lt;Diagram or Table&gt;</strong></p>
+<p><strong>Mapping Input/Output to Channels:</strong></p>
 </div>
-<div class="paragraph">
-<p><strong>&lt;optionally: Explanation of technical interfaces&gt;</strong></p>
-</div>
-<div class="paragraph">
-<p><strong>&lt;Mapping Input/Output to Channels&gt;</strong></p>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Communication Partner</th>
+<th class="tableblock halign-left valign-top">I/O</th>
+<th class="tableblock halign-left valign-top">Channel / Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>User (Client Device)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UI interactions, form submissions (e.g., sending username).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HTTP</strong> for fetching the SPA from the webapp service (Port 80). Once loaded, the browser communicates via <strong>HTTP POST</strong> with the users service API (/createuser on Port 3000) and the gamey engine (Port 4000).</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -846,36 +812,6 @@ together with a mapping table showing the relationships between channels and inp
 <div class="sect1">
 <h2 id="section-solution-strategy">4. Solution Strategy</h2>
 <div class="sectionbody">
-<div class="paragraph">
-<p>The GameY project follows a layered structured divided into UI, game logic and backend user handling</p>
-</div>
-<div class="sect2">
-<h3 id="_technology_decisions">4.1. Technology decisions</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>The UI will be develop using React, Vite and TypeScript due to requirements</p>
-</li>
-<li>
-<p>The logic will consist of a Rust application due to requirements</p>
-</li>
-<li>
-<p>The users will be handle by a database which is still in debate</p>
-</li>
-<li>
-<p>Github will be used as the cloud platform to work</p>
-</li>
-<li>
-<p>Docker will be used to deploy the application</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_quality_goals_2">4.2. Quality goals</h3>
-<div class="paragraph">
-<p>Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project</p>
-</div>
 <div class="sidebarblock arc42help">
 <div class="content">
 <div class="paragraph">
@@ -920,305 +856,184 @@ Refer to details in the following sections.</p>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
-</div>
 <div class="sect1">
 <h2 id="section-building-block-view">5. Building Block View</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Content</div>
-<p>The building block view shows the static decomposition of the system into building blocks (modules, components, subsystems, classes, interfaces, packages, libraries, frameworks, layers, partitions, tiers, functions, macros, operations, data structures, &#8230;&#8203;) as well as their dependencies (relationships, associations, &#8230;&#8203;)</p>
+<p>This section describes the decomposition of the GameY system into its principal building blocks, showing their internal structure and relationships. The system is detailed across two levels: Level 1 shows the overall system components, and Level 2 zooms into the internal structure of each specific component.</p>
+</div>
+<div class="sect2">
+<h3 id="_whitebox_overall_system_level_1">5.1. Whitebox Overall System (Level 1)</h3>
+<div class="paragraph">
+<p>Here we describe the decomposition of the overall GameY system.</p>
 </div>
 <div class="paragraph">
-<p>This view is mandatory for every architecture documentation.
-In analogy to a house this is the <em>floor plan</em>.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Maintain an overview of your source code by making its structure understandable through
-abstraction.</p>
-</div>
-<div class="paragraph">
-<p>This allows you to communicate with your stakeholder on an abstract level without disclosing implementation details.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>The building block view is a hierarchical collection of black boxes and white boxes
-(see figure below) and their descriptions.</p>
+<p><strong>Overview Diagram</strong></p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="./images/05_building_blocks-EN.png" alt="Hierarchy of building blocks">
+<img src="./images/level-1-overall.png" alt="level 1 overall" width="332" height="356">
 </div>
 </div>
 <div class="paragraph">
-<p><strong>Level 1</strong> is the white box description of the overall system together with black
-box descriptions of all contained building blocks.</p>
+<p><strong>Motivation</strong></p>
 </div>
 <div class="paragraph">
-<p><strong>Level 2</strong> zooms into some building blocks of level 1.
-Thus it contains the white box description of selected building blocks of level 1, together with black box descriptions of their internal building blocks.</p>
+<p>The system is decomposed into three main building blocks to separate concerns:
+* The user interface (frontend) is isolated to provide a responsive SPA (Single Page Application).
+* The user handling is separated into its own microservice to independently manage registrations and user logic.
+* The game logic is encapsulated in a high-performance Rust engine, ensuring fast execution for bot AI and game state validation.</p>
 </div>
 <div class="paragraph">
-<p><strong>Level 3</strong> zooms into selected building blocks of level 2, and so on.</p>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-5/">Building Block View</a> in the arc42 documentation.</p>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_whitebox_overall_system">5.1. Whitebox Overall System</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<p>Here you describe the decomposition of the overall system using the following white box template. It contains</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>an overview diagram</p>
-</li>
-<li>
-<p>a motivation for the decomposition</p>
-</li>
-<li>
-<p>black box descriptions of the contained building blocks. For these we offer you alternatives:</p>
-<div class="ulist">
-<ul>
-<li>
-<p>use <em>one</em> table for a short and pragmatic overview of all contained building blocks and their interfaces</p>
-</li>
-<li>
-<p>use a list of black box descriptions of the building blocks according to the black box template (see below).
-Depending on your choice of tool this list could be sub-chapters (in text files), sub-pages (in a Wiki) or nested elements (in a modeling tool).</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p>(optional:) important interfaces, that are not explained in the black box templates of a building block, but are very important for understanding the white box.
-Since there are so many ways to specify interfaces why do not provide a specific template for them.
- In the worst case you have to specify and describe syntax, semantics, protocols, error handling,
- restrictions, versions, qualities, necessary compatibilities and many things more.
-In the best case you will get away with examples or simple signatures.</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="paragraph">
-<p><em><strong>&lt;Overview Diagram&gt;</strong></em></p>
-</div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1">Motivation</dt>
-<dd>
-<p><em>&lt;text explanation&gt;</em></p>
-</dd>
-<dt class="hdlist1">Contained Building Blocks</dt>
-<dd>
-<p><em>&lt;Description of contained building block (black boxes)&gt;</em></p>
-</dd>
-<dt class="hdlist1">Important Interfaces</dt>
-<dd>
-<p><em>&lt;Description of important interfaces&gt;</em></p>
-</dd>
-</dl>
-</div>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<p>Insert your explanations of black boxes from level 1:</p>
-</div>
-<div class="paragraph">
-<p>If you use tabular form you will only describe your black boxes with name and
-responsibility according to the following schema:</p>
+<p><strong>Contained Building Blocks</strong></p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
-<col style="width: 33.3333%;">
-<col style="width: 66.6667%;">
+<col style="width: 50%;">
+<col style="width: 50%;">
 </colgroup>
 <thead>
 <tr>
-<th class="tableblock halign-left valign-top"><strong>Name</strong></th>
-<th class="tableblock halign-left valign-top"><strong>Responsibility</strong></th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;black box 1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"> <em>&lt;Text&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>webapp</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend web application. Renders the user interface, handles form submissions (like RegisterForm), and communicates with backend services to display data.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;black box 2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"> <em>&lt;Text&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>users</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Backend REST API service. Currently responsible for handling user registration requests and returning welcome messages.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>gamey</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core game engine and bot service. Responsible for managing the game state, board coordinates, valid actions, notations, and bot logic.</p></td>
 </tr>
 </tbody>
 </table>
-<div class="paragraph">
-<p>If you use a list of black box descriptions then you fill in a separate black box template for every important building block .
-Its headline is the name of the black box.</p>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_name_black_box_1">5.1.1. &lt;Name black box 1&gt;</h4>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<p>Here you describe &lt;black box 1&gt;
-according the the following black box template:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Purpose/Responsibility</p>
-</li>
-<li>
-<p>Interface(s), when they are not extracted as separate paragraphs. This interfaces may include qualities and performance characteristics.</p>
-</li>
-<li>
-<p>(Optional) Quality-/Performance characteristics of the black box, e.g.availability, run time behavior, &#8230;&#8203;.</p>
-</li>
-<li>
-<p>(Optional) directory/file location</p>
-</li>
-<li>
-<p>(Optional) Fulfilled requirements (if you need traceability to requirements).</p>
-</li>
-<li>
-<p>(Optional) Open issues/problems/risks</p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<div class="paragraph">
-<p><em>&lt;Purpose/Responsibility&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;Interface(s)&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Quality/Performance Characteristics&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Directory/File Location&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(Optional) Fulfilled Requirements&gt;</em></p>
-</div>
-<div class="paragraph">
-<p><em>&lt;(optional) Open Issues/Problems/Risks&gt;</em></p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_name_black_box_2">5.1.2. &lt;Name black box 2&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;black box template&gt;</em></p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_name_black_box_n">5.1.3. &lt;Name black box n&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;black box template&gt;</em></p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_name_interface_1">5.1.4. &lt;Name interface 1&gt;</h4>
-<div class="paragraph">
-<p>&#8230;&#8203;</p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_name_interface_m">5.1.5. &lt;Name interface m&gt;</h4>
-
-</div>
 </div>
 <div class="sect2">
 <h3 id="_level_2">5.2. Level 2</h3>
-<div class="sidebarblock arc42help">
+<div class="paragraph">
+<p>This level zooms into the internal structure of the three main building blocks defined in Level 1.</p>
+</div>
+<div class="sect3">
+<h4 id="_whitebox_webapp">5.2.1. Whitebox: webapp</h4>
+<div class="paragraph">
+<p><strong>Overview Diagram</strong></p>
+</div>
+<div class="imageblock">
 <div class="content">
+<img src="./images/level-2-webapp.png" alt="level 2 webapp" width="207" height="318">
+</div>
+</div>
 <div class="paragraph">
-<p>Here you can specify the inner structure of (some) building blocks from level 1 as white boxes.</p>
+<p><strong>Contained Building Blocks</strong></p>
 </div>
-<div class="paragraph">
-<p>You have to decide which building blocks of your system are important enough to justify such a detailed description.
-Please prefer relevance over completeness. Specify important, surprising, risky, complex or volatile building blocks.
-Leave out normal, simple, boring or standardized parts of your system</p>
-</div>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>App.tsx</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The root React component that serves as the entry point for the frontend application.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>RegisterForm.tsx</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A specific UI component that renders the registration form, captures user input (username), and sends the HTTP POST request to the users service API.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_1">5.2.1. White Box <em>&lt;building block 1&gt;</em></h4>
-<div class="sidebarblock arc42help">
+<h4 id="_whitebox_users">5.2.2. Whitebox: users</h4>
+<div class="paragraph">
+<p><strong>Overview Diagram</strong></p>
+</div>
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<p>&#8230;&#8203;describes the internal structure of <em>building block 1</em>.</p>
-</div>
+<img src="./images/level-2-users.png" alt="level 2 users" width="219" height="294">
 </div>
 </div>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p><strong>Contained Building Blocks</strong></p>
 </div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>users-service.js</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The main Express server file. It defines the API endpoints, specifically the /createuser route. It currently simulates a database delay (1000ms) and processes the JSON response sent back to the client.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect3">
-<h4 id="_white_box_building_block_2">5.2.2. White Box <em>&lt;building block 2&gt;</em></h4>
+<h4 id="_whitebox_gamey">5.2.3. Whitebox: gamey</h4>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p><strong>Overview Diagram</strong></p>
 </div>
-<div class="paragraph">
-<p>&#8230;&#8203;</p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_white_box_building_block_m">5.2.3. White Box <em>&lt;building block m&gt;</em></h4>
-<div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_level_3">5.3. Level 3</h3>
-<div class="sidebarblock arc42help">
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<p>Here you can specify the inner structure of (some) building blocks from level 2 as white boxes.</p>
-</div>
-<div class="paragraph">
-<p>When you need more detailed levels of your architecture please copy this
-part of arc42 for additional levels.</p>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_white_box_building_block_x_1">5.3.1. White Box &lt;_building block x.1_&gt;</h4>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<p>Specifies the internal structure of <em>building block x.1</em>.</p>
-</div>
+<img src="./images/level-2-gamey.png" alt="level 2 gamey" width="204" height="262">
 </div>
 </div>
 <div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
+<p><strong>Contained Building Blocks</strong></p>
 </div>
-</div>
-<div class="sect3">
-<h4 id="_white_box_building_block_x_2">5.3.2. White Box &lt;_building block x.2_&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_white_box_building_block_y_1">5.3.3. White Box &lt;_building block y.1_&gt;</h4>
-<div class="paragraph">
-<p><em>&lt;white box template&gt;</em></p>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>main.rs / lib.rs</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Entry point and library exports for the Rust application. It initializes the engine (e.g., HTTP server mode on Port 4000).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>web</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Manages the web interface components and server routing.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>core</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Contains the core game logic, including actions, coordinates, game state, and player management.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>bot</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements the bot registry and automated player logic.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>notation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides parsers and support for game notation formats (YEN, YGN).</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -1294,47 +1109,9 @@ You will mainly capture scenarios in your documentation to communicate your arch
 </div>
 <div class="sect2">
 <h3 id="_player_makes_a_move">6.1. Player Makes a Move</h3>
-<div class="listingblock">
+<div class="imageblock">
 <div class="content">
-<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
-@startuml
-actor Player1
-participant "React Frontend" as FE
-participant "WebSocket Server" as WS
-participant "Game Logic" as GL
-participant "Game State Manager" as GSM
-participant "MongoDB" as DB
-actor Player2
-
-Player1 -&gt; FE: Clicks on hexagonal cell
-FE -&gt; FE: Validates cell is empty
-alt Cell already occupied
-    FE --&gt; Player1: Show error notification
-else Cell is empty (valid move)
-    FE -&gt; WS: Send move (cellId, playerId)
-    WS -&gt; GL: Process move request
-    GL -&gt; GSM: Get current game state
-    GSM --&gt; GL: Return game state
-    GL -&gt; GL: Apply move to board
-    GL -&gt; GL: Update player's territory
-    GL -&gt; GL: Check if all 3 sides touched
-    GL -&gt; GSM: Update game state
-    GSM -&gt; DB: Persist game state
-    DB --&gt; GSM: Confirmation
-    GSM --&gt; GL: State updated
-    GL --&gt; WS: Move confirmed + updated board
-    WS --&gt; FE: Broadcast board update
-    FE --&gt; Player1: Update UI (cell color)
-    WS --&gt; Player2: Broadcast board update
-    Player2 &lt;- FE: Update UI (cell color)
-    alt All 3 sides touched
-        FE --&gt; Player1: Display victory
-        FE --&gt; Player2: Display defeat
-    else Game continues
-        FE --&gt; Player2: Your turn notification
-    end
-end
-@enduml</pre>
+<img src="./images/player-move-sequence.png" alt="player move sequence" width="1052" height="999">
 </div>
 </div>
 <div class="paragraph">
@@ -1368,43 +1145,9 @@ end
 </div>
 <div class="sect2">
 <h3 id="_game_initialization_matchmaking">6.2. Game Initialization (Matchmaking)</h3>
-<div class="listingblock">
+<div class="imageblock">
 <div class="content">
-<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
-@startuml
-actor Player1
-actor Player2
-participant "Frontend" as FE1
-participant "Frontend" as FE2
-participant "Matchmaking Service" as MM
-participant "Game Creator" as GC
-participant "WebSocket Server" as WS
-participant "MongoDB" as DB
-
-Player1 -&gt; FE1: Click "Find Match"
-FE1 -&gt; MM: Request match
-MM -&gt; MM: Add to waiting queue
-Player2 -&gt; FE2: Click "Find Match"
-FE2 -&gt; MM: Request match
-MM -&gt; MM: Match players
-MM -&gt; GC: Create new game
-GC -&gt; GC: Initialize triangular board\nwith hexagonal cells
-GC -&gt; GC: Randomly assign colors
-GC -&gt; DB: Save initial game state
-DB --&gt; GC: Game created (gameId)
-GC --&gt; MM: Game ready (gameId)
-MM -&gt; WS: Establish game room
-WS --&gt; FE1: Game found (gameId, color, opponent)
-WS --&gt; FE2: Game found (gameId, color, opponent)
-FE1 --&gt; Player1: Navigate to game board
-FE2 --&gt; Player2: Navigate to game board
-FE1 -&gt; WS: Join game room
-FE2 -&gt; WS: Join game room
-WS --&gt; FE1: Initial board state
-WS --&gt; FE2: Initial board state
-FE1 --&gt; Player1: Display hexagonal board (waiting/your turn)
-FE2 --&gt; Player2: Display hexagonal board (waiting/your turn)
-@enduml</pre>
+<img src="./images/game-init-sequence.png" alt="game init sequence" width="968" height="950">
 </div>
 </div>
 <div class="paragraph">
@@ -1438,32 +1181,9 @@ FE2 --&gt; Player2: Display hexagonal board (waiting/your turn)
 </div>
 <div class="sect2">
 <h3 id="_win_condition_detection">6.3. Win Condition Detection</h3>
-<div class="listingblock">
+<div class="imageblock">
 <div class="content">
-<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
-@startuml
-participant "Game Logic" as GL
-participant "Board Analyzer" as BA
-participant "Path Finder" as PF
-participant "Game State Manager" as GSM
-
-GL -&gt; BA: Check win condition (playerId)
-BA -&gt; BA: Get all cells of player's color
-BA -&gt; PF: Find connected path touching all 3 sides
-PF -&gt; PF: Build graph of adjacent hexagonal cells\nof player's color
-PF -&gt; PF: Execute graph traversal algorithm\n(DFS/BFS from edge cells)
-PF -&gt; PF: Check if connected component\ntouches all 3 triangle sides
-alt Connected path touches all 3 sides
-    PF --&gt; BA: Winning chain found
-    BA --&gt; GL: Player has won
-    GL -&gt; GSM: Set game status = "finished"
-    GL -&gt; GSM: Set winner = playerId
-    GSM -&gt; GSM: Record game result
-else No complete chain
-    PF --&gt; BA: Chain incomplete (touching only [X] side(s))
-    BA --&gt; GL: Game continues
-end
-@enduml</pre>
+<img src="./images/win-detection-sequence.png" alt="win detection sequence" width="916" height="650">
 </div>
 </div>
 <div class="paragraph">
@@ -1491,41 +1211,9 @@ end
 </div>
 <div class="sect2">
 <h3 id="_player_reconnection_after_disconnect">6.4. Player Reconnection After Disconnect</h3>
-<div class="listingblock">
+<div class="imageblock">
 <div class="content">
-<pre>Failed to generate image: Could not load PlantUML. Either require 'asciidoctor-diagram-plantuml' or specify the location of the PlantUML JAR(s) using the 'DIAGRAM_PLANTUML_CLASSPATH' environment variable. Alternatively a PlantUML binary can be provided (plantuml-native in $PATH).
-@startuml
-actor Player1
-participant "React Frontend" as FE
-participant "WebSocket Server" as WS
-participant "Backend API" as API
-participant "MongoDB" as DB
-actor Player2
-
-note over Player1,WS: Connection Lost
-WS -&gt; WS: Detect disconnection
-WS -&gt; Player2: Notify: opponent disconnected
-Player2 &lt;- FE: Display "Waiting for opponent..."
-
-note over Player1: Player reopens application
-Player1 -&gt; FE: Login
-FE -&gt; API: GET /api/games/active
-API -&gt; DB: Query active games for user
-DB --&gt; API: Return active games list
-API --&gt; FE: Active games
-FE --&gt; Player1: Show "Resume Game" option
-Player1 -&gt; FE: Click "Resume Game"
-FE -&gt; WS: Reconnect to game room (gameId)
-WS -&gt; API: Request current game state
-API -&gt; DB: Retrieve game state
-DB --&gt; API: Current board state
-API --&gt; WS: Full game state
-WS --&gt; FE: Board state + turn info
-FE --&gt; Player1: Restore game UI
-WS -&gt; Player2: Notify: opponent reconnected
-Player2 &lt;- FE: Update status "Opponent back"
-note over Player1,Player2: Game resumes
-@enduml</pre>
+<img src="./images/player-reconnection-sequence.png" alt="player reconnection sequence" width="989" height="882">
 </div>
 </div>
 <div class="paragraph">
@@ -1596,20 +1284,7 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 </div>
 <div class="paragraph">
 <div class="title">Form</div>
-<p>Maybe a highest level deployment diagram is already contained in section 3.2. as
-technical context with your own infrastructure as ONE black box. In this section one can
-zoom into this black box using additional deployment diagrams:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>UML offers deployment diagrams to express that view. Use it, probably with nested diagrams,
-when your infrastructure is more complex.</p>
-</li>
-<li>
-<p>When your (hardware) stakeholders prefer other kinds of diagrams rather than a deployment diagram, let them use any kind that is able to show nodes and channels of the infrastructure.</p>
-</li>
-</ul>
+<p>The deployment view uses UML deployment diagrams to express the infrastructure. Nested diagrams show the internal structure of containers when needed.</p>
 </div>
 <div class="paragraph">
 <div class="title">Further Information</div>
@@ -1645,25 +1320,73 @@ when your infrastructure is more complex.</p>
 </div>
 </div>
 </div>
-<div class="paragraph">
-<p><em><strong>&lt;Overview Diagram&gt;</strong></em></p>
+<div class="imageblock">
+<div class="content">
+<img src="./images/deployment-overview.png" alt="deployment overview" width="206" height="679">
+</div>
 </div>
 <div class="dlist">
 <dl>
 <dt class="hdlist1">Motivation</dt>
 <dd>
-<p><em>&lt;explanation in text form&gt;</em></p>
+<p>Game Y uses Docker containers to separate frontend (React/Vite), backend (Rust game logic with WebSocket), and database (MongoDB). This ensures isolation, portability, and independent scaling of components. The containerized approach provides consistency across development and production environments.</p>
 </dd>
 <dt class="hdlist1">Quality and/or Performance Features</dt>
 <dd>
-<p><em>&lt;explanation in text form&gt;</em></p>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Real-time gameplay:</strong> WebSocket enables low-latency bidirectional communication between players</p>
+</li>
+<li>
+<p><strong>Isolation:</strong> Docker containers prevent component conflicts and ensure clean separation of concerns</p>
+</li>
+<li>
+<p><strong>Scalability:</strong> Each component can scale independently based on load requirements</p>
+</li>
+<li>
+<p><strong>Portability:</strong> The application runs consistently across different platforms and environments</p>
+</li>
+<li>
+<p><strong>Development efficiency:</strong> Docker Compose orchestrates local development setup</p>
+</li>
+</ul>
+</div>
 </dd>
 <dt class="hdlist1">Mapping of Building Blocks to Infrastructure</dt>
-<dd>
-<p><em>&lt;description of the mapping&gt;</em></p>
-</dd>
 </dl>
 </div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Building Block</th>
+<th class="tableblock halign-left valign-top">Container</th>
+<th class="tableblock halign-left valign-top">Technology</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User Interface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">React + TypeScript + Vite</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Game Logic &amp; WebSocket</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Backend Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rust</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data Storage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Database Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="sect2">
 <h3 id="_infrastructure_level_2">7.2. Infrastructure Level 2</h3>
@@ -1678,24 +1401,60 @@ when your infrastructure is more complex.</p>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_infrastructure_element_1">7.2.1. <em>&lt;Infrastructure Element 1&gt;</em></h4>
+<h4 id="_backend_container">7.2.1. Backend Container</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/backend-detail.png" alt="backend detail" width="965" height="134">
+</div>
+</div>
 <div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
+<p>The backend container runs the Rust application handling game logic, real-time WebSocket communication, and database operations. Key components include:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Game Engine:</strong> Validates moves and enforces game rules</p>
+</li>
+<li>
+<p><strong>WebSocket Server:</strong> Maintains persistent connections with both players for real-time updates</p>
+</li>
+<li>
+<p><strong>Win Condition Checker:</strong> Detects when a connected chain of hexagonal cells touches all three sides</p>
+</li>
+<li>
+<p><strong>Board Manager:</strong> Maintains the state of the hexagonal grid</p>
+</li>
+<li>
+<p><strong>MongoDB Driver:</strong> Handles all database operations with connection pooling</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_infrastructure_element_2">7.2.2. <em>&lt;Infrastructure Element 2&gt;</em></h4>
-<div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
-</div>
-<div class="paragraph">
-<p>&#8230;&#8203;</p>
+<h4 id="_mongodb_container">7.2.2. MongoDB Container</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/mongodb-detail.png" alt="mongodb detail" width="538" height="155">
 </div>
 </div>
-<div class="sect3">
-<h4 id="_infrastructure_element_n">7.2.3. <em>&lt;Infrastructure Element n&gt;</em></h4>
 <div class="paragraph">
-<p><em>&lt;diagram + explanation&gt;</em></p>
+<p>The MongoDB container stores all persistent data:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>users collection:</strong> User accounts, authentication credentials, and player statistics</p>
+</li>
+<li>
+<p><strong>games collection:</strong> Active game sessions with current board state and turn information. The hexagonal board configuration is stored as an array of cell objects, indexed by gameId for quick retrieval</p>
+</li>
+<li>
+<p><strong>game_history collection:</strong> Archive of completed games including complete move logs for replay and analytics</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The database uses indexes on frequently queried fields (email for users, gameId for games) to optimize performance.</p>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
@@ -2075,7 +1834,7 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-02-15 23:07:43 +0100
+Last updated 2026-02-15 17:04:46 +0100
 </div>
 </div>
 </body>
