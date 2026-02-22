@@ -15,10 +15,10 @@ The GameY project follows a layered structured divided into UI, game logic and b
 
 === Quality goals
 
-Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project
-Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it
-Security will be handled through strict user validation during the login
-Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing
+* Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project
+* Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it
+* Security will be handled through strict user validation during the login
+* Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing
 
 ifdef::arc42help[]
 [role="arc42help"]
