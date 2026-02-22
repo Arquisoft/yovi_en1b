@@ -3,6 +3,22 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-solution-strategy]]
 == Solution Strategy
 
+The GameY project follows a layered structured divided into UI, game logic and backend user handling
+
+=== Technology decisions
+
+* The UI will be develop using React, due to one of the members already knowing it; Vite and TypeScript due to constraints
+* The logic will consist of a Rust application due to constraints
+* The users will be handle by a MongoDB database because we believe it is a very powerful database and would be great to know for our careers.
+* Github will be used as the cloud platform to work due to constraints
+* Docker will be used to deploy the application due to constraints
+
+=== Quality goals
+
+* Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project
+* Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it
+* Security will be handled through strict user validation during the login
+* Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing
 
 ifdef::arc42help[]
 [role="arc42help"]
