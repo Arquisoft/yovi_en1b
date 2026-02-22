@@ -27,7 +27,7 @@ export function useGameBot(): GameBotResult {
     
     try {
       const gameState = createEmptyBoard(3);
-      const response = await getBotMove('random', gameState);
+      const response = await getBotMove('random_bot', gameState);
       
       const { x, y, z } = response.coords;
       setResult(
