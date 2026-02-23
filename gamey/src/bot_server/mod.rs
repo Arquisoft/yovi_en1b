@@ -24,7 +24,9 @@ pub mod error;
 pub mod state;
 pub mod version;
 use axum::response::IntoResponse;
+use axum::http::Method;
 use std::sync::Arc;
+use tower_http::cors::{CorsLayer, AllowOrigin};
 pub use choose::MoveResponse;
 pub use error::ErrorResponse;
 pub use version::*;
@@ -35,6 +37,17 @@ use crate::{GameYError, RandomBot, YBotRegistry, state::AppState};
 ///
 /// This is useful for testing the API without binding to a network port.
 pub fn create_router(state: AppState) -> axum::Router {
+    // Configure CORS for development and production environments
+    let cors = CorsLayer::new()
+        // Allow origins for local development and Docker deployment
+        .allow_origin(AllowOrigin::exact("http://localhost:5173".parse().unwrap()))  // Vite dev server
+        .allow_origin(AllowOrigin::exact("http://localhost".parse().unwrap()))       // Docker default
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+        ]);
+    
     axum::Router::new()
         .route("/status", axum::routing::get(status))
         .route(
@@ -42,6 +55,7 @@ pub fn create_router(state: AppState) -> axum::Router {
             axum::routing::post(choose::choose),
         )
         .with_state(state)
+        .layer(cors)
 }
 
 /// Creates the default application state with the standard bot registry.
