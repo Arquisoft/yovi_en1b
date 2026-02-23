@@ -5,8 +5,18 @@ const swaggerUi = require('swagger-ui-express');
 const fs = require('node:fs');
 const YAML = require('js-yaml');
 const promBundle = require('express-prom-bundle');
+const mongoose = require('mongoose');
 
-const metricsMiddleware = promBundle({includeMethod: true});
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_database';
+mongoose.connect(mongoUri);
+
+const userSchema = new mongoose.Schema({
+  username: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const User = mongoose.model('User', userSchema);
+
+const metricsMiddleware = promBundle({ includeMethod: true });
 app.use(metricsMiddleware);
 
 try {
@@ -28,22 +38,26 @@ app.use(express.json());
 
 app.post('/createuser', async (req, res) => {
   const username = req.body && req.body.username;
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
   try {
-    // Simulate a 1 second delay to mimic processing/network latency
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const newUser = new User({ username });
+    await newUser.save();
 
     const message = `Hello ${username}! welcome to the course!`;
-    res.json({ message });
+    res.json({ message, user: newUser });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-
 if (require.main === module) {
   app.listen(port, () => {
-    console.log(`User Service listening at http://localhost:${port}`)
-  })
+    console.log(`User Service listening at http://localhost:${port}`);
+  });
 }
 
-module.exports = app
+module.exports = app;

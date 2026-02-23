@@ -1,10 +1,27 @@
 services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-init/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - monitor-net
+
   users:
     build: ./users
     container_name: users
     image: ghcr.io/arquisoft/yovi_en1b-users:latest
+    restart: always
     ports:
       - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/app_database
+    depends_on:
+      - mongodb
     networks:
       - monitor-net
 
@@ -15,6 +32,7 @@ services:
         - VITE_API_URL=http://localhost:3000
     container_name: webapp
     image: ghcr.io/arquisoft/yovi_en1b-webapp:latest
+    restart: always
     ports:
       - "80:80"
     depends_on:
@@ -26,8 +44,13 @@ services:
     build: ./gamey
     container_name: gamey
     image: ghcr.io/arquisoft/yovi_en1b-gamey:latest
+    restart: always
     ports:
       - "4000:4000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/app_database
+    depends_on:
+      - mongodb
     networks:
       - monitor-net
 
@@ -54,3 +77,6 @@ services:
 networks:
   monitor-net:
     driver: bridge
+
+volumes:
+  mongo-data:
