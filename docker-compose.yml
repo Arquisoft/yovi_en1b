@@ -30,6 +30,7 @@ services:
       context: ./webapp
       args:
         - VITE_API_URL=http://localhost:3000
+        - VITE_GAMEY_URL=http://localhost:4000
     container_name: webapp
     image: ghcr.io/arquisoft/yovi_en1b-webapp:latest
     restart: always
@@ -37,6 +38,7 @@ services:
       - "80:80"
     depends_on:
       - users
+      - gamey
     networks:
       - monitor-net
 
