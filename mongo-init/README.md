@@ -1,46 +1,22 @@
-======================================================================
-       MONGODB INITIALIZATION AND CONFIGURATION - MICROSERVICES
-======================================================================
+# yovi_en1b - MongoDB Infrastructure
 
-1. OVERVIEW
------------
-This directory contains the initialization scripts for the MongoDB 
-instance. The database is automatically provisioned and configured 
-through Docker Compose to ensure a consistent environment.
+This directory contains the initialization and configuration for the project's database layer.
 
-2. ARCHITECTURAL CHANGES
-------------------------
-* Added 'mongodb' service to the root docker-compose.yml.
-* Created 'init.js' for automated setup of 'app_database' and 
-  collections ('users' and 'games').
-* Integrated 'mongoose' into 'users-service' for data persistence.
-* Configured 'restart: always' policies to handle boot dependencies.
+## Project Structure
 
-3. OPERATIONAL COMMANDS
------------------------
+The database setup is divided into two main parts:
 
-[ DEPLOYMENT ]
-To build and start the entire infrastructure:
-$ docker compose up -d --build
+- `init.js`: Script for automated database and collection provisioning.
+- `docker-compose.yml`: Root configuration for the MongoDB service and data volumes.
 
-To stop the service:
-$ docker compose down
+## Basic Features
 
-[ DATA VERIFICATION ]
-To confirm users are being persisted in the database:
-$ docker exec -it mongodb mongosh app_database --eval "db.users.find()"
+- **Data Persistence**: Uses Docker volumes to ensure user data is not lost after container restarts.
+- **Automated Setup**: Self-configuring database environment through initialization scripts.
+- **Microservice Integration**: Provides a real storage backend for the user management service.
 
-[ TROUBLESHOOTING ]
-To check logs for connection or initialization issues:
-$ docker compose logs mongodb
-$ docker compose logs users
+## Components
 
-4. PERSISTENCE NOTE
--------------------
-Data is stored in a Docker volume named 'mongo-data'. This ensures 
-that the information is not lost even if containers are stopped 
-or removed.
-
-======================================================================
-
-
+- **Deployment**: `docker compose up -d --build`
+- **Shutting down**: `docker compose down`
+- **Verification**: `docker exec -it mongodb mongosh app_database --eval "db.users.find()"`
