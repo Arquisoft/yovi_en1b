@@ -14,6 +14,7 @@
     "express": "^5.2.1",
     "express-prom-bundle": "^8.0.0",
     "js-yaml": "^4.1.0",
+    "mongoose": "^9.2.1",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
