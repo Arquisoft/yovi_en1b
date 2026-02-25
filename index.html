@@ -452,25 +452,14 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_stakeholders">1.3. Stakeholders</a></li>
 </ul>
 </li>
-<li><a href="#section-architecture-constraints">2. Architecture Constraints</a>
-<ul class="sectlevel2">
-<li><a href="#_technical_constraints">2.1. Technical Constraints</a></li>
-<li><a href="#_organizational_constraints">2.2. Organizational Constraints</a></li>
-<li><a href="#_conventions">2.3. Conventions</a></li>
-</ul>
-</li>
+<li><a href="#section-architecture-constraints">2. Architecture Constraints</a></li>
 <li><a href="#section-system-scope-and-context">3. Context and Scope</a>
 <ul class="sectlevel2">
 <li><a href="#_business_context">3.1. Business Context</a></li>
 <li><a href="#_technical_context">3.2. Technical Context</a></li>
 </ul>
 </li>
-<li><a href="#section-solution-strategy">4. Solution Strategy</a>
-<ul class="sectlevel2">
-<li><a href="#_technology_decisions">4.1. Technology decisions</a></li>
-<li><a href="#_quality_goals_2">4.2. Quality goals</a></li>
-</ul>
-</li>
+<li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
 <li><a href="#section-building-block-view">5. Building Block View</a>
 <ul class="sectlevel2">
 <li><a href="#_whitebox_overall_system_level_1">5.1. Whitebox Overall System (Level 1)</a></li>
@@ -728,146 +717,17 @@ Constraints must always be dealt with; they may be negotiable, though.</p>
 <div class="paragraph">
 <div class="title">Form</div>
 <p>Simple tables of constraints with explanations.
-If needed you can subdivide them into technical constraints, organizational and political constraints and conventions.</p>
+If needed you can subdivide them into
+technical constraints, organizational and political constraints and
+conventions (e.g. programming or versioning guidelines, documentation or naming conventions)</p>
+</div>
+<div class="paragraph">
+<div class="title">Further Information</div>
+<p>See <a href="https://docs.arc42.org/section-2/">Architecture Constraints</a> in the arc42 documentation.</p>
 </div>
 </div>
 </div>
-<div class="sect2">
-<h3 id="_technical_constraints">2.1. Technical Constraints</h3>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 11.1111%;">
-<col style="width: 22.2222%;">
-<col style="width: 33.3333%;">
-<col style="width: 33.3334%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Constraint ID</th>
-<th class="tableblock halign-left valign-top">Constraint</th>
-<th class="tableblock halign-left valign-top">Impact</th>
-<th class="tableblock halign-left valign-top">Rationale</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-01</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Mandatory Tech Stack</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Web application must use <strong>TypeScript</strong>; core game logic (move validation/generation) must be in <strong>Rust</strong>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Requirement defined by the ASW course to practice polyglot development and language interoperability.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-02</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Communication Protocol</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Subsystems must communicate via <strong>JSON messages</strong>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standardizes data exchange between the TypeScript frontend and the Rust backend service.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-03</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Game Representation (YEN)</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">All game states and moves must be represented using the <strong>YEN notation</strong>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ensures consistency in how the Game Y board is serialized and stored across the system.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-04</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Architecture Decomposition</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">System must be split into at least two subsystems: <strong>Web Application</strong> and <strong>Rust-based web service</strong>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Encourages modularity and demonstrates the ability to integrate different architectural components.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-05</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>External API</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The system must expose a documented API for third-party bots.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Facilitates extensibility and allows the game to be played by automated agents.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">TC-06</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Public Deployment</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The application must be accessible via a public URL.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Demonstrates the ability to manage cloud deployment and production environments.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="sect2">
-<h3 id="_organizational_constraints">2.2. Organizational Constraints</h3>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 11.1111%;">
-<col style="width: 22.2222%;">
-<col style="width: 33.3333%;">
-<col style="width: 33.3334%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Constraint ID</th>
-<th class="tableblock halign-left valign-top">Constraint</th>
-<th class="tableblock halign-left valign-top">Impact</th>
-<th class="tableblock halign-left valign-top">Rationale</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">OC-01</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Version Control</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">All source code and documentation must be hosted in the assigned <strong>GitHub repository</strong> (Arquisoft/yovi_en1b).</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Enables collaborative development and allows instructors to track progress and contributions.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">OC-02</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Automated CI/CD</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Deployment and testing must be automated using CI/CD pipelines (e.g., GitHub Actions).</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ensures software quality and rapid feedback loops throughout the development lifecycle.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">OC-03</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Documentation Standards</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Use of the <strong>arc42 template</strong> and <strong>ADRs</strong> (Architectural Decision Records) is mandatory.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Provides a standardized structure for architectural documentation and history of key decisions.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="sect2">
-<h3 id="_conventions">2.3. Conventions</h3>
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col style="width: 11.1111%;">
-<col style="width: 22.2222%;">
-<col style="width: 33.3333%;">
-<col style="width: 33.3334%;">
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Constraint ID</th>
-<th class="tableblock halign-left valign-top">Constraint</th>
-<th class="tableblock halign-left valign-top">Impact</th>
-<th class="tableblock halign-left valign-top">Rationale</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">C-01</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing Requirements</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Mandatory inclusion of Unit, Integration, E2E, and Load tests.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Critical for verifying system reliability and performance under stress.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">C-02</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>AI Strategy Options</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The AI must offer at least two different strategies or difficulty levels.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Enhances user experience and demonstrates implementation of different algorithmic approaches.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">C-03</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Language</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">All documentation and code comments should be in <strong>English</strong>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard practice in software engineering.</p></td>
-</tr>
-</tbody>
-</table>
 <div style="page-break-after: always;"></div>
-</div>
 </div>
 </div>
 <div class="sect1">
@@ -952,49 +812,6 @@ If needed you can subdivide them into technical constraints, organizational and 
 <div class="sect1">
 <h2 id="section-solution-strategy">4. Solution Strategy</h2>
 <div class="sectionbody">
-<div class="paragraph">
-<p>The GameY project follows a layered structured divided into UI, game logic and backend user handling</p>
-</div>
-<div class="sect2">
-<h3 id="_technology_decisions">4.1. Technology decisions</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>The UI will be develop using React, due to one of the members already knowing it; Vite and TypeScript due to constraints</p>
-</li>
-<li>
-<p>The logic will consist of a Rust application due to constraints</p>
-</li>
-<li>
-<p>The users will be handle by a MongoDB database because we believe it is a very powerful database and would be great to know for our careers.</p>
-</li>
-<li>
-<p>Github will be used as the cloud platform to work due to constraints</p>
-</li>
-<li>
-<p>Docker will be used to deploy the application due to constraints</p>
-</li>
-</ul>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_quality_goals_2">4.2. Quality goals</h3>
-<div class="ulist">
-<ul>
-<li>
-<p>Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project</p>
-</li>
-<li>
-<p>Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it</p>
-</li>
-<li>
-<p>Security will be handled through strict user validation during the login</p>
-</li>
-<li>
-<p>Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing</p>
-</li>
-</ul>
-</div>
 <div class="sidebarblock arc42help">
 <div class="content">
 <div class="paragraph">
@@ -1037,7 +854,6 @@ Refer to details in the following sections.</p>
 </div>
 </div>
 <div style="page-break-after: always;"></div>
-</div>
 </div>
 </div>
 <div class="sect1">
@@ -2018,7 +1834,7 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-02-15 23:07:43 +0100
+Last updated 2026-02-15 17:04:46 +0100
 </div>
 </div>
 </body>
