@@ -2,6 +2,15 @@ import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest
 import request from 'supertest'
 import mongoose from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
+
+vi.mock('mongoose', async (importOriginal) => {
+    const actual = await importOriginal()
+    return {
+        ...actual,
+        connect: vi.fn(),
+    }
+})
+
 import app from '../users-service.js'
 
 let mongoServer;
@@ -11,12 +20,10 @@ describe('POST /createuser', () => {
     beforeAll(async () => {
         mongoServer = await MongoMemoryServer.create();
         const mongoUri = mongoServer.getUri();
+        const mongooseActual = await import('mongoose').then(m => m.default || m);
 
-        if (mongoose.connection.readyState !== 0) {
-            await mongoose.disconnect();
-        }
-
-        await mongoose.connect(mongoUri);
+        await mongooseActual.disconnect();
+        await mongooseActual.connect(mongoUri);
     }, 60000);
 
     afterAll(async () => {
