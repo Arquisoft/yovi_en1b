@@ -58,52 +58,71 @@ endif::arc42help[]
 @startuml
 !include <C4/C4_Deployment>
 
-Deployment_Node(client, "Client Device"){
-    Container(browser, "Web Browser", "Runs the React UI")
+Deployment_Node(client, "Client Device", "Browser"){
+    Container(browser, "Web Browser", "Runs the React UI", "Accesses port 80")
 }
 
-Deployment_Node(docker, "Docker Environment"){
-    Deployment_Node(frontend, "Frontend Container"){
-        Container(react_app, "React App", "TypeScript, Vite")
+Deployment_Node(docker, "Docker Environment (docker-compose)"){
+    Deployment_Node(frontend, "Webapp Container", "React + TypeScript + Vite, port 80"){
+        Container(react_app, "React App", "TypeScript, Vite", "User interface and game board")
     }
-    
-    Deployment_Node(backend, "Backend Container"){
-        Container(rust_logic, "Game Logic", "Rust")
+
+    Deployment_Node(users_svc, "Users Container", "Node.js + Express, port 3000"){
+        Container(users_service, "Users Service", "Node.js, Express", "User registration and management")
     }
-    
-    Deployment_Node(db, "Database Container"){
-        ContainerDb(mongodb, "MongoDB", "Game & user data")
+
+    Deployment_Node(gamey_svc, "Gamey Container", "Rust, port 4000"){
+        Container(gamey_service, "Gamey Service", "Rust", "Game logic engine and bot service")
+    }
+
+    Deployment_Node(db, "MongoDB Container", "mongo:7, port 27017"){
+        ContainerDb(mongodb, "MongoDB", "NoSQL", "Persistent storage for players, games and history")
     }
 }
 
-Rel(browser, react_app, "HTTPS")
-Rel(react_app, rust_logic, "WebSocket")
-Rel(rust_logic, mongodb, "MongoDB Protocol")
+Rel(browser, react_app, "HTTPS / HTTP", "port 80")
+Rel(react_app, users_service, "REST API", "HTTP, port 3000")
+Rel(react_app, gamey_service, "REST API", "HTTP, port 4000")
+Rel(react_app, users_service, "Game results", "HTTP, port 3000")
+Rel(users_service, mongodb, "MongoDB Protocol", "port 27017")
 
 @enduml
 ----
 
 Motivation::
 
-Game Y uses Docker containers to separate frontend (React/Vite), backend (Rust game logic with WebSocket), and database (MongoDB). This ensures isolation, portability, and independent scaling of components. The containerized approach provides consistency across development and production environments.
+Game Y uses Docker Compose to orchestrate four independent containers: the `webapp` (React frontend), the `users` service (Node.js/Express user management API), the `gamey` service (Rust game engine), and a `mongodb` container for persistent storage. This separation ensures that each service can be developed, built, and scaled independently. MongoDB is the chosen database because its document-oriented model fits naturally with the variable structure of game states and move histories, and it integrates well with the Node.js ecosystem.
+
+Only the `users` service connects to MongoDB. This is a deliberate architectural decision: `gamey` manages active game state in memory during a match (which is sufficient for its role as a pure game engine), and once a game ends the result is sent to the `users` service, which is responsible for all persistence — player accounts, statistics, and game history. This avoids two services competing to write to the same database and keeps data ownership clear.
 
 Quality and/or Performance Features::
 
-* *Real-time gameplay:* WebSocket enables low-latency bidirectional communication between players
-* *Isolation:* Docker containers prevent component conflicts and ensure clean separation of concerns
-* *Scalability:* Each component can scale independently based on load requirements
-* *Portability:* The application runs consistently across different platforms and environments
-* *Development efficiency:* Docker Compose orchestrates local development setup
+* *Isolation:* Each service runs in its own Docker container, preventing dependency conflicts and simplifying upgrades.
+* *Portability:* `docker-compose up --build` reproduces the full environment on any machine with Docker installed.
+* *Independent scaling:* The `gamey` and `users` services can be scaled individually based on load without affecting the frontend.
+* *Clear interface boundaries:* Services communicate only via HTTP REST, making the contracts explicit and testable.
+* *Development efficiency:* Docker Compose orchestrates the full local setup with a single command; no manual service wiring is required.
 
 Mapping of Building Blocks to Infrastructure::
 
 [options="header"]
 |===
-| Building Block | Container | Technology
-| User Interface | Frontend Container | React + TypeScript + Vite
-| Game Logic & WebSocket | Backend Container | Rust
-| Data Storage | Database Container | MongoDB
+| Building Block | Container | Technology | Exposed Port | Connects to
+| User Interface | Webapp Container | React + TypeScript + Vite | 80 | Users (3000), Gamey (4000)
+| User Management & Persistence | Users Container | Node.js + Express | 3000 | MongoDB (27017)
+| Game Logic & Bot | Gamey Container | Rust (Cargo) | 4000 | —
+| Persistent Storage | MongoDB Container | MongoDB 7 | 27017 (internal) | —
 |===
+
+==== Container Descriptions
+
+*Webapp Container* — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It talks to the `users` service for everything related to the player (registration, login, stats, history) and to the `gamey` service for all game actions (creating a game, submitting a move, querying board state).
+
+*Users Container* — Manages player accounts, authentication, statistics, and game history. It is the only service that connects to MongoDB, acting as the single gateway for all persistent data. When a game finishes, the result is reported here so it can be stored and reflected in player stats.
+
+*Gamey Container* — A pure game engine written in Rust. It handles game creation, move validation, win condition checking, and bot moves entirely in memory. It has no database connection; active game state lives in memory for the duration of a match. Once the game ends, the result is communicated back to the frontend, which then reports it to the `users` service.
+
+*MongoDB Container* — Provides persistent NoSQL storage exclusively for the `users` service. It runs as a Docker container within the same Compose network, so it is not directly accessible from outside.
 
 
 === Infrastructure Level 2
@@ -117,61 +136,102 @@ Please copy the structure from level 1 for each selected element.
 ****
 endif::arc42help[]
 
-==== Backend Container
+==== Gamey Container
 
-[plantuml,"backend-detail",png]
+[plantuml,"gamey-detail",png]
 ----
 @startuml
-node "Backend Container" {
-    component "Game Engine" as engine
-    component "WebSocket Server" as ws
-    component "Win Checker" as win
-    component "Board Manager" as board
-    component "MongoDB Driver" as db
+node "Gamey Container (Rust, port 4000)" {
+    component "Web Interface\n(HTTP handlers)" as web
+    component "Game Engine\n(core game logic)" as engine
+    component "Win Condition Checker" as win
+    component "Bot Registry\n(AI opponents)" as bot
+    component "Notation Parser\n(YEN / YGN)" as notation
 }
 
-ws -> engine : Process moves
-engine -> board : Update state
-engine -> win : Check victory
-engine -> db : Persist data
-
+web --> engine : Forwards moves and\ngame creation requests
+engine --> win : Checks victory after each move
+engine --> bot : Requests bot move\n(when playing vs AI)
+engine --> notation : Encodes / decodes\ngame notation
 @enduml
 ----
 
-The backend container runs the Rust application handling game logic, real-time WebSocket communication, and database operations. Key components include:
+The Gamey container runs the Rust application that implements the full game logic for Game Y. Its internal components are:
 
-* *Game Engine:* Validates moves and enforces game rules
-* *WebSocket Server:* Maintains persistent connections with both players for real-time updates
-* *Win Condition Checker:* Detects when a connected chain of hexagonal cells touches all three sides
-* *Board Manager:* Maintains the state of the hexagonal grid
-* *MongoDB Driver:* Handles all database operations with connection pooling
+* *Web Interface:* Exposes HTTP endpoints on port 4000 that the React frontend calls to create games, submit moves, and query game state.
+* *Game Engine (core):* Contains the core data model — coordinates, board state, player management, and action dispatch. This is the authoritative source for game rules.
+* *Win Condition Checker:* Evaluates after every move whether a player's connected chain of cells touches all three sides of the triangular board. Uses a graph traversal (DFS/BFS) over the hexagonal grid.
+* *Bot Registry:* Maintains a set of registered bot strategies. When a player chooses to play against the computer, the bot registry selects the appropriate bot and returns its move to the game engine.
+* *Notation Parser:* Supports YEN (Yovi Extended Notation) and YGN (Yovi Game Notation) for encoding and decoding move sequences. This enables game export, replay, and interoperability.
+
+NOTE: The Win Condition Checker is an internal component of the Gamey service, not a separate deployment unit. It runs in-process within the Rust binary and is invoked synchronously during move processing. It is surfaced here to clarify its role, since it is architecturally significant and cross-referenced in the runtime view (see section 6).
+
+==== Users Container
+
+[plantuml,"users-detail",png]
+----
+@startuml
+node "Users Container (Node.js, port 3000)" {
+    component "Express HTTP Server" as server
+    component "User Controller\n(/createuser)" as ctrl
+    component "In-Memory User Store" as store
+}
+
+server --> ctrl : Routes POST /createuser
+ctrl --> store : Registers new user
+@enduml
+----
+
+The Users container is a lightweight Node.js/Express service. It exposes a REST endpoint (`POST /createuser`) that the React frontend calls during user registration. In the current implementation, user records are kept in-memory within the process; no external database is required. This service is designed to be replaced or extended with a persistent store in later development phases.
+
+==== Webapp Container
+
+The Webapp container serves the React single-page application compiled by Vite. It is served via a static file server on port 80. All game interactions are handled client-side in the browser, with REST calls made to the `users` service (port 3000) and the `gamey` service (port 4000). There is no server-side rendering; the container's only role is to deliver the compiled JavaScript and assets to the browser.
 
 ==== MongoDB Container
 
 [plantuml,"mongodb-detail",png]
 ----
 @startuml
-database "MongoDB" {
+database "MongoDB Container (port 27017)" {
     folder "Collections" {
-        component "users"
-        component "games"
-        component "game_history"
+        component "players" as players
+        component "game_history" as history
     }
 }
 
-note right of games
-  Active game states,
-  hexagonal board config,
-  current turn
+note right of players
+  User accounts,
+  credentials,
+  player statistics
+  (wins, losses)
 end note
 
+note right of history
+  Completed games,
+  full move logs,
+  results for replay
+end note
 @enduml
 ----
 
-The MongoDB container stores all persistent data:
+The MongoDB container is exclusively used by the `users` service. It holds two collections:
 
-* *users collection:* User accounts, authentication credentials, and player statistics
-* *games collection:* Active game sessions with current board state and turn information. The hexagonal board configuration is stored as an array of cell objects, indexed by gameId for quick retrieval
-* *game_history collection:* Archive of completed games including complete move logs for replay and analytics
+* *players:* User accounts, hashed credentials, and per-player statistics (wins, losses, games played).
+* *game_history:* Archived completed games including the full sequence of moves, the result, and the participants. This allows the frontend to display match history and enables future replay functionality.
 
-The database uses indexes on frequently queried fields (email for users, gameId for games) to optimize performance.
+`gamey` does not connect to MongoDB. Active game state is kept in memory within the Rust process for the duration of a match, which is sufficient for its role as a game engine. When a game concludes, the frontend reports the result to the `users` service, which writes it to `game_history`.
+
+The MongoDB port (27017) is only exposed internally within the Docker Compose network and is not reachable from outside the host machine.
+
+The docker-compose entry for this container is:
+
+[source,yaml]
+----
+mongodb:
+  image: mongo:7
+  volumes:
+    - mongo_data:/data/db
+----
+
+The named volume `mongo_data` ensures that data persists across container restarts. Note that the port is intentionally not published to the host — only the `users` container needs to reach it, and it can do so through the internal Docker network.
