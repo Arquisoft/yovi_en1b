@@ -8,7 +8,10 @@ const promBundle = require('express-prom-bundle');
 const mongoose = require('mongoose');
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_database';
-mongoose.connect(mongoUri);
+
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(mongoUri)
+}
 
 const userSchema = new mongoose.Schema({
   username: String,
