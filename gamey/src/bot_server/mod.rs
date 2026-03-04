@@ -39,9 +39,8 @@ use crate::{GameYError, RandomBot, YBotRegistry, state::AppState};
 pub fn create_router(state: AppState) -> axum::Router {
     // Configure CORS for development and production environments
     let cors = CorsLayer::new()
-        // Allow origins for local development and Docker deployment
-        .allow_origin(AllowOrigin::exact("http://localhost:5173".parse().unwrap()))  // Vite dev server
-        .allow_origin(AllowOrigin::exact("http://localhost".parse().unwrap()))       // Docker default
+        // Only trust your specific frontend IP
+        .allow_origin("http://4.233.184.98".parse::<axum::http::HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
