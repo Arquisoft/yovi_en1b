@@ -13,6 +13,18 @@ COPY . .
 ARG VITE_API_URL="http://localhost:3000"
 RUN export VITE_API_URL=${VITE_API_URL} && npm run build
 
+# 1. Declaramos los argumentos que recibiremos (del compose o de GitHub Actions)
+ARG VITE_API_URL
+ARG VITE_GAMEY_URL
+
+# 2. Los convertimos en variables de entorno reales para el proceso de build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GAMEY_URL=$VITE_GAMEY_URL
+
+# 3. Ahora compilamos (Vite detectará las variables ENV automáticamente)
+RUN npm run build
+
+
 # Production image
 FROM nginx:stable-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
