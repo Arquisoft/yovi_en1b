@@ -105,6 +105,10 @@ app.post('/createuser', async (req, res) => {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+
   try {
     const existing = await User.findOne({ username });
     if (existing) {
@@ -127,6 +131,10 @@ app.post('/login', async (req, res) => {
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Invalid input' });
   }
 
   try {
@@ -169,8 +177,11 @@ app.get('/users/:id/stats', authMiddleware, async (req, res) => {
 
 // Get user game history (without moves array for a lighter response)
 app.get('/users/:id/history', authMiddleware, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
   try {
-    const games = await Game.find({ player_id: req.params.id })
+    const games = await Game.find({ player_id: new mongoose.Types.ObjectId(req.params.id) })
         .select('-moves')
         .sort({ created_at: -1 });
     res.json(games);

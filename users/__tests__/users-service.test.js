@@ -49,6 +49,15 @@ describe('POST /createuser', () => {
         expect(res.status).toBe(400)
     })
 
+    it('returns 400 if input is not a string (NoSQL injection prevention)', async () => {
+        const res = await request(app)
+            .post('/createuser')
+            .send({ username: { $gt: '' }, password: 'password123' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(400)
+    })
+
     it('returns 409 if username is already taken', async () => {
         const res = await request(app)
             .post('/createuser')
@@ -74,6 +83,24 @@ describe('POST /login', () => {
 
         token = res.body.token
         userId = res.body.userId
+    })
+
+    it('returns 400 if username or password is missing', async () => {
+        const res = await request(app)
+            .post('/login')
+            .send({ username: 'Pablo' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(400)
+    })
+
+    it('returns 400 if input is not a string (NoSQL injection prevention)', async () => {
+        const res = await request(app)
+            .post('/login')
+            .send({ username: { $gt: '' }, password: 'password123' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(400)
     })
 
     it('returns 401 with wrong password', async () => {
@@ -111,31 +138,55 @@ describe('GET /users/:id', () => {
         const res = await request(app).get(`/users/${userId}`)
         expect(res.status).toBe(401)
     })
+
+    it('returns 401 with invalid token', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', 'Bearer invalidtoken')
+        expect(res.status).toBe(401)
+    })
+
+    it('returns 404 for non-existent user', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .get(`/users/${fakeId}`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
+    })
 })
 
 // User stats
 describe('GET /users/:id/stats', () => {
-    it('returns user statistics', async () => {
+    it('returns user statistics with correct initial values', async () => {
         const res = await request(app)
             .get(`/users/${userId}/stats`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body).toHaveProperty('games_played')
-        expect(res.body).toHaveProperty('wins')
-        expect(res.body).toHaveProperty('losses')
+        expect(res.body.games_played).toBe(0)
+        expect(res.body.wins).toBe(0)
+        expect(res.body.losses).toBe(0)
+    })
+
+    it('returns 404 for non-existent user', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .get(`/users/${fakeId}/stats`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
     })
 })
 
 // User history
 describe('GET /users/:id/history', () => {
-    it('returns user game history', async () => {
+    it('returns empty game history initially', async () => {
         const res = await request(app)
             .get(`/users/${userId}/history`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body)).toBe(true)
+        expect(res.body.length).toBe(0)
     })
 })
 
@@ -151,6 +202,7 @@ describe('POST /games', () => {
         expect(res.body).toHaveProperty('_id')
         expect(res.body.board_size).toBe(7)
         expect(res.body.status).toBe('IN_PROGRESS')
+        expect(res.body.result).toBeNull()
 
         gameId = res.body._id
     })
@@ -162,6 +214,34 @@ describe('POST /games', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(400)
+    })
+
+    it('returns 401 without token', async () => {
+        const res = await request(app)
+            .post('/games')
+            .send({ board_size: 7 })
+        expect(res.status).toBe(401)
+    })
+})
+
+// Get game
+describe('GET /games/:id', () => {
+    it('returns game state', async () => {
+        const res = await request(app)
+            .get(`/games/${gameId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body._id).toBe(gameId)
+        expect(res.body.status).toBe('IN_PROGRESS')
+    })
+
+    it('returns 404 for non-existent game', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .get(`/games/${fakeId}`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
     })
 })
 
@@ -176,12 +256,31 @@ describe('POST /games/:id/move', () => {
         expect(res.status).toBe(201)
         expect(res.body.move_number).toBe(1)
         expect(res.body.player).toBe('HUMAN')
+        expect(res.body.coordinates).toEqual({ x: 1, y: 1, z: 1 })
+    })
+
+    it('returns 400 if coordinates are missing', async () => {
+        const res = await request(app)
+            .post(`/games/${gameId}/move`)
+            .send({ player: 'HUMAN' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+    })
+
+    it('returns 404 for non-existent game', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .post(`/games/${fakeId}/move`)
+            .send({ player: 'HUMAN', coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
     })
 })
 
 // Finish game
 describe('PUT /games/:id/finish', () => {
-    it('finishes a game and updates user stats', async () => {
+    it('finishes a game with WIN and updates user stats', async () => {
         const res = await request(app)
             .put(`/games/${gameId}/finish`)
             .send({ result: 'WIN', yen_final_state: 'B/.B/RB./B..R', duration_seconds: 120 })
@@ -190,6 +289,25 @@ describe('PUT /games/:id/finish', () => {
         expect(res.status).toBe(200)
         expect(res.body.status).toBe('FINISHED')
         expect(res.body.result).toBe('WIN')
+    })
+
+    it('updates user stats after WIN', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}/stats`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.body.games_played).toBe(1)
+        expect(res.body.wins).toBe(1)
+        expect(res.body.losses).toBe(0)
+    })
+
+    it('returns 400 if result is missing', async () => {
+        const res = await request(app)
+            .put(`/games/${gameId}/finish`)
+            .send({})
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
     })
 
     it('returns 400 if game is already finished', async () => {
@@ -212,5 +330,14 @@ describe('GET /games/:id/moves', () => {
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body)).toBe(true)
         expect(res.body[0].move_number).toBe(1)
+        expect(res.body[0].coordinates).toEqual({ x: 1, y: 1, z: 1 })
+    })
+
+    it('returns 404 for non-existent game', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .get(`/games/${fakeId}/moves`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
     })
 })
