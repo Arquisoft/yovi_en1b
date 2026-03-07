@@ -5,38 +5,212 @@ import { MongoMemoryServer } from 'mongodb-memory-server'
 import app from '../users-service.js'
 
 let mongoServer;
+let token;
+let userId;
+let gameId;
 
+beforeAll(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+}, 60000);
+
+afterAll(async () => {
+    await mongoose.disconnect();
+    if (mongoServer) {
+        await mongoServer.stop();
+    }
+}, 60000);
+
+afterEach(() => {
+    vi.restoreAllMocks()
+});
+
+// Register
 describe('POST /createuser', () => {
+    it('registers a new user successfully', async () => {
+        const res = await request(app)
+            .post('/createuser')
+            .send({ username: 'Pablo', password: 'password123' })
+            .set('Accept', 'application/json')
 
-    beforeAll(async () => {
-        mongoServer = await MongoMemoryServer.create();
-        const mongoUri = mongoServer.getUri();
-        await mongoose.connect(mongoUri);
-    }, 60000);
-
-    afterAll(async () => {
-        await mongoose.disconnect();
-        if (mongoServer) {
-            await mongoServer.stop();
-        }
-    }, 60000);
-
-    afterEach(() => {
-        vi.restoreAllMocks()
+        expect(res.status).toBe(201)
+        expect(res.body).toHaveProperty('message')
+        expect(res.body.message).toMatch(/Welcome Pablo/i)
+        expect(res.body).toHaveProperty('userId')
     })
 
-    it('returns a greeting message for the provided username', async () => {
+    it('returns 400 if username or password is missing', async () => {
         const res = await request(app)
             .post('/createuser')
             .send({ username: 'Pablo' })
             .set('Accept', 'application/json')
 
-        expect(res.status).toBe(200)
-        expect(res.body).toHaveProperty('message')
-        expect(res.body.message).toMatch(/Hello Pablo! Welcome to the course!/i)
+        expect(res.status).toBe(400)
+    })
 
-        expect(res.body).toHaveProperty('user')
-        expect(res.body.user.username).toBe('Pablo')
-        expect(res.body.user).toHaveProperty('createdAt')
+    it('returns 409 if username is already taken', async () => {
+        const res = await request(app)
+            .post('/createuser')
+            .send({ username: 'Pablo', password: 'password123' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(409)
+    })
+})
+
+// Login
+describe('POST /login', () => {
+    it('logs in successfully and returns a token', async () => {
+        const res = await request(app)
+            .post('/login')
+            .send({ username: 'Pablo', password: 'password123' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(200)
+        expect(res.body).toHaveProperty('token')
+        expect(res.body).toHaveProperty('userId')
+        expect(res.body.username).toBe('Pablo')
+
+        token = res.body.token
+        userId = res.body.userId
+    })
+
+    it('returns 401 with wrong password', async () => {
+        const res = await request(app)
+            .post('/login')
+            .send({ username: 'Pablo', password: 'wrongpassword' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(401)
+    })
+
+    it('returns 401 with unknown user', async () => {
+        const res = await request(app)
+            .post('/login')
+            .send({ username: 'Unknown', password: 'password123' })
+            .set('Accept', 'application/json')
+
+        expect(res.status).toBe(401)
+    })
+})
+
+// User profile
+describe('GET /users/:id', () => {
+    it('returns user profile', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body.username).toBe('Pablo')
+        expect(res.body).not.toHaveProperty('password_hash')
+    })
+
+    it('returns 401 without token', async () => {
+        const res = await request(app).get(`/users/${userId}`)
+        expect(res.status).toBe(401)
+    })
+})
+
+// User stats
+describe('GET /users/:id/stats', () => {
+    it('returns user statistics', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}/stats`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body).toHaveProperty('games_played')
+        expect(res.body).toHaveProperty('wins')
+        expect(res.body).toHaveProperty('losses')
+    })
+})
+
+// User history
+describe('GET /users/:id/history', () => {
+    it('returns user game history', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}/history`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+})
+
+// Games
+describe('POST /games', () => {
+    it('creates a new game', async () => {
+        const res = await request(app)
+            .post('/games')
+            .send({ board_size: 7, strategy: 'random', difficulty_level: 'medium' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body).toHaveProperty('_id')
+        expect(res.body.board_size).toBe(7)
+        expect(res.body.status).toBe('IN_PROGRESS')
+
+        gameId = res.body._id
+    })
+
+    it('returns 400 if board_size is missing', async () => {
+        const res = await request(app)
+            .post('/games')
+            .send({ strategy: 'random' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+    })
+})
+
+// Moves
+describe('POST /games/:id/move', () => {
+    it('saves a move', async () => {
+        const res = await request(app)
+            .post(`/games/${gameId}/move`)
+            .send({ player: 'HUMAN', coordinates: { x: 1, y: 1, z: 1 }, yen_state: 'B/.B/RB./B..R' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.move_number).toBe(1)
+        expect(res.body.player).toBe('HUMAN')
+    })
+})
+
+// Finish game
+describe('PUT /games/:id/finish', () => {
+    it('finishes a game and updates user stats', async () => {
+        const res = await request(app)
+            .put(`/games/${gameId}/finish`)
+            .send({ result: 'WIN', yen_final_state: 'B/.B/RB./B..R', duration_seconds: 120 })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body.status).toBe('FINISHED')
+        expect(res.body.result).toBe('WIN')
+    })
+
+    it('returns 400 if game is already finished', async () => {
+        const res = await request(app)
+            .put(`/games/${gameId}/finish`)
+            .send({ result: 'WIN' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+    })
+})
+
+// Replay
+describe('GET /games/:id/moves', () => {
+    it('returns all moves ordered by move_number', async () => {
+        const res = await request(app)
+            .get(`/games/${gameId}/moves`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+        expect(res.body[0].move_number).toBe(1)
     })
 })
