@@ -110,7 +110,7 @@ app.post('/createuser', async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ username });
+    const existing = await User.findOne({ username: String(username) });
     if (existing) {
       return res.status(409).json({ error: 'Username already taken' });
     }
@@ -138,7 +138,7 @@ app.post('/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: String(username) });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const match = await bcrypt.compare(password, user.password_hash);
