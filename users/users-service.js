@@ -27,8 +27,7 @@ const userSchema = new mongoose.Schema({
   statistics: {
     games_played: { type: Number, default: 0 },
     wins:         { type: Number, default: 0 },
-    losses:       { type: Number, default: 0 },
-    draws:        { type: Number, default: 0 }
+    losses:       { type: Number, default: 0 }
   }
 });
 const User = mongoose.model('User', userSchema);
@@ -51,7 +50,7 @@ const gameSchema = new mongoose.Schema({
   strategy:         { type: String, default: 'random' },
   difficulty_level: { type: String, default: 'medium' },  // 'easy', 'medium', 'hard'
   status:           { type: String, enum: ['IN_PROGRESS', 'FINISHED'], default: 'IN_PROGRESS' },
-  result:           { type: String, enum: ['WIN', 'LOSS', 'DRAW', null], default: null },
+  result:           { type: String, enum: ['WIN', 'LOSS', null], default: null },
   duration_seconds: { type: Number, default: 0 },
   yen_final_state:  { type: String },
   created_at:       { type: Date, default: Date.now },
@@ -236,11 +235,11 @@ app.post('/games/:id/move', authMiddleware, async (req, res) => {
   }
 });
 
-// Finish a game — update result and update user statistics
+// Finish a game — update result and update user statistics atomically
 app.put('/games/:id/finish', authMiddleware, async (req, res) => {
   const { result, yen_final_state, duration_seconds } = req.body || {};
 
-  if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS, DRAW)' });
+  if (!result) return res.status(400).json({ error: 'result is required (WIN or LOSS)' });
 
   try {
     const game = await Game.findById(req.params.id);
@@ -257,7 +256,6 @@ app.put('/games/:id/finish', authMiddleware, async (req, res) => {
     const statsUpdate = { $inc: { 'statistics.games_played': 1 } };
     if (result === 'WIN')  statsUpdate.$inc['statistics.wins'] = 1;
     if (result === 'LOSS') statsUpdate.$inc['statistics.losses'] = 1;
-    if (result === 'DRAW') statsUpdate.$inc['statistics.draws'] = 1;
     await User.findByIdAndUpdate(game.player_id, statsUpdate);
 
     res.json(game);
