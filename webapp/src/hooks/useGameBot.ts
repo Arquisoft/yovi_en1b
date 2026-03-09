@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { getBotMove, createEmptyBoard, GameyApiError } from '../api/gameyApi';
+import { getBotMove, GameyApiError } from '../api/gameyApi';
+import { createEmptyBoard } from '../utils/gameBoard';
 
 export interface GameBotResult {
   result: string;

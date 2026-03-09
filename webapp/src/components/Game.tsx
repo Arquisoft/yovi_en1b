@@ -1,4 +1,4 @@
-import { useGameBot } from './hooks/useGameBot';
+import { useGameBot } from '../hooks/useGameBot';
 
 export function Game() {
   const { result, loading, askBot } = useGameBot();

@@ -1,45 +1,32 @@
-import { render, screen,  waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import RegisterForm from '../RegisterForm'
-import { afterEach, describe, expect, test, vi } from 'vitest' 
-import '@testing-library/jest-dom'
-
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
+import { describe, expect, test, vi } from 'vitest';
+import RegisterForm from '../components/RegisterForm';
 
 describe('RegisterForm', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   test('shows validation error when username is empty', async () => {
-    render(<RegisterForm />)
-    const user = userEvent.setup()
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    await waitFor(async () => {
-      await user.click(screen.getByRole('button', { name: /lets go!/i }))
-      expect(screen.getByText(/please enter a username/i)).toBeInTheDocument()
-    })
-  })
+    render(<RegisterForm loading={false} error={null} onSubmit={onSubmit} />);
 
-  test('submits username and displays response', async () => {
-    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /register/i }));
 
-    // Mock fetch to resolve automatically
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: 'Hello Pablo! Welcome to the course!' }),
-    } as Response)
+    expect(await screen.findByText(/please enter a username/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 
-    render(<RegisterForm />)
+  test('submits username and password', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
 
-    // Wrap interaction + assertion inside waitFor
-    await waitFor(async () => {
-      await user.type(screen.getByLabelText(/whats your name\?/i), 'Pablo')
-      await user.click(screen.getByRole('button', { name: /lets go!/i }))
+    render(<RegisterForm loading={false} error={null} onSubmit={onSubmit} />);
 
-      // Response message should appear
-      expect(
-        screen.getByText(/hello pablo! welcome to the course!/i)
-      ).toBeInTheDocument()
-    })
-  })
-})
+    await user.type(screen.getByLabelText(/username/i), '  pablo  ');
+    await user.type(screen.getByLabelText(/password/i), 'secret');
+    await user.click(screen.getByRole('button', { name: /register/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith({ username: 'pablo', password: 'secret' });
+  });
+});
