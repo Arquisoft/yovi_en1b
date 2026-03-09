@@ -64,3 +64,4 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ loading, error, onSubmit })
 };
 
 export default RegisterForm;
+
