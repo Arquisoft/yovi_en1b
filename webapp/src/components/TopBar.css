@@ -1,0 +1,94 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: 260px 1fr 260px;
+  align-items: center;
+  padding: 0 32px;
+  height: 60px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .45);
+}
+
+.topbar-left { justify-self: start; }
+
+.topbar-center {
+  justify-self: center;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: #f9fafb;
+}
+
+.topbar-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* brand */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+.topbar-brand:hover { text-decoration: none; }
+
+.topbar-logo {
+  width: 30px;
+  height: 30px;
+}
+
+/* user link */
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #d1d5db;
+  font-size: .9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background .15s;
+}
+.topbar-user:hover {
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  text-decoration: none;
+}
+
+.topbar-user-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.topbar-username {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* logout */
+.topbar-logout {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: #d1d5db;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: .85rem;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.topbar-logout:hover {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(255,255,255,.06);
+}
+

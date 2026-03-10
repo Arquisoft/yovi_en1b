@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import './AuthForm.css';
+import { useState } from 'react';
 import type { RegisterPayload } from '../types/auth';
 
 type RegisterFormProps = {
@@ -7,7 +8,7 @@ type RegisterFormProps = {
   onSubmit: (payload: RegisterPayload) => Promise<void>;
 };
 
-const RegisterForm: React.FC<RegisterFormProps> = ({ loading, error, onSubmit }) => {
+export default function RegisterForm({ loading, error, onSubmit }: RegisterFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
@@ -17,12 +18,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ loading, error, onSubmit })
     setLocalError(null);
 
     if (!username.trim()) {
-      setLocalError('Please enter a username.');
+      setLocalError('Zadejte uživatelské jméno.');
       return;
     }
 
     if (!password.trim()) {
-      setLocalError('Please enter a password.');
+      setLocalError('Zadejte heslo.');
       return;
     }
 
@@ -30,38 +31,35 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ loading, error, onSubmit })
   };
 
   return (
-    <form onSubmit={handleSubmit} className="register-form">
+    <form className="auth-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label htmlFor="register-username">Username</label>
+        <label htmlFor="register-username">Uživatelské jméno</label>
         <input
           type="text"
           id="register-username"
+          className="form-input"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="form-input"
         />
       </div>
 
       <div className="form-group">
-        <label htmlFor="register-password">Password</label>
+        <label htmlFor="register-password">Heslo</label>
         <input
           type="password"
           id="register-password"
+          className="form-input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="form-input"
         />
       </div>
 
       <button type="submit" className="submit-button" disabled={loading}>
-        {loading ? 'Registering...' : 'Register'}
+        {loading ? 'Registruji...' : 'Registrovat se'}
       </button>
 
-      {localError ? <div className="error-message" style={{ marginTop: 12, color: 'red' }}>{localError}</div> : null}
-      {error ? <div className="error-message" style={{ marginTop: 12, color: 'red' }}>{error}</div> : null}
+      {localError ? <p className="form-error">{localError}</p> : null}
+      {error    ? <p className="form-error">{error}</p>      : null}
     </form>
   );
-};
-
-export default RegisterForm;
-
+}

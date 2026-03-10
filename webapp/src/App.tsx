@@ -1,5 +1,5 @@
 import './App.css';
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -8,24 +8,14 @@ import NewGamePage from './pages/NewGamePage';
 import GamePage from './pages/GamePage';
 import GameHistoryPage from './pages/GameHistoryPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import { useAuth } from './hooks/useAuth';
+import TopBar from './components/TopBar';
 
 function App() {
-  const { isLoggedIn, userId, signOut } = useAuth();
-  const profileId = userId ?? 'demo';
-
   return (
-    <div>
-      <nav style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20 }}>
-        <Link to="/">homepage</Link>
-        {!isLoggedIn ? <Link to="/login">login</Link> : null}
-        {!isLoggedIn ? <Link to="/register">registrace</Link> : null}
-        {isLoggedIn ? <Link to={`/users/${profileId}`}>detail uzivatele</Link> : null}
-        {isLoggedIn ? <Link to={`/users/${profileId}/history`}>game history</Link> : null}
-        {isLoggedIn ? <Link to="/games/new">tvorba hry</Link> : null}
-        {isLoggedIn ? <button type="button" onClick={signOut}>logout</button> : null}
-      </nav>
+    <div className="app-shell">
+      <TopBar />
 
+      <main className="app-content">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -40,6 +30,7 @@ function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </main>
     </div>
   );
 }

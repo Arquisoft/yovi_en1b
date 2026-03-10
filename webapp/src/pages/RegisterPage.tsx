@@ -1,3 +1,4 @@
+import './AuthPage.css';
 import { Navigate, useNavigate } from 'react-router-dom';
 import RegisterForm from '../components/RegisterForm';
 import { useAuth } from '../hooks/useAuth';
@@ -16,9 +17,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div>
-      <h1>Registrace</h1>
-      <RegisterForm loading={loading} error={error} onSubmit={handleRegister} />
+    <div className="auth-page">
+      <div className="auth-page-card">
+        <h1>Registrace</h1>
+        <RegisterForm loading={loading} error={error} onSubmit={handleRegister} />
+      </div>
     </div>
   );
 }

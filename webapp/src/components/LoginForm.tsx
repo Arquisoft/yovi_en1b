@@ -1,20 +1,16 @@
-import { useEffect, useState } from 'react';
+import './AuthForm.css';
+import { useState } from 'react';
 import type { LoginPayload } from '../types/auth';
 
 type LoginFormProps = {
   loading: boolean;
   error: string | null;
   onSubmit: (payload: LoginPayload) => Promise<void>;
-  defaultUsername?: string;
 };
 
-export default function LoginForm({ loading, error, onSubmit, defaultUsername = '' }: LoginFormProps) {
-  const [username, setUsername] = useState(defaultUsername);
+export default function LoginForm({ loading, error, onSubmit }: LoginFormProps) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-
-  useEffect(() => {
-    setUsername(defaultUsername);
-  }, [defaultUsername]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -22,14 +18,14 @@ export default function LoginForm({ loading, error, onSubmit, defaultUsername = 
   };
 
   return (
-    <form className="register-form" onSubmit={handleSubmit}>
+    <form className="auth-form" onSubmit={handleSubmit}>
       <div className="form-group">
         <label htmlFor="login-username">Username</label>
         <input
           id="login-username"
           className="form-input"
           value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          onChange={(e) => setUsername(e.target.value)}
           required
         />
       </div>
@@ -40,15 +36,14 @@ export default function LoginForm({ loading, error, onSubmit, defaultUsername = 
           type="password"
           className="form-input"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
       </div>
-
       <button type="submit" className="submit-button" disabled={loading}>
-        {loading ? 'Logging in...' : 'Login'}
+        {loading ? 'Přihlašuji...' : 'Přihlásit se'}
       </button>
-      {error ? <p style={{ color: 'red' }}>{error}</p> : null}
+      {error ? <p className="form-error">{error}</p> : null}
     </form>
   );
 }
