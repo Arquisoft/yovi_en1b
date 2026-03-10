@@ -6,7 +6,7 @@ export default function GamePage() {
 
   return (
     <div>
-      <h1>Hra: {id}</h1>
+      <h1>Game: {id}</h1>
       <Game />
     </div>
   );

@@ -8,13 +8,13 @@ type HomePageProps = {
 export default function HomePage({ userId }: HomePageProps) {
   return (
     <div className="home-actions">
-      <h1>Homepage</h1>
+      <h1>Home</h1>
       <div className="home-actions-grid">
         <Link to="/games/new" className="home-action-button">
-          Nova hra
+          New Game
         </Link>
         <Link to={`/users/${userId}/history`} className="home-action-button">
-          Historie her
+          Game History
         </Link>
       </div>
     </div>

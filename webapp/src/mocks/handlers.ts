@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 const users = new Map<string, { userId: string; username: string; password: string }>();
+let gameCounter = 1;
 
 function createJwtLikeToken(username: string, userId: string) {
   const payloadJson = JSON.stringify({ sub: userId, username });
@@ -10,6 +11,7 @@ function createJwtLikeToken(username: string, userId: string) {
 
 export function resetMockState() {
   users.clear();
+  gameCounter = 1;
 }
 
 export const handlers = [
@@ -71,5 +73,30 @@ export const handlers = [
     }
 
     return HttpResponse.json({ coords: firstFree });
+  }),
+
+  http.post('*/games', async ({ request }) => {
+    const body = (await request.json()) as {
+      board_size?: number;
+      strategy?: string;
+      difficulty_level?: string;
+    };
+
+    if (!body.board_size) {
+      return HttpResponse.json({ error: 'board_size is required' }, { status: 400 });
+    }
+
+    const game = {
+      _id: `mock-game-${gameCounter++}`,
+      player_id: 'mock-user-1',
+      board_size: body.board_size,
+      strategy: body.strategy ?? 'random',
+      difficulty_level: body.difficulty_level ?? 'medium',
+      status: 'IN_PROGRESS',
+      result: null,
+      created_at: new Date().toISOString()
+    };
+
+    return HttpResponse.json(game, { status: 201 });
   })
 ];

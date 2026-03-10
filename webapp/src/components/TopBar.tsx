@@ -3,15 +3,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/home': 'Homepage',
-  '/games/new': 'Tvorba hry',
+  '/home': 'Home',
+  '/games/new': 'Create Game',
 };
 
 function getTitle(pathname: string): string {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  if (pathname.startsWith('/games/')) return 'Hra';
-  if (pathname.includes('/history')) return 'Historie her';
-  if (pathname.startsWith('/users/')) return 'Profil';
+  if (pathname.startsWith('/games/')) return 'Game';
+  if (pathname.includes('/history')) return 'Game History';
+  if (pathname.startsWith('/users/')) return 'Profile';
   return '';
 }
 
@@ -37,12 +37,12 @@ export default function TopBar() {
       </div>
 
       <div className="topbar-right">
-        <Link to={`/users/${profileId}`} className="topbar-user" title="Profil">
+        <Link to={`/users/${profileId}`} className="topbar-user" title="Profile">
           <span className="topbar-user-icon">👤</span>
           <span className="topbar-username">{username}</span>
         </Link>
         <button type="button" className="topbar-logout" onClick={signOut}>
-          Odhlásit se
+          Log out
         </button>
       </div>
     </header>

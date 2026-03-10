@@ -21,7 +21,7 @@ export default function EntryPage() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = username.trim();
-    if (!name) { setError('Zadejte uživatelské jméno.'); return; }
+    if (!name) { setError('Please enter a username.'); return; }
 
     setLoading(true);
     setError(null);
@@ -29,7 +29,7 @@ export default function EntryPage() {
       const { exists } = await verifyUsername(name);
       setStep(exists ? 'login' : 'register');
     } catch {
-      setError('Nepodařilo se ověřit jméno. Zkuste to znovu.');
+      setError('Could not verify username. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -38,7 +38,7 @@ export default function EntryPage() {
   /* ── step 2a: login ── */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) { setError('Zadejte heslo.'); return; }
+    if (!password) { setError('Please enter a password.'); return; }
 
     setLoading(true);
     setError(null);
@@ -46,7 +46,7 @@ export default function EntryPage() {
       await signIn({ username: username.trim(), password });
       navigate('/games/new', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Přihlášení selhalo.');
+      setError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
       setLoading(false);
     }
@@ -55,8 +55,8 @@ export default function EntryPage() {
   /* ── step 2b: register ── */
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password)              { setError('Zadejte heslo.'); return; }
-    if (password !== confirm)   { setError('Hesla se neshodují.'); return; }
+    if (!password)              { setError('Please enter a password.'); return; }
+    if (password !== confirm)   { setError('Passwords do not match.'); return; }
 
     setLoading(true);
     setError(null);
@@ -64,7 +64,7 @@ export default function EntryPage() {
       await signUp({ username: username.trim(), password });
       navigate('/games/new', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registrace selhala.');
+      setError(err instanceof Error ? err.message : 'Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -85,19 +85,19 @@ export default function EntryPage() {
         {/* ── username ── */}
         {step === 'username' && (
           <>
-            <p className="entry-subtitle">Zadejte své uživatelské jméno pro vstup do aplikace.</p>
+            <p className="entry-subtitle">Enter your username to access the app.</p>
             <form onSubmit={handleVerify} className="entry-form">
               <input
                 type="text"
                 className="entry-input"
-                placeholder="Uživatelské jméno"
+                placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoFocus
                 autoComplete="username"
               />
               <button type="submit" className="entry-button" disabled={loading}>
-                {loading ? 'Ověřuji…' : 'Pokračovat'}
+                {loading ? 'Checking...' : 'Continue'}
               </button>
               {error && <p className="entry-error">{error}</p>}
             </form>
@@ -108,24 +108,24 @@ export default function EntryPage() {
         {step === 'login' && (
           <>
             <p className="entry-subtitle">
-              Vítejte zpět, <strong>{username}</strong>. Zadejte heslo.
+              Welcome back, <strong>{username}</strong>. Enter your password.
             </p>
             <form onSubmit={handleLogin} className="entry-form">
               <input
                 type="password"
                 className="entry-input"
-                placeholder="Heslo"
+                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus
                 autoComplete="current-password"
               />
               <button type="submit" className="entry-button" disabled={loading}>
-                {loading ? 'Přihlašuji…' : 'Přihlásit se'}
+                {loading ? 'Signing in...' : 'Sign in'}
               </button>
               {error && <p className="entry-error">{error}</p>}
               <button type="button" className="entry-back" onClick={goBack}>
-                ← Zpět
+                {'<- Back'}
               </button>
             </form>
           </>
@@ -135,13 +135,13 @@ export default function EntryPage() {
         {step === 'register' && (
           <>
             <p className="entry-subtitle">
-              Jméno <strong>{username}</strong> je volné. Zvolte heslo a zaregistrujte se.
+              Username <strong>{username}</strong> is available. Choose a password to register.
             </p>
             <form onSubmit={handleRegister} className="entry-form">
               <input
                 type="password"
                 className="entry-input"
-                placeholder="Heslo"
+                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus
@@ -150,17 +150,17 @@ export default function EntryPage() {
               <input
                 type="password"
                 className="entry-input"
-                placeholder="Potvrzení hesla"
+                placeholder="Confirm password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
               />
               <button type="submit" className="entry-button" disabled={loading}>
-                {loading ? 'Registruji…' : 'Registrovat se'}
+                {loading ? 'Creating account...' : 'Register'}
               </button>
               {error && <p className="entry-error">{error}</p>}
               <button type="button" className="entry-back" onClick={goBack}>
-                ← Zpět
+                {'<- Back'}
               </button>
             </form>
           </>
