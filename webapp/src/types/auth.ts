@@ -24,3 +24,9 @@ export type RegisterResponse = {
   message: string;
   userId: string;
 };
+
+export type VerifyNameResponse = {
+  exists: boolean;
+};
+
+

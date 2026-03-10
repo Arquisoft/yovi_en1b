@@ -3,10 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Homepage',
+  '/home': 'Homepage',
   '/games/new': 'Tvorba hry',
-  '/register': 'Registrace',
-  '/login': 'Přihlášení',
 };
 
 function getTitle(pathname: string): string {
@@ -28,7 +26,7 @@ export default function TopBar() {
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <Link to="/" className="topbar-brand">
+        <Link to="/home" className="topbar-brand">
           <img src="/vite.svg" alt="logo" className="topbar-logo" />
           <span className="topbar-name">YOVI</span>
         </Link>
@@ -50,4 +48,3 @@ export default function TopBar() {
     </header>
   );
 }
-

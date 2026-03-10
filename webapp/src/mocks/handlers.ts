@@ -8,7 +8,20 @@ function createJwtLikeToken(username: string, userId: string) {
   return `mock.${payload}.token`;
 }
 
+export function resetMockState() {
+  users.clear();
+}
+
 export const handlers = [
+  http.post('*/verifyname', async ({ request }) => {
+    const body = (await request.json()) as { username?: string };
+    const username = body.username?.trim();
+    if (!username) {
+      return HttpResponse.json({ error: 'Username is required' }, { status: 400 });
+    }
+    return HttpResponse.json({ exists: users.has(username) });
+  }),
+
   http.post('*/createuser', async ({ request }) => {
     const body = (await request.json()) as { username?: string; password?: string };
     const username = body.username?.trim();

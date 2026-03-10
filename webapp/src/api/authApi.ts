@@ -1,5 +1,5 @@
 import { requestJson } from './httpClient';
-import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse } from '../types/auth';
+import type { LoginPayload, LoginResponse, RegisterPayload, RegisterResponse, VerifyNameResponse } from '../types/auth';
 
 export const TOKEN_KEY = 'auth_token';
 const USERNAME_KEY = 'auth_username';
@@ -10,6 +10,14 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
+  });
+}
+
+export async function verifyUsername(username: string): Promise<VerifyNameResponse> {
+  return requestJson<VerifyNameResponse>('/verifyname', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username })
   });
 }
 
