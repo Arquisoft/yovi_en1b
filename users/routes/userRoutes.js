@@ -1,43 +1,43 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const authMiddleware = require('../middleware/auth');
 
-const setupSwagger      = require('./config/swagger');
-const metricsMiddleware = require('./config/metrics');
-const corsMiddleware    = require('./middleware/cors');
-const MongoUserRepository = require('./repository/MongoUserRepository');
+module.exports = (repository) => {
+    const router = express.Router();
 
-const authRoutes  = require('./routes/authRoutes');
-const userRoutes  = require('./routes/userRoutes');
-const gameRoutes  = require('./routes/gameRoutes');
+    // Get user profile + statistics
+    router.get('/:id', authMiddleware, async (req, res) => {
+        try {
+            const user = await repository.findById(req.params.id);
+            if (!user) return res.status(404).json({ error: 'User not found' });
 
-const app  = express();
-const port = 3000;
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_database';
-
-const repository = new MongoUserRepository();
-
-if (process.env.NODE_ENV !== 'test') {
-    mongoose.connect(mongoUri)
-        .then(() => console.log('Connected to MongoDB'))
-        .catch(err => console.error('MongoDB connection error:', err));
-}
-
-// Config & Middleware
-app.use(metricsMiddleware);
-setupSwagger(app);
-app.use(corsMiddleware);
-app.use(express.json());
-
-// Routes
-app.use('/',      authRoutes(repository));
-app.use('/users', userRoutes(repository));
-app.use('/games', gameRoutes(repository));  // also exposes POST /games/play (bot API)
-
-// Start
-if (require.main === module) {
-    app.listen(port, () => {
-        console.log(`User Service listening at http://localhost:${port}`);
+            const response = user.toObject();
+            delete response.password_hash;
+            res.json(response);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
-}
 
-module.exports = app;
+    // Get user statistics
+    router.get('/:id/stats', authMiddleware, async (req, res) => {
+        try {
+            const user = await repository.findById(req.params.id);
+            if (!user) return res.status(404).json({ error: 'User not found' });
+            res.json(user.statistics);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Get user game history
+    router.get('/:id/history', authMiddleware, async (req, res) => {
+        try {
+            const games = await repository.findGamesByPlayer(req.params.id);
+            res.json(games);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    return router;
+};
