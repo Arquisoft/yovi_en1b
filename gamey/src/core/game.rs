@@ -1,5 +1,6 @@
 use crate::core::Board;
 use crate::{Coordinates, GameAction, GameYError, Movement, PlayerId, RenderOptions, YEN};
+use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 use std::path::Path;
 
@@ -27,7 +28,7 @@ pub struct GameY {
 }
 
 /// Represents the state of a single cell on the board.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Cell {
     /// The cell has no piece.
     Empty,
@@ -376,7 +377,7 @@ fn apply_player_color(symbol: String, player: Option<PlayerId>) -> String {
 }
 
 /// Represents the current status of a game.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GameStatus {
     /// The game is still in progress with the specified player to move next.
     Ongoing { next_player: PlayerId },

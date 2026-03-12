@@ -1,11 +1,12 @@
 use crate::{Coordinates, GameAction, PlayerId};
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 /// Represents a move that a player can make during the game.
 ///
 /// A movement can either be placing a piece on the board at specific coordinates,
 /// or performing a special game action like swapping or resigning.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Movement {
     /// A piece placement on the board.
     Placement {

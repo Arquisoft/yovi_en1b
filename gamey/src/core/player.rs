@@ -1,7 +1,9 @@
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
 /// Represents a player in the game with an identifier and a name.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
     id: PlayerId,
     name: String,
@@ -34,7 +36,7 @@ impl Display for Player {
 ///
 /// This is a lightweight wrapper around a `u32` that provides type safety
 /// for player identification throughout the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerId(u32);
 
 impl PlayerId {
