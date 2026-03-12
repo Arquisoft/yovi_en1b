@@ -47,7 +47,7 @@ app.use(express.json());
 // JWT auth middleware
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
   try {
@@ -67,6 +67,10 @@ app.post('/createuser', async (req, res) => {
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Invalid input' });
   }
 
   try {
@@ -92,6 +96,10 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+
   try {
     const user = await repository.findByUsername(username);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
@@ -113,7 +121,14 @@ app.get('/users/:id', authMiddleware, async (req, res) => {
   try {
     const user = await repository.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+
+    const response = user.toObject();
+    response.statistics.games_played = user.statistics.total_games;
+    response.statistics.wins = user.statistics.total_wins;
+    response.statistics.losses = user.statistics.total_losses;
+    delete response.password_hash;
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -124,7 +139,13 @@ app.get('/users/:id/stats', authMiddleware, async (req, res) => {
   try {
     const user = await repository.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user.statistics);
+
+    const stats = {
+      games_played: user.statistics.total_games,
+      wins: user.statistics.total_wins,
+      losses: user.statistics.total_losses
+    };
+    res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -206,20 +227,25 @@ app.put('/games/:id/finish', authMiddleware, async (req, res) => {
     if (!game) return res.status(404).json({ error: 'Game not found' });
     if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-    await repository.updateGame(req.params.id, {
+    const updatedGame = await repository.updateGame(req.params.id, {
       status: 'FINISHED',
       result,
       yen_final_state,
       duration_seconds: duration_seconds || 0
     });
 
-    await repository.updateStats(game.player_id, {
+    const updatedUser = await repository.updateStats(game.player_id, {
       result,
       type: game.game_type,
       difficulty: game.difficulty_level
     });
 
-    res.json({ message: 'Game finished and stats updated' });
+    const response = updatedGame.toObject();
+    response.games_played = updatedUser.statistics.total_games;
+    response.wins = updatedUser.statistics.total_wins;
+    response.losses = updatedUser.statistics.total_losses;
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
