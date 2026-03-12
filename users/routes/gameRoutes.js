@@ -1,7 +1,8 @@
 const express = require('express');
+const crypto = require('crypto');
 const authMiddleware = require('../middleware/auth');
 
-const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000';
+const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
 module.exports = function gameRoutes(repository) {
     const router = express.Router();
@@ -42,7 +43,7 @@ module.exports = function gameRoutes(repository) {
         }
 
         try {
-            const current_turn = Math.random() < 0.5 ? 'B' : 'R';
+            const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
 
             const game = await repository.createGame({
                 player_id:        req.user.userId,
@@ -84,7 +85,7 @@ module.exports = function gameRoutes(repository) {
             if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
             const player = game.current_turn;
-            const yen_state = req.body?.yen_state || null;
+            const yen_state = req.body?.yen_state ?? null;
 
             game.moves.push({ move_number: game.moves.length + 1, player, coordinates, yen_state });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
