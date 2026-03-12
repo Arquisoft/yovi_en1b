@@ -34,16 +34,64 @@ components:
           example: 1
         player:
           type: string
-          enum: [HUMAN, BOT]
-          example: HUMAN
+          enum: [B, R]
+          example: B
         coordinates:
           $ref: '#/components/schemas/Coordinates'
         yen_state:
           type: string
+          nullable: true
           example: "B/.B/RB./B..R"
         created_at:
           type: string
           format: date-time
+
+    VsPlayerStats:
+      type: object
+      properties:
+        wins:
+          type: integer
+          example: 2
+        losses:
+          type: integer
+          example: 1
+
+    VsBotDifficultyStats:
+      type: object
+      properties:
+        wins:
+          type: integer
+          example: 3
+        losses:
+          type: integer
+          example: 1
+
+    VsBotStats:
+      type: object
+      properties:
+        easy:
+          $ref: '#/components/schemas/VsBotDifficultyStats'
+        medium:
+          $ref: '#/components/schemas/VsBotDifficultyStats'
+        hard:
+          $ref: '#/components/schemas/VsBotDifficultyStats'
+
+    Statistics:
+      type: object
+      properties:
+        total_games:
+          type: integer
+          example: 10
+        total_wins:
+          type: integer
+          example: 6
+        total_losses:
+          type: integer
+          example: 4
+        vs_player:
+          $ref: '#/components/schemas/VsPlayerStats'
+        vs_bot:
+          $ref: '#/components/schemas/VsBotStats'
 
     Game:
       type: object
@@ -54,6 +102,14 @@ components:
         player_id:
           type: string
           example: "64b1f2e3c4d5e6f7a8b9c0d2"
+        game_type:
+          type: string
+          enum: [BOT, PLAYER]
+          example: BOT
+        name_of_enemy:
+          type: string
+          nullable: true
+          example: null
         board_size:
           type: integer
           example: 7
@@ -63,13 +119,17 @@ components:
         difficulty_level:
           type: string
           example: "medium"
+        current_turn:
+          type: string
+          enum: [B, R]
+          example: B
         status:
           type: string
           enum: [IN_PROGRESS, FINISHED]
           example: IN_PROGRESS
         result:
           type: string
-          enum: [WIN, LOSS]
+          enum: [WIN, LOSS, DRAW]
           nullable: true
           example: null
         duration_seconds:
@@ -85,19 +145,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Move'
-
-    Statistics:
-      type: object
-      properties:
-        games_played:
-          type: integer
-          example: 10
-        wins:
-          type: integer
-          example: 6
-        losses:
-          type: integer
-          example: 4
 
     User:
       type: object
@@ -151,7 +198,7 @@ paths:
                     type: string
                     example: "64b1f2e3c4d5e6f7a8b9c0d2"
         '400':
-          description: Username and password are required
+          description: Username and password are required, or input is not a string
         '409':
           description: Username already taken
         '500':
@@ -193,9 +240,34 @@ paths:
                     type: string
                     example: "64b1f2e3c4d5e6f7a8b9c0d2"
         '400':
-          description: Username and password are required
+          description: Username and password are required, or input is not a string
         '401':
           description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /exists/{username}:
+    get:
+      summary: Check if username is taken
+      description: Returns whether a username is already registered. Public endpoint, no authentication required.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "nacho"
+      responses:
+        '200':
+          description: Username availability
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                    example: false
         '500':
           description: Internal server error
 
@@ -231,7 +303,7 @@ paths:
   /users/{id}/stats:
     get:
       summary: Get user statistics
-      description: Returns wins, losses and games played. Requires authentication.
+      description: Returns detailed statistics including vs_player and vs_bot breakdowns. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -258,7 +330,7 @@ paths:
   /users/{id}/history:
     get:
       summary: Get user game history
-      description: Returns all games played by the user, ordered by date. Requires authentication.
+      description: Returns all games played by the user ordered by date (without moves array). Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -270,7 +342,7 @@ paths:
           example: "64b1f2e3c4d5e6f7a8b9c0d2"
       responses:
         '200':
-          description: List of games (without moves for a lighter response)
+          description: List of games without moves array
           content:
             application/json:
               schema:
@@ -287,7 +359,7 @@ paths:
   /games:
     post:
       summary: Create a new game
-      description: Creates a new game for the authenticated user. Requires authentication.
+      description: Creates a new game for the authenticated user. Starting turn (B or R) is assigned randomly. Requires authentication.
       security:
         - bearerAuth: []
       requestBody:
@@ -301,11 +373,22 @@ paths:
                 board_size:
                   type: integer
                   example: 7
+                game_type:
+                  type: string
+                  enum: [BOT, PLAYER]
+                  default: BOT
+                  example: BOT
+                name_of_enemy:
+                  type: string
+                  description: Required when game_type is PLAYER
+                  example: "Tobias"
                 strategy:
                   type: string
+                  default: random
                   example: "random"
                 difficulty_level:
                   type: string
+                  default: medium
                   example: "medium"
       responses:
         '201':
@@ -315,11 +398,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/Game'
         '400':
-          description: board_size is required
+          description: board_size is required, or name_of_enemy is required for PLAYER games
         '401':
           description: No token provided or invalid token
         '500':
           description: Internal server error
+
+  /games/play:
+    post:
+      summary: Request a bot move
+      description: Forwards a board position to the Gamey bot service and returns the bot's chosen move. Public endpoint, no authentication required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position:
+                  type: string
+                  description: Current board in YEN notation
+                  example: "B/.B/RB./B..R"
+                bot_id:
+                  type: string
+                  nullable: true
+                  example: null
+                strategy:
+                  type: string
+                  nullable: true
+                  example: "random"
+      responses:
+        '200':
+          description: Bot move returned from Gamey service
+        '400':
+          description: position is required
+        '502':
+          description: Gamey service returned an error
+        '503':
+          description: Gamey service unreachable
 
   /games/{id}:
     get:
@@ -351,7 +468,7 @@ paths:
   /games/{id}/move:
     post:
       summary: Submit a move
-      description: Saves a move as a subdocument inside the game. Requires authentication.
+      description: Saves a move. The player (B or R) is inferred automatically from current_turn — do not send it. Turn switches after each move. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -367,26 +484,23 @@ paths:
           application/json:
             schema:
               type: object
-              required: [player, coordinates]
+              required: [coordinates]
               properties:
-                player:
-                  type: string
-                  enum: [HUMAN, BOT]
-                  example: "HUMAN"
                 coordinates:
                   $ref: '#/components/schemas/Coordinates'
                 yen_state:
                   type: string
+                  nullable: true
                   example: "B/.B/RB./B..R"
       responses:
         '201':
-          description: Move saved
+          description: Move saved — returns full updated game state
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Move'
+                $ref: '#/components/schemas/Game'
         '400':
-          description: player and coordinates (x, y, z) are required, or game is already finished
+          description: coordinates (x, y, z) are required, or game is already finished
         '401':
           description: No token provided or invalid token
         '404':
@@ -397,7 +511,7 @@ paths:
   /games/{id}/finish:
     put:
       summary: Finish a game
-      description: Marks a game as finished, saves the result and updates user statistics. Requires authentication.
+      description: Marks a game as FINISHED. WIN/LOSS update user statistics. DRAW (user quit) does not update statistics. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -417,10 +531,11 @@ paths:
               properties:
                 result:
                   type: string
-                  enum: [WIN, LOSS]
+                  enum: [WIN, LOSS, DRAW]
                   example: "WIN"
                 yen_final_state:
                   type: string
+                  nullable: true
                   example: "B/.B/RB./B..R"
                 duration_seconds:
                   type: integer

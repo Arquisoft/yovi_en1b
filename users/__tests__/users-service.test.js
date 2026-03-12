@@ -8,6 +8,7 @@ let mongoServer;
 let token;
 let userId;
 let gameId;
+let finishedGameId;
 
 beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
@@ -17,25 +18,22 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await mongoose.disconnect();
-    if (mongoServer) {
-        await mongoServer.stop();
-    }
+    if (mongoServer) await mongoServer.stop();
 }, 60000);
 
 afterEach(() => {
-    vi.restoreAllMocks()
+    vi.restoreAllMocks();
 });
 
-// Register
+// ─── Register ────────────────────────────────────────────────────────────────
+
 describe('POST /createuser', () => {
     it('registers a new user successfully', async () => {
         const res = await request(app)
             .post('/createuser')
             .send({ username: 'Pablo', password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(201)
-        expect(res.body).toHaveProperty('message')
         expect(res.body.message).toMatch(/Welcome Pablo/i)
         expect(res.body).toHaveProperty('userId')
     })
@@ -44,7 +42,6 @@ describe('POST /createuser', () => {
         const res = await request(app)
             .post('/createuser')
             .send({ username: 'Pablo' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(400)
     })
@@ -53,7 +50,6 @@ describe('POST /createuser', () => {
         const res = await request(app)
             .post('/createuser')
             .send({ username: { $gt: '' }, password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(400)
     })
@@ -62,19 +58,18 @@ describe('POST /createuser', () => {
         const res = await request(app)
             .post('/createuser')
             .send({ username: 'Pablo', password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(409)
     })
 })
 
-// Login
+// ─── Login ───────────────────────────────────────────────────────────────────
+
 describe('POST /login', () => {
     it('logs in successfully and returns a token', async () => {
         const res = await request(app)
             .post('/login')
             .send({ username: 'Pablo', password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(200)
         expect(res.body).toHaveProperty('token')
@@ -89,7 +84,6 @@ describe('POST /login', () => {
         const res = await request(app)
             .post('/login')
             .send({ username: 'Pablo' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(400)
     })
@@ -98,7 +92,6 @@ describe('POST /login', () => {
         const res = await request(app)
             .post('/login')
             .send({ username: { $gt: '' }, password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(400)
     })
@@ -107,7 +100,6 @@ describe('POST /login', () => {
         const res = await request(app)
             .post('/login')
             .send({ username: 'Pablo', password: 'wrongpassword' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(401)
     })
@@ -116,15 +108,33 @@ describe('POST /login', () => {
         const res = await request(app)
             .post('/login')
             .send({ username: 'Unknown', password: 'password123' })
-            .set('Accept', 'application/json')
 
         expect(res.status).toBe(401)
     })
 })
 
-// User profile
+// ─── Username exists ─────────────────────────────────────────────────────────
+
+describe('GET /exists/:username', () => {
+    it('returns true for an existing username', async () => {
+        const res = await request(app).get('/exists/Pablo')
+
+        expect(res.status).toBe(200)
+        expect(res.body.exists).toBe(true)
+    })
+
+    it('returns false for a non-existing username', async () => {
+        const res = await request(app).get('/exists/NoExiste')
+
+        expect(res.status).toBe(200)
+        expect(res.body.exists).toBe(false)
+    })
+})
+
+// ─── User profile ─────────────────────────────────────────────────────────────
+
 describe('GET /users/:id', () => {
-    it('returns user profile', async () => {
+    it('returns user profile without password_hash', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
@@ -155,7 +165,8 @@ describe('GET /users/:id', () => {
     })
 })
 
-// User stats
+// ─── User stats ───────────────────────────────────────────────────────────────
+
 describe('GET /users/:id/stats', () => {
     it('returns user statistics with correct initial values', async () => {
         const res = await request(app)
@@ -163,9 +174,11 @@ describe('GET /users/:id/stats', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body.games_played).toBe(0)
-        expect(res.body.wins).toBe(0)
-        expect(res.body.losses).toBe(0)
+        expect(res.body.total_games).toBe(0)
+        expect(res.body.total_wins).toBe(0)
+        expect(res.body.total_losses).toBe(0)
+        expect(res.body).toHaveProperty('vs_player')
+        expect(res.body).toHaveProperty('vs_bot')
     })
 
     it('returns 404 for non-existent user', async () => {
@@ -177,7 +190,8 @@ describe('GET /users/:id/stats', () => {
     })
 })
 
-// User history
+// ─── User history ─────────────────────────────────────────────────────────────
+
 describe('GET /users/:id/history', () => {
     it('returns empty game history initially', async () => {
         const res = await request(app)
@@ -190,21 +204,44 @@ describe('GET /users/:id/history', () => {
     })
 })
 
-// Games
+// ─── Create game ──────────────────────────────────────────────────────────────
+
 describe('POST /games', () => {
-    it('creates a new game', async () => {
+    it('creates a new BOT game', async () => {
         const res = await request(app)
             .post('/games')
-            .send({ board_size: 7, strategy: 'random', difficulty_level: 'medium' })
+            .send({ board_size: 7, strategy: 'random', difficulty_level: 'medium', game_type: 'BOT' })
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
         expect(res.body).toHaveProperty('_id')
         expect(res.body.board_size).toBe(7)
+        expect(res.body.game_type).toBe('BOT')
         expect(res.body.status).toBe('IN_PROGRESS')
         expect(res.body.result).toBeNull()
+        expect(['B', 'R']).toContain(res.body.current_turn)
 
         gameId = res.body._id
+    })
+
+    it('creates a PLAYER game with name_of_enemy', async () => {
+        const res = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.game_type).toBe('PLAYER')
+        expect(res.body.name_of_enemy).toBe('Tobias')
+    })
+
+    it('returns 400 if PLAYER game has no name_of_enemy', async () => {
+        const res = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER' })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
     })
 
     it('returns 400 if board_size is missing', async () => {
@@ -224,7 +261,8 @@ describe('POST /games', () => {
     })
 })
 
-// Get game
+// ─── Get game ─────────────────────────────────────────────────────────────────
+
 describe('GET /games/:id', () => {
     it('returns game state', async () => {
         const res = await request(app)
@@ -234,6 +272,8 @@ describe('GET /games/:id', () => {
         expect(res.status).toBe(200)
         expect(res.body._id).toBe(gameId)
         expect(res.body.status).toBe('IN_PROGRESS')
+        expect(res.body).toHaveProperty('moves')
+        expect(res.body).toHaveProperty('current_turn')
     })
 
     it('returns 404 for non-existent game', async () => {
@@ -245,24 +285,34 @@ describe('GET /games/:id', () => {
     })
 })
 
-// Moves
+// ─── Submit move ──────────────────────────────────────────────────────────────
+
 describe('POST /games/:id/move', () => {
-    it('saves a move', async () => {
+    it('saves a move and returns updated game state with switched turn', async () => {
+        // Get current turn first
+        const gameRes = await request(app)
+            .get(`/games/${gameId}`)
+            .set('Authorization', `Bearer ${token}`)
+        const firstTurn = gameRes.body.current_turn
+        const nextTurn = firstTurn === 'B' ? 'R' : 'B'
+
         const res = await request(app)
             .post(`/games/${gameId}/move`)
-            .send({ player: 'HUMAN', coordinates: { x: 1, y: 1, z: 1 }, yen_state: 'B/.B/RB./B..R' })
+            .send({ coordinates: { x: 1, y: 1, z: 1 }, yen_state: 'B/.B/RB./B..R' })
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
-        expect(res.body.move_number).toBe(1)
-        expect(res.body.player).toBe('HUMAN')
-        expect(res.body.coordinates).toEqual({ x: 1, y: 1, z: 1 })
+        expect(res.body.moves.length).toBe(1)
+        expect(res.body.moves[0].move_number).toBe(1)
+        expect(res.body.moves[0].player).toBe(firstTurn)      // player = who just moved
+        expect(res.body.current_turn).toBe(nextTurn)          // turn has switched
+        expect(res.body.moves[0].coordinates).toEqual({ x: 1, y: 1, z: 1 })
     })
 
     it('returns 400 if coordinates are missing', async () => {
         const res = await request(app)
             .post(`/games/${gameId}/move`)
-            .send({ player: 'HUMAN' })
+            .send({})
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(400)
@@ -272,13 +322,14 @@ describe('POST /games/:id/move', () => {
         const fakeId = new mongoose.Types.ObjectId()
         const res = await request(app)
             .post(`/games/${fakeId}/move`)
-            .send({ player: 'HUMAN', coordinates: { x: 1, y: 1, z: 1 } })
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
             .set('Authorization', `Bearer ${token}`)
         expect(res.status).toBe(404)
     })
 })
 
-// Finish game
+// ─── Finish game ──────────────────────────────────────────────────────────────
+
 describe('PUT /games/:id/finish', () => {
     it('finishes a game with WIN and updates user stats', async () => {
         const res = await request(app)
@@ -289,6 +340,8 @@ describe('PUT /games/:id/finish', () => {
         expect(res.status).toBe(200)
         expect(res.body.status).toBe('FINISHED')
         expect(res.body.result).toBe('WIN')
+
+        finishedGameId = gameId
     })
 
     it('updates user stats after WIN', async () => {
@@ -296,14 +349,39 @@ describe('PUT /games/:id/finish', () => {
             .get(`/users/${userId}/stats`)
             .set('Authorization', `Bearer ${token}`)
 
-        expect(res.body.games_played).toBe(1)
-        expect(res.body.wins).toBe(1)
-        expect(res.body.losses).toBe(0)
+        expect(res.status).toBe(200)
+        expect(res.body.total_games).toBe(1)
+        expect(res.body.total_wins).toBe(1)
+        expect(res.body.total_losses).toBe(0)
+        expect(res.body.vs_bot.medium.wins).toBe(1)
+        expect(res.body.vs_bot.medium.losses).toBe(0)
+    })
+
+    it('does NOT update stats when result is DRAW (user quit)', async () => {
+        // Create a new game to draw
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7 })
+            .set('Authorization', `Bearer ${token}`)
+        const drawGameId = createRes.body._id
+
+        await request(app)
+            .put(`/games/${drawGameId}/finish`)
+            .send({ result: 'DRAW' })
+            .set('Authorization', `Bearer ${token}`)
+
+        const statsRes = await request(app)
+            .get(`/users/${userId}/stats`)
+            .set('Authorization', `Bearer ${token}`)
+
+        // Stats should be unchanged from before
+        expect(statsRes.body.total_games).toBe(1)
+        expect(statsRes.body.total_wins).toBe(1)
     })
 
     it('returns 400 if result is missing', async () => {
         const res = await request(app)
-            .put(`/games/${gameId}/finish`)
+            .put(`/games/${finishedGameId}/finish`)
             .send({})
             .set('Authorization', `Bearer ${token}`)
 
@@ -312,7 +390,7 @@ describe('PUT /games/:id/finish', () => {
 
     it('returns 400 if game is already finished', async () => {
         const res = await request(app)
-            .put(`/games/${gameId}/finish`)
+            .put(`/games/${finishedGameId}/finish`)
             .send({ result: 'WIN' })
             .set('Authorization', `Bearer ${token}`)
 
@@ -320,15 +398,17 @@ describe('PUT /games/:id/finish', () => {
     })
 })
 
-// Replay
+// ─── Replay ───────────────────────────────────────────────────────────────────
+
 describe('GET /games/:id/moves', () => {
     it('returns all moves ordered by move_number', async () => {
         const res = await request(app)
-            .get(`/games/${gameId}/moves`)
+            .get(`/games/${finishedGameId}/moves`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body)).toBe(true)
+        expect(res.body.length).toBeGreaterThan(0)
         expect(res.body[0].move_number).toBe(1)
         expect(res.body[0].coordinates).toEqual({ x: 1, y: 1, z: 1 })
     })
@@ -339,5 +419,23 @@ describe('GET /games/:id/moves', () => {
             .get(`/games/${fakeId}/moves`)
             .set('Authorization', `Bearer ${token}`)
         expect(res.status).toBe(404)
+    })
+})
+
+// ─── User history (after games played) ───────────────────────────────────────
+
+describe('GET /users/:id/history (after games)', () => {
+    it('returns game history with games played', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}/history`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+        expect(res.body.length).toBeGreaterThan(0)
+        // Moves should not be included in history
+        res.body.forEach(game => {
+            expect(game).not.toHaveProperty('moves')
+        })
     })
 })

@@ -1,16 +1,22 @@
 const express = require('express');
-const app = express();
-const port = 3000;
-const swaggerUi = require('swagger-ui-express');
-const fs = require('node:fs');
-const YAML = require('js-yaml');
-const promBundle = require('express-prom-bundle');
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 
+<<<<<<< HEAD
+=======
+const setupSwagger      = require('./config/swagger');
+const metricsMiddleware = require('./config/metrics');
+const corsMiddleware    = require('./middleware/cors');
+const MongoUserRepository = require('./repository/MongoUserRepository');
+
+const authRoutes  = require('./routes/authRoutes');
+const userRoutes  = require('./routes/userRoutes');
+const gameRoutes  = require('./routes/gameRoutes');
+const playRoutes  = require('./routes/playRoutes');
+
+const app  = express();
+const port = 3000;
+>>>>>>> 6e05924 (refactor users service, add new game fields and bot play endpoint(not finished))
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_database';
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret';
 
 if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(mongoUri)
@@ -18,6 +24,7 @@ if (process.env.NODE_ENV !== 'test') {
       .catch(err => console.error('MongoDB connection error:', err));
 }
 
+<<<<<<< HEAD
 // Models
 
 const userSchema = new mongoose.Schema({
@@ -61,25 +68,15 @@ const Game = mongoose.model('Game', gameSchema);
 // Middleware
 
 const metricsMiddleware = promBundle({ includeMethod: true });
+=======
+// Config & Middleware
+>>>>>>> 6e05924 (refactor users service, add new game fields and bot play endpoint(not finished))
 app.use(metricsMiddleware);
-
-try {
-  const swaggerDocument = YAML.load(fs.readFileSync('./openapi.yaml', 'utf8'));
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-} catch (e) {
-  console.log('Swagger not loaded:', e.message);
-}
-
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
-
+setupSwagger(app);
+app.use(corsMiddleware);
 app.use(express.json());
 
+<<<<<<< HEAD
 // JWT auth middleware
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -286,9 +283,15 @@ app.get('/games/:id/moves', authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+=======
+// Routes
+app.use('/',       authRoutes(repository));
+app.use('/users',  userRoutes(repository));
+app.use('/games',  gameRoutes(repository));
+app.use('/play',   playRoutes());           // POST /play — bot API, no auth needed
+>>>>>>> 6e05924 (refactor users service, add new game fields and bot play endpoint(not finished))
 
 // Start
-
 if (require.main === module) {
   app.listen(port, () => {
     console.log(`User Service listening at http://localhost:${port}`);
