@@ -1,7 +1,5 @@
-use crate::core::SetIdx;
-use crate::core::player_set::PlayerSet;
+use crate::core::Board;
 use crate::{Coordinates, GameAction, GameYError, Movement, PlayerId, RenderOptions, YEN};
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::path::Path;
 
@@ -13,23 +11,19 @@ pub type Result<T> = std::result::Result<T, crate::GameYError>;
 /// Y is a connection game played on a triangular board where players
 /// take turns placing pieces. The goal is to connect all three sides
 /// of the triangle with a single chain of connected pieces.
+///
+/// Game-flow logic (turns, status, history, actions) lives here.
+/// Board operations (placement, win detection) are delegated to [`Board`].
 #[derive(Debug, Clone)]
 pub struct GameY {
-    // Size of the board (length of one side of the triangular board).
-    board_size: u32,
+    /// The board state (coordinates, Union-Find, available cells).
+    board: Board,
 
-    // Mapping from coordinates to identifiers of players who placed stones there.
-    board_map: HashMap<Coordinates, (SetIdx, PlayerId)>,
-
+    /// Current status of the game (ongoing or finished).
     status: GameStatus,
 
-    // History of moves made in the game.
+    /// History of moves made in the game.
     history: Vec<Movement>,
-
-    // Union-Find data structure to track connected components for each player
-    sets: Vec<PlayerSet>,
-
-    available_cells: Vec<u32>,
 }
 
 /// Represents the state of a single cell on the board.
@@ -44,17 +38,18 @@ pub enum Cell {
 impl GameY {
     /// Creates a new game with the specified board size and number of players.
     pub fn new(board_size: u32) -> Self {
-        let total_cells = (board_size * (board_size + 1)) / 2;
         Self {
-            board_size,
-            board_map: HashMap::new(),
+            board: Board::new(board_size),
             history: Vec::new(),
-            sets: Vec::new(),
             status: GameStatus::Ongoing {
                 next_player: PlayerId::new(0),
             },
-            available_cells: (0..total_cells).collect(),
         }
+    }
+
+    /// Returns a reference to the underlying board.
+    pub fn board(&self) -> &Board {
+        &self.board
     }
 
     /// Returns the current game status.
@@ -72,12 +67,17 @@ impl GameY {
 
     /// Returns the list of available cell indices where pieces can be placed.
     pub fn available_cells(&self) -> &Vec<u32> {
-        &self.available_cells
+        self.board.available_cells()
     }
 
     /// Returns the total number of cells on the board.
     pub fn total_cells(&self) -> u32 {
-        (self.board_size * (self.board_size + 1)) / 2
+        self.board.total_cells()
+    }
+
+    /// Returns the size of the board (length of one side of the triangle).
+    pub fn board_size(&self) -> u32 {
+        self.board.board_size()
     }
 
     /// Checks if the movement is made by the correct player.
@@ -147,47 +147,18 @@ impl GameY {
         Ok(())
     }
 
-    /// Orchestrates the placement logic
+    /// Orchestrates the placement logic.
     fn handle_placement(&mut self, player: PlayerId, coords: Coordinates) -> Result<()> {
         self.validate_placement(player, coords)?;
 
-        // Update board state (available cells, sets, board_map)
-        let set_idx = self.register_piece(player, coords);
-
-        // Connect neighbors and determine if this move won the game
-        let won = self.connect_neighbors_and_check_win(coords, player, set_idx);
+        // Delegate to Board — it handles set creation, neighbor merging, win check
+        let won = self.board.place_piece(player, coords);
 
         self.update_status_after_placement(player, won);
         Ok(())
     }
 
-    /// Iterates over neighbors to union sets and checks for a win condition
-    fn connect_neighbors_and_check_win(
-        &mut self,
-        coords: Coordinates,
-        player: PlayerId,
-        current_set_idx: usize,
-    ) -> bool {
-        // Base win condition: The piece itself touches all required sides
-        let mut won = self.sets[current_set_idx].is_winning_configuration();
-
-        //
-        let neighbors = self.get_neighbors(&coords);
-
-        for neighbor in neighbors {
-            if let Some((neighbor_idx, neighbor_player)) = self.board_map.get(&neighbor)
-                && *neighbor_player == player
-            {
-                // Union returns true if the merge resulted in a winning connection
-                //
-                let connection_won = self.union(current_set_idx, *neighbor_idx);
-                won = won || connection_won;
-            }
-        }
-        won
-    }
-
-    /// Updates the game status (Finished vs Ongoing)
+    /// Updates the game status (Finished vs Ongoing).
     fn update_status_after_placement(&mut self, player: PlayerId, won: bool) {
         if self.check_game_over() {
             tracing::info!("Game was already over. Move ignored for status update.");
@@ -195,7 +166,6 @@ impl GameY {
             tracing::debug!("Player {} wins the game!", player);
             self.status = GameStatus::Finished { winner: player };
         } else {
-            // tracing::debug!("No win yet..."); // Optional debug
             self.status = GameStatus::Ongoing {
                 next_player: other_player(player),
             };
@@ -218,13 +188,13 @@ impl GameY {
         }
     }
 
-    /// Handles validation logic (Game Over checks and Occupancy)
+    /// Handles validation logic (Game Over checks and Occupancy).
     fn validate_placement(&self, player: PlayerId, coords: Coordinates) -> Result<()> {
         if self.check_game_over() {
             tracing::info!("Game is already over. Move at {} could be ignored", coords);
         }
 
-        if self.board_map.contains_key(&coords) {
+        if !self.board.is_empty_at(&coords) {
             return Err(GameYError::Occupied {
                 coordinates: coords,
                 player,
@@ -233,63 +203,18 @@ impl GameY {
         Ok(())
     }
 
-    /// Updates internal data structures (Available cells, Sets, Map)
-    /// Returns the index of the newly created set.
-    fn register_piece(&mut self, player: PlayerId, coords: Coordinates) -> usize {
-        let cell_idx = coords.to_index(self.board_size);
-        self.available_cells.retain(|&x| x != cell_idx);
-
-        let set_idx = self.sets.len();
-        let new_set = PlayerSet {
-            parent: set_idx,
-            touches_side_a: coords.touches_side_a(),
-            touches_side_b: coords.touches_side_b(),
-            touches_side_c: coords.touches_side_c(),
-        };
-        self.sets.push(new_set);
-        self.board_map.insert(coords, (set_idx, player));
-
-        set_idx
-    }
-
-    /// Returns the size of the board (length of one side of the triangle).
-    pub fn board_size(&self) -> u32 {
-        self.board_size
-    }
-
-    /// Returns the neighboring coordinates for a given cell.
-    fn get_neighbors(&self, coords: &Coordinates) -> Vec<Coordinates> {
-        let mut neighbors = Vec::new();
-        let x = coords.x();
-        let y = coords.y();
-        let z = coords.z();
-
-        if x > 0 {
-            neighbors.push(Coordinates::new(x - 1, y + 1, z));
-            neighbors.push(Coordinates::new(x - 1, y, z + 1));
-        }
-        if y > 0 {
-            neighbors.push(Coordinates::new(x + 1, y - 1, z));
-            neighbors.push(Coordinates::new(x, y - 1, z + 1));
-        }
-        if z > 0 {
-            neighbors.push(Coordinates::new(x + 1, y, z - 1));
-            neighbors.push(Coordinates::new(x, y + 1, z - 1));
-        }
-        neighbors
-    }
-
     /// Renders the current state of the board as a text string.
     /// If `show_coordinates` is true, the coordinates of each cell will be displayed.
     pub fn render(&self, options: &RenderOptions) -> String {
+        let board_size = self.board.board_size();
         let mut result = String::new();
-        let coords_size = self.board_size.to_string().len();
-        let _ = writeln!(result, "--- Game of Y (Size {}) ---", self.board_size);
+        let coords_size = board_size.to_string().len();
+        let _ = writeln!(result, "--- Game of Y (Size {}) ---", board_size);
 
         let indent_multiplier = self.get_indent_multiplier(options);
 
-        for row in 0..self.board_size {
-            let x = self.board_size - 1 - row;
+        for row in 0..board_size {
+            let x = board_size - 1 - row;
             indent(&mut result, x * indent_multiplier);
 
             for y in 0..=row {
@@ -306,72 +231,6 @@ impl GameY {
         }
         result
     }
-    /*pub fn render(&self, options: &RenderOptions) -> String {
-        let mut result = String::new();
-        let coords_size = self.board_size.to_string().len() as u32;
-
-        let _ = writeln!(result, "--- Game of Y (Size {}) ---", self.board_size);
-
-        for row in 0..self.board_size {
-            let x = self.board_size - 1 - row;
-
-            let indent_multiplier = match (options.show_3d_coords, options.show_idx) {
-                (true, true) => 8,
-                (true, false) => 4,
-                (false, true) => 4,
-                (false, false) => 2,
-            };
-
-            indent(&mut result, x * indent_multiplier);
-
-            for y in 0..=row {
-                let z = row - y;
-
-                let coords = Coordinates::new(x, y, z);
-                let player = self.board_map.get(&coords).map(|(_, p)| *p);
-
-                let mut symbol = match player {
-                    Some(p) => format!("{}", p),
-                    None => ".".to_string(),
-                };
-
-                if options.show_3d_coords {
-                    symbol.push_str(
-                        format!(
-                            "({:0width$},{:0width$},{:0width$})",
-                            x,
-                            y,
-                            z,
-                            width = coords_size as usize
-                        )
-                        .as_str(),
-                    );
-                }
-                if options.show_idx {
-                    let idx = coords.to_index(self.board_size);
-                    symbol.push_str(format!("({}) ", idx).as_str());
-                }
-                if options.show_colors {
-                    match player {
-                        Some(p) if p.id() == 0 => {
-                            symbol = format!("\x1b[34m{}\x1b[0m", symbol); // Blue for player 0
-                        }
-                        Some(p) if p.id() == 1 => {
-                            symbol = format!("\x1b[31m{}\x1b[0m", symbol); // Red for player 1
-                        }
-                        _ => {}
-                    }
-                }
-
-                let _ = write!(result, "{}   ", symbol);
-            }
-            result.push('\n');
-            if options.show_idx || options.show_3d_coords {
-                result.push('\n');
-            }
-        }
-        result
-    }*/
 
     fn get_indent_multiplier(&self, options: &RenderOptions) -> u32 {
         match (options.show_3d_coords, options.show_idx) {
@@ -383,7 +242,7 @@ impl GameY {
     }
 
     fn format_cell(&self, coords: Coordinates, options: &RenderOptions, width: usize) -> String {
-        let player = self.board_map.get(&coords).map(|(_, p)| *p);
+        let player = self.board.get_cell(&coords);
 
         // 1. Base symbol
         let mut symbol = match player {
@@ -402,7 +261,7 @@ impl GameY {
             ));
         }
         if options.show_idx {
-            let idx = coords.to_index(self.board_size);
+            let idx = coords.to_index(self.board.board_size());
             symbol.push_str(&format!("({}) ", idx));
         }
 
@@ -412,34 +271,6 @@ impl GameY {
         }
 
         symbol
-    }
-
-    /// Disjoint Set Union 'Find' with path compression
-    fn find(&mut self, i: SetIdx) -> SetIdx {
-        if self.sets[i].parent == i {
-            i
-        } else {
-            self.sets[i].parent = self.find(self.sets[i].parent);
-            self.sets[i].parent
-        }
-    }
-
-    /// Disjoint Set Union 'Union' operation
-    fn union(&mut self, i: SetIdx, j: SetIdx) -> bool {
-        let root_i = self.find(i);
-        let root_j = self.find(j);
-
-        if root_i != root_j {
-            self.sets[root_i].parent = root_j;
-            // Merge side properties
-            self.sets[root_j].touches_side_a |= self.sets[root_i].touches_side_a;
-            self.sets[root_j].touches_side_b |= self.sets[root_i].touches_side_b;
-            self.sets[root_j].touches_side_c |= self.sets[root_i].touches_side_c;
-            return self.sets[root_j].touches_side_a
-                && self.sets[root_j].touches_side_b
-                && self.sets[root_j].touches_side_c;
-        }
-        false
     }
 }
 
@@ -503,17 +334,17 @@ impl TryFrom<YEN> for GameY {
 
 impl From<&GameY> for YEN {
     fn from(game: &GameY) -> Self {
-        let size = game.board_size;
+        let size = game.board.board_size();
         let turn = match game.status {
             GameStatus::Finished { winner } => other_player(winner).id() as u32,
             GameStatus::Ongoing { next_player } => next_player.id(),
         };
         let mut layout = String::new();
-        let total_cells = (game.board_size * (game.board_size + 1)) / 2;
+        let total_cells = game.board.total_cells();
         let players = vec!['B', 'R'];
         for idx in 0..total_cells {
-            let coords = Coordinates::from_index(idx, game.board_size);
-            let cell_char = match game.board_map.get(&coords) {
+            let coords = Coordinates::from_index(idx, size);
+            let cell_char = match game.board.board_map().get(&coords) {
                 Some((_, player)) if player.id() == 0 => 'B',
                 Some((_, player)) if player.id() == 1 => 'R',
                 _ => '.',
@@ -567,7 +398,7 @@ mod tests {
     #[test]
     fn test_game_initialization() {
         let game = GameY::new(7);
-        assert_eq!(game.board_size, 7);
+        assert_eq!(game.board_size(), 7);
         assert_eq!(game.history.len(), 0);
         match game.status {
             GameStatus::Ongoing { next_player } => {
@@ -586,10 +417,8 @@ mod tests {
 
     #[test]
     fn test_interior_cell_has_six_neighbors() {
-        let board = GameY::new(5);
         let cell = Coordinates::new(2, 1, 1);
-
-        let neighbors = board.get_neighbors(&cell);
+        let neighbors = cell.neighbors(5);
 
         let expected = vec![
             Coordinates::new(1, 2, 1),
@@ -606,10 +435,8 @@ mod tests {
 
     #[test]
     fn test_corner_cell_has_two_neighbors() {
-        let board = GameY::new(5);
         let top_corner = Coordinates::new(4, 0, 0);
-
-        let neighbors = board.get_neighbors(&top_corner);
+        let neighbors = top_corner.neighbors(5);
 
         let expected = vec![Coordinates::new(3, 1, 0), Coordinates::new(3, 0, 1)];
 
@@ -619,10 +446,8 @@ mod tests {
 
     #[test]
     fn test_edge_cell_has_four_neighbors() {
-        let board = GameY::new(5);
         let edge_cell = Coordinates::new(0, 2, 2);
-
-        let neighbors = board.get_neighbors(&edge_cell);
+        let neighbors = edge_cell.neighbors(5);
 
         let expected = vec![
             Coordinates::new(1, 1, 2),
@@ -700,7 +525,7 @@ mod tests {
         let yen: YEN = (&game).into();
         let loaded_game = GameY::try_from(yen.clone()).unwrap();
 
-        assert_eq!(game.board_size, loaded_game.board_size);
+        assert_eq!(game.board_size(), loaded_game.board_size());
         let yen_loaded: YEN = (&loaded_game).into();
         assert_eq!(yen.layout(), yen_loaded.layout());
     }

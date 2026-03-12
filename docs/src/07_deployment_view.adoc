@@ -144,13 +144,11 @@ endif::arc42help[]
 node "Gamey Container (Rust, port 4000)" {
     component "Web Interface\n(HTTP handlers)" as web
     component "Game Engine\n(core game logic)" as engine
-    component "Win Condition Checker" as win
     component "Bot Registry\n(AI opponents)" as bot
     component "Notation Parser\n(YEN / YGN)" as notation
 }
 
 web --> engine : Forwards moves and\ngame creation requests
-engine --> win : Checks victory after each move
 engine --> bot : Requests bot move\n(when playing vs AI)
 engine --> notation : Encodes / decodes\ngame notation
 @enduml
@@ -159,12 +157,9 @@ engine --> notation : Encodes / decodes\ngame notation
 The Gamey container runs the Rust application that implements the full game logic for Game Y. Its internal components are:
 
 * *Web Interface:* Exposes HTTP endpoints on port 4000 that the React frontend calls to create games, submit moves, and query game state.
-* *Game Engine (core):* Contains the core data model — coordinates, board state, player management, and action dispatch. This is the authoritative source for game rules.
-* *Win Condition Checker:* Evaluates after every move whether a player's connected chain of cells touches all three sides of the triangular board. Uses a graph traversal (DFS/BFS) over the hexagonal grid.
+* *Game Engine (core):* Contains the core data model — coordinates, board state, player management, and action dispatch. This is the authoritative source for game rules. Win condition checking is performed internally within the engine after every move, using a graph traversal (DFS/BFS) over the hexagonal grid to detect whether a player's connected chain touches all three sides of the triangular board (see section 6 for the runtime scenario).
 * *Bot Registry:* Maintains a set of registered bot strategies. When a player chooses to play against the computer, the bot registry selects the appropriate bot and returns its move to the game engine.
 * *Notation Parser:* Supports YEN (Yovi Extended Notation) and YGN (Yovi Game Notation) for encoding and decoding move sequences. This enables game export, replay, and interoperability.
-
-NOTE: The Win Condition Checker is an internal component of the Gamey service, not a separate deployment unit. It runs in-process within the Rust binary and is invoked synchronously during move processing. It is surfaced here to clarify its role, since it is architecturally significant and cross-referenced in the runtime view (see section 6).
 
 ==== Users Container
 

@@ -2,6 +2,8 @@
 //!
 //! This module contains the fundamental types for representing and playing Y:
 //! - [`Coordinates`]: Barycentric coordinates on the triangular board
+//! - [`BoardSide`]: The three sides of the triangular board (A, B, C)
+//! - [`Board`]: The board state with Union-Find win detection
 //! - [`GameY`]: The main game state and logic
 //! - [`GameStatus`]: Whether the game is ongoing or finished
 //! - [`Player`] and [`PlayerId`]: Player representation
@@ -10,6 +12,7 @@
 //! - [`RenderOptions`]: Configuration for board rendering
 
 pub mod action;
+pub mod board;
 pub mod coord;
 pub mod game;
 pub mod movement;
@@ -18,6 +21,7 @@ mod player_set;
 pub mod render_options;
 
 pub use action::*;
+pub use board::*;
 pub use coord::*;
 pub use game::*;
 pub use movement::*;

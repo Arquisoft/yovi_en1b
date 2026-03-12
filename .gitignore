@@ -7,3 +7,4 @@ docs/build
 webapp/.env
 .DS_Store
 .vscode/
+.idea/

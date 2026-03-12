@@ -1,27 +1,143 @@
 openapi: 3.0.0
 info:
   title: User Service API
-  version: 1.0.0
-  description: API for managing users
+  version: 2.0.0
+  description: API for managing users, authentication and games
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Coordinates:
+      type: object
+      required: [x, y, z]
+      properties:
+        x:
+          type: integer
+          example: 1
+        y:
+          type: integer
+          example: 1
+        z:
+          type: integer
+          example: 1
+
+    Move:
+      type: object
+      properties:
+        move_number:
+          type: integer
+          example: 1
+        player:
+          type: string
+          enum: [HUMAN, BOT]
+          example: HUMAN
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        yen_state:
+          type: string
+          example: "B/.B/RB./B..R"
+        created_at:
+          type: string
+          format: date-time
+
+    Game:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+        player_id:
+          type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d2"
+        board_size:
+          type: integer
+          example: 7
+        strategy:
+          type: string
+          example: "random"
+        difficulty_level:
+          type: string
+          example: "medium"
+        status:
+          type: string
+          enum: [IN_PROGRESS, FINISHED]
+          example: IN_PROGRESS
+        result:
+          type: string
+          enum: [WIN, LOSS]
+          nullable: true
+          example: null
+        duration_seconds:
+          type: integer
+          example: 0
+        yen_final_state:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        moves:
+          type: array
+          items:
+            $ref: '#/components/schemas/Move'
+
+    Statistics:
+      type: object
+      properties:
+        games_played:
+          type: integer
+          example: 10
+        wins:
+          type: integer
+          example: 6
+        losses:
+          type: integer
+          example: 4
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d2"
+        username:
+          type: string
+          example: "nacho"
+        created_at:
+          type: string
+          format: date-time
+        statistics:
+          $ref: '#/components/schemas/Statistics'
+
 paths:
+
+  # Auth
+
   /createuser:
     post:
-      summary: Creates a new user
-      description: Creates a new user with the given username.
+      summary: Register a new user
+      description: Creates a new user with a hashed password.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - username
+              required: [username, password]
               properties:
                 username:
                   type: string
-                  example: "testuser"
+                  example: "nacho"
+                password:
+                  type: string
+                  example: "securepassword"
       responses:
-        '200':
+        '201':
           description: User created successfully
           content:
             application/json:
@@ -30,6 +146,326 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Hello testuser! welcome to the course!"
+                    example: "Welcome nacho!"
+                  userId:
+                    type: string
+                    example: "64b1f2e3c4d5e6f7a8b9c0d2"
         '400':
-          description: Error creating user
+          description: Username and password are required
+        '409':
+          description: Username already taken
+        '500':
+          description: Internal server error
+
+  /login:
+    post:
+      summary: Login
+      description: Authenticates a user and returns a JWT token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: "nacho"
+                password:
+                  type: string
+                  example: "securepassword"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  username:
+                    type: string
+                    example: "nacho"
+                  userId:
+                    type: string
+                    example: "64b1f2e3c4d5e6f7a8b9c0d2"
+        '400':
+          description: Username and password are required
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  # Users
+
+  /users/{id}:
+    get:
+      summary: Get user profile
+      description: Returns user profile and statistics. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d2"
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+  /users/{id}/stats:
+    get:
+      summary: Get user statistics
+      description: Returns wins, losses and games played. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d2"
+      responses:
+        '200':
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statistics'
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+  /users/{id}/history:
+    get:
+      summary: Get user game history
+      description: Returns all games played by the user, ordered by date. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d2"
+      responses:
+        '200':
+          description: List of games (without moves for a lighter response)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Game'
+        '401':
+          description: No token provided or invalid token
+        '500':
+          description: Internal server error
+
+  # Games
+
+  /games:
+    post:
+      summary: Create a new game
+      description: Creates a new game for the authenticated user. Requires authentication.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [board_size]
+              properties:
+                board_size:
+                  type: integer
+                  example: 7
+                strategy:
+                  type: string
+                  example: "random"
+                difficulty_level:
+                  type: string
+                  example: "medium"
+      responses:
+        '201':
+          description: Game created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: board_size is required
+        '401':
+          description: No token provided or invalid token
+        '500':
+          description: Internal server error
+
+  /games/{id}:
+    get:
+      summary: Get game state
+      description: Returns the full game state including all moves. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      responses:
+        '200':
+          description: Game state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '500':
+          description: Internal server error
+
+  /games/{id}/move:
+    post:
+      summary: Submit a move
+      description: Saves a move as a subdocument inside the game. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [player, coordinates]
+              properties:
+                player:
+                  type: string
+                  enum: [HUMAN, BOT]
+                  example: "HUMAN"
+                coordinates:
+                  $ref: '#/components/schemas/Coordinates'
+                yen_state:
+                  type: string
+                  example: "B/.B/RB./B..R"
+      responses:
+        '201':
+          description: Move saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Move'
+        '400':
+          description: player and coordinates (x, y, z) are required, or game is already finished
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '500':
+          description: Internal server error
+
+  /games/{id}/finish:
+    put:
+      summary: Finish a game
+      description: Marks a game as finished, saves the result and updates user statistics. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result]
+              properties:
+                result:
+                  type: string
+                  enum: [WIN, LOSS]
+                  example: "WIN"
+                yen_final_state:
+                  type: string
+                  example: "B/.B/RB./B..R"
+                duration_seconds:
+                  type: integer
+                  example: 120
+      responses:
+        '200':
+          description: Game finished
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: result is required, or game is already finished
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '500':
+          description: Internal server error
+
+  /games/{id}/moves:
+    get:
+      summary: Get all moves of a game
+      description: Returns all moves ordered by move_number for replay purposes. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      responses:
+        '200':
+          description: List of moves ordered by move_number
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Move'
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '500':
+          description: Internal server error
