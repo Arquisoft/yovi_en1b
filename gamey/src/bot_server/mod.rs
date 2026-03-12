@@ -53,6 +53,23 @@ pub fn create_router(state: AppState) -> axum::Router {
             "/{api_version}/ybot/choose/{bot_id}",
             axum::routing::post(choose::choose),
         )
+        // Game endpoints
+        .route(
+            "/{api_version}/game/new",
+            axum::routing::post(crate::game_server::handlers::new_game),
+        )
+        .route(
+            "/{api_version}/game/move",
+            axum::routing::post(crate::game_server::handlers::make_move),
+        )
+        .route(
+            "/{api_version}/game/load",
+            axum::routing::post(crate::game_server::handlers::load_game),
+        )
+        .route(
+            "/{api_version}/game/board-info/{board_size}",
+            axum::routing::get(crate::game_server::handlers::board_info),
+        )
         .with_state(state)
         .layer(cors)
 }

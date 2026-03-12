@@ -1,0 +1,272 @@
+//! Request handlers for the game server API.
+//!
+//! Each handler corresponds to one REST endpoint and delegates to the core game engine.
+
+use crate::bot_server::error::ErrorResponse;
+use crate::game_server::dto::{
+    BoardInfoResponse, GameStateResponse, MakeMoveRequest, NewGameRequest,
+};
+use crate::{GameAction, GameY, Movement, PlayerId, YEN, check_api_version};
+use axum::extract::Path;
+use axum::Json;
+use serde::Deserialize;
+
+/// Path parameters shared by all game endpoints that include the API version.
+#[derive(Deserialize)]
+pub struct VersionParam {
+    /// The API version (e.g., "v1").
+    api_version: String,
+}
+
+/// Path parameters for the board-info endpoint.
+#[derive(Deserialize)]
+pub struct BoardInfoParams {
+    /// The API version (e.g., "v1").
+    api_version: String,
+    /// The board size to get information about.
+    board_size: u32,
+}
+
+/// `POST /{api_version}/game/new`
+///
+/// Creates a new game with the specified board size.
+///
+/// # Request Body
+/// ```json
+/// { "board_size": 7 }
+/// ```
+///
+/// # Response
+/// A `GameStateResponse` with the initial empty board state.
+#[axum::debug_handler]
+pub async fn new_game(
+    Path(params): Path<VersionParam>,
+    Json(req): Json<NewGameRequest>,
+) -> Result<Json<GameStateResponse>, Json<ErrorResponse>> {
+    check_api_version(&params.api_version)?;
+
+    if req.board_size == 0 || req.board_size > 100 {
+        return Err(Json(ErrorResponse::error(
+            &format!(
+                "Invalid board size: {}. Must be between 1 and 100.",
+                req.board_size
+            ),
+            Some(params.api_version),
+            None,
+        )));
+    }
+
+    let game = GameY::new(req.board_size);
+    let response = GameStateResponse::from_game(&game, params.api_version);
+    Ok(Json(response))
+}
+
+/// `POST /{api_version}/game/move`
+///
+/// Makes a move in an existing game. The request body contains the current game
+/// state (in YEN format) and the move to make.
+///
+/// # Request Body
+/// ```json
+/// {
+///   "game": { "size": 3, "turn": 0, "players": ["B","R"], "layout": "./../..." },
+///   "movement": { "player_id": 0, "coords": { "x": 2, "y": 0, "z": 0 } }
+/// }
+/// ```
+///
+/// # Response
+/// A `GameStateResponse` with the updated game state after the move.
+#[axum::debug_handler]
+pub async fn make_move(
+    Path(params): Path<VersionParam>,
+    Json(req): Json<MakeMoveRequest>,
+) -> Result<Json<GameStateResponse>, Json<ErrorResponse>> {
+    check_api_version(&params.api_version)?;
+
+    let mut game = GameY::try_from(req.game).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Invalid YEN format: {}", err),
+            Some(params.api_version.clone()),
+            None,
+        ))
+    })?;
+
+    let player = PlayerId::new(req.movement.player_id);
+    let movement = build_movement(player, &req.movement)?;
+
+    game.add_move(movement).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Invalid move: {}", err),
+            Some(params.api_version.clone()),
+            None,
+        ))
+    })?;
+
+    let response = GameStateResponse::from_game(&game, params.api_version);
+    Ok(Json(response))
+}
+
+/// `POST /{api_version}/game/load`
+///
+/// Loads a game from a YEN representation.
+///
+/// # Request Body
+/// A JSON object in YEN format.
+///
+/// # Response
+/// A `GameStateResponse` with the loaded game state.
+#[axum::debug_handler]
+pub async fn load_game(
+    Path(params): Path<VersionParam>,
+    Json(yen): Json<YEN>,
+) -> Result<Json<GameStateResponse>, Json<ErrorResponse>> {
+    check_api_version(&params.api_version)?;
+
+    let game = GameY::try_from(yen).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Invalid YEN format: {}", err),
+            Some(params.api_version.clone()),
+            None,
+        ))
+    })?;
+
+    let response = GameStateResponse::from_game(&game, params.api_version);
+    Ok(Json(response))
+}
+
+/// `GET /{api_version}/game/board-info/{board_size}`
+///
+/// Returns board geometry information: coordinates, sides, and neighbors
+/// for every cell on a board of the given size.
+///
+/// This endpoint requires no game state and is useful for the frontend
+/// to initialize the board rendering.
+#[axum::debug_handler]
+pub async fn board_info(
+    Path(params): Path<BoardInfoParams>,
+) -> Result<Json<BoardInfoResponse>, Json<ErrorResponse>> {
+    check_api_version(&params.api_version)?;
+
+    if params.board_size == 0 || params.board_size > 100 {
+        return Err(Json(ErrorResponse::error(
+            &format!(
+                "Invalid board size: {}. Must be between 1 and 100.",
+                params.board_size
+            ),
+            Some(params.api_version),
+            None,
+        )));
+    }
+
+    let response = BoardInfoResponse::from_board_size(params.board_size, params.api_version);
+    Ok(Json(response))
+}
+
+/// Helper: converts a `MoveRequest` into a core `Movement`.
+fn build_movement(
+    player: PlayerId,
+    req: &crate::game_server::dto::MoveRequest,
+) -> Result<Movement, Json<ErrorResponse>> {
+    match (&req.coords, &req.action) {
+        (Some(coords), None) => Ok(Movement::Placement {
+            player,
+            coords: *coords,
+        }),
+        (None, Some(action_str)) => {
+            let action = match action_str.to_lowercase().as_str() {
+                "swap" => GameAction::Swap,
+                "resign" => GameAction::Resign,
+                _ => {
+                    return Err(Json(ErrorResponse::error(
+                        &format!("Unknown action: '{}'. Valid actions: swap, resign", action_str),
+                        None,
+                        None,
+                    )));
+                }
+            };
+            Ok(Movement::Action { player, action })
+        }
+        (Some(_), Some(_)) => Err(Json(ErrorResponse::error(
+            "Cannot specify both 'coords' and 'action' in the same move",
+            None,
+            None,
+        ))),
+        (None, None) => Err(Json(ErrorResponse::error(
+            "Must specify either 'coords' (for placement) or 'action' (swap/resign)",
+            None,
+            None,
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Coordinates;
+
+    #[test]
+    fn test_build_movement_placement() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 0,
+            coords: Some(Coordinates::new(1, 2, 1)),
+            action: None,
+        };
+        let result = build_movement(PlayerId::new(0), &req);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_movement_resign() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 0,
+            coords: None,
+            action: Some("resign".to_string()),
+        };
+        let result = build_movement(PlayerId::new(0), &req);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_movement_swap() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 1,
+            coords: None,
+            action: Some("Swap".to_string()),
+        };
+        let result = build_movement(PlayerId::new(1), &req);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_movement_both_errors() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 0,
+            coords: Some(Coordinates::new(0, 0, 0)),
+            action: Some("resign".to_string()),
+        };
+        let result = build_movement(PlayerId::new(0), &req);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_movement_neither_errors() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 0,
+            coords: None,
+            action: None,
+        };
+        let result = build_movement(PlayerId::new(0), &req);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_movement_unknown_action() {
+        let req = crate::game_server::dto::MoveRequest {
+            player_id: 0,
+            coords: None,
+            action: Some("fly".to_string()),
+        };
+        let result = build_movement(PlayerId::new(0), &req);
+        assert!(result.is_err());
+    }
+}

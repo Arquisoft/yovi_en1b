@@ -1,9 +1,11 @@
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
 /// Represents special game actions that are not regular piece placements.
 ///
 /// These actions allow players to perform non-placement moves during the game.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GameAction {
     /// The swap rule: allows the second player to swap colors after the first move.
     /// This is commonly used in games like Hex and Y to balance first-move advantage.
