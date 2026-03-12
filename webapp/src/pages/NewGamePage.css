@@ -1,0 +1,231 @@
+.new-game-form {
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.form-section legend {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #f8fafc;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.radio-label:hover {
+  background: #334155;
+  border-color: #0ea5e9;
+}
+
+.radio-label input[type='radio'] {
+  margin-top: 4px;
+  cursor: pointer;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border: 2px solid #475569;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.radio-label input[type='radio']:checked {
+  border-color: #0ea5e9;
+  background: #0ea5e9;
+}
+
+.radio-label input[type='radio']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.radio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.radio-text strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.radio-text small {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+}
+
+.form-field input[type='text'],
+.form-field input[type='password'],
+.form-field select {
+  padding: 12px 14px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #e5e7eb;
+  background-color: #0f172a;
+  transition: all 0.2s ease;
+}
+
+.form-field input[type='text']:focus,
+.form-field input[type='password']:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  background-color: #1e293b;
+}
+
+.form-field input[type='text']:disabled,
+.form-field input[type='password']:disabled,
+.form-field select:disabled {
+  background: #0f172a;
+  color: #64748b;
+  border-color: #1e293b;
+  cursor: not-allowed;
+}
+
+.form-field input[type='text']::placeholder {
+  color: #64748b;
+}
+
+.slider {
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #334155;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid #0ea5e9;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.5);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid #0ea5e9;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.5);
+}
+
+.slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.size-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 14px 20px;
+  border: 1px solid #0ea5e9;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: #06b6d4;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.5);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-error {
+  padding: 16px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+

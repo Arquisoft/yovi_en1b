@@ -2,6 +2,10 @@ export type GameType = 'BOT' | 'PLAYER';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 
+export type RuleSet = 'normal' | 'extended' | 'custom';
+
+export type Strategy = 'random' | 'balanced' | 'aggressive' | 'defensive';
+
 export type Coordinates = {
   x: number;
   y: number;
@@ -21,8 +25,9 @@ export type GameRecord = {
   game_type: GameType;
   name_of_enemy: string | null;
   board_size: number;
-  strategy: string;
+  strategy: Strategy;
   difficulty_level: DifficultyLevel;
+  rule_set: RuleSet;
   current_turn: 'B' | 'R';
   status: 'IN_PROGRESS' | 'FINISHED';
   result: 'WIN' | 'LOSS' | 'DRAW' | null;
@@ -35,8 +40,9 @@ export type CreateGamePayload = {
   board_size: number;
   game_type: GameType;
   name_of_enemy?: string;
-  strategy?: string;
+  strategy?: Strategy;
   difficulty_level?: DifficultyLevel;
+  rule_set?: RuleSet;
 };
 
 export type SubmitMovePayload = {
