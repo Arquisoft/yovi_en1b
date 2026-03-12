@@ -17,9 +17,9 @@ const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_datab
 const repository = new MongoUserRepository();
 
 if (process.env.NODE_ENV !== 'test') {
-  mongoose.connect(mongoUri)
-      .then(() => console.log('Connected to MongoDB'))
-      .catch(err => console.error('MongoDB connection error:', err));
+    mongoose.connect(mongoUri)
+        .then(() => console.log('Connected to MongoDB'))
+        .catch(err => console.error('MongoDB connection error:', err));
 }
 
 // Config & Middleware
@@ -35,9 +35,9 @@ app.use('/games', gameRoutes(repository));  // also exposes POST /games/play (bo
 
 // Start
 if (require.main === module) {
-  app.listen(port, () => {
-    console.log(`User Service listening at http://localhost:${port}`);
-  });
+    app.listen(port, () => {
+        console.log(`User Service listening at http://localhost:${port}`);
+    });
 }
 
 module.exports = app;
