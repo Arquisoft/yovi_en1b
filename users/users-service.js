@@ -9,54 +9,18 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+const MongoUserRepository = require('./repository/MongoUserRepository');
+
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/app_database';
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret';
 
+const repository = new MongoUserRepository();
+
 if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(mongoUri)
-      .then(() => console.log('Connected to MongoDB'))
-      .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB connection error:', err));
 }
-
-// Models
-
-const userSchema = new mongoose.Schema({
-  username:      { type: String, required: true, unique: true },
-  password_hash: { type: String, required: true },
-  created_at:    { type: Date, default: Date.now },
-  statistics: {
-    games_played: { type: Number, default: 0 },
-    wins:         { type: Number, default: 0 },
-    losses:       { type: Number, default: 0 }
-  }
-});
-const User = mongoose.model('User', userSchema);
-
-const moveSchema = new mongoose.Schema({
-  move_number: { type: Number, required: true },
-  player:      { type: String, required: true },          // 'HUMAN' or 'BOT'
-  coordinates: {
-    x: { type: Number, required: true },                  // barycentric coordinates
-    y: { type: Number, required: true },
-    z: { type: Number, required: true }
-  },
-  yen_state:   { type: String },                          // board state after this move
-  created_at:  { type: Date, default: Date.now }
-}, { _id: false });                                       // subdocument, no separate _id needed
-
-const gameSchema = new mongoose.Schema({
-  player_id:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  board_size:       { type: Number, required: true },
-  strategy:         { type: String, default: 'random' },
-  difficulty_level: { type: String, default: 'medium' },  // 'easy', 'medium', 'hard'
-  status:           { type: String, enum: ['IN_PROGRESS', 'FINISHED'], default: 'IN_PROGRESS' },
-  result:           { type: String, enum: ['WIN', 'LOSS', null], default: null },
-  duration_seconds: { type: Number, default: 0 },
-  yen_final_state:  { type: String },
-  created_at:       { type: Date, default: Date.now },
-  moves:            [moveSchema]                           // array of subdocuments, no joins needed
-});
-const Game = mongoose.model('Game', gameSchema);
 
 // Middleware
 
@@ -110,14 +74,13 @@ app.post('/createuser', async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ username: String(username) });
+    const existing = await repository.findByUsername(username);
     if (existing) {
       return res.status(409).json({ error: 'Username already taken' });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, password_hash });
-    await newUser.save();
+    const newUser = await repository.create({ username, password_hash });
 
     res.status(201).json({ message: `Welcome ${username}!`, userId: newUser._id });
   } catch (err) {
@@ -138,7 +101,7 @@ app.post('/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ username: String(username) });
+    const user = await repository.findByUsername(username);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const match = await bcrypt.compare(password, user.password_hash);
@@ -156,9 +119,16 @@ app.post('/login', async (req, res) => {
 // Get user profile + statistics
 app.get('/users/:id', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password_hash');
+    const user = await repository.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+
+    const response = user.toObject();
+    response.statistics.games_played = user.statistics.total_games;
+    response.statistics.wins = user.statistics.total_wins;
+    response.statistics.losses = user.statistics.total_losses;
+    delete response.password_hash;
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -167,9 +137,15 @@ app.get('/users/:id', authMiddleware, async (req, res) => {
 // Get user statistics
 app.get('/users/:id/stats', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('statistics');
+    const user = await repository.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user.statistics);
+
+    const stats = {
+      games_played: user.statistics.total_games,
+      wins: user.statistics.total_wins,
+      losses: user.statistics.total_losses
+    };
+    res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -177,13 +153,8 @@ app.get('/users/:id/stats', authMiddleware, async (req, res) => {
 
 // Get user game history (without moves array for a lighter response)
 app.get('/users/:id/history', authMiddleware, async (req, res) => {
-  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid user id' });
-  }
   try {
-    const games = await Game.find({ player_id: new mongoose.Types.ObjectId(req.params.id) })
-        .select('-moves')
-        .sort({ created_at: -1 });
+    const games = await repository.findGamesByPlayer(req.params.id);
     res.json(games);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -194,18 +165,18 @@ app.get('/users/:id/history', authMiddleware, async (req, res) => {
 
 // Create a new game
 app.post('/games', authMiddleware, async (req, res) => {
-  const { board_size, strategy, difficulty_level } = req.body || {};
+  const { board_size, strategy, difficulty_level, game_type } = req.body || {};
 
   if (!board_size) return res.status(400).json({ error: 'board_size is required' });
 
   try {
-    const game = new Game({
+    const game = await repository.createGame({
       player_id: req.user.userId,
+      game_type: game_type || 'BOT',
       board_size,
       strategy: strategy || 'random',
       difficulty_level: difficulty_level || 'medium'
     });
-    await game.save();
     res.status(201).json(game);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -215,7 +186,7 @@ app.post('/games', authMiddleware, async (req, res) => {
 // Get game state (including all moves for replay)
 app.get('/games/:id', authMiddleware, async (req, res) => {
   try {
-    const game = await Game.findById(req.params.id);
+    const game = await repository.findGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
     res.json(game);
   } catch (err) {
@@ -232,12 +203,11 @@ app.post('/games/:id/move', authMiddleware, async (req, res) => {
   }
 
   try {
-    const game = await Game.findById(req.params.id);
+    const game = await repository.findGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
     if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-    const move_number = game.moves.length + 1;
-    game.moves.push({ move_number, player, coordinates, yen_state });
+    game.moves.push({ move_number: game.moves.length + 1, player, coordinates, yen_state });
     await game.save();
 
     res.status(201).json(game.moves[game.moves.length - 1]);
@@ -253,23 +223,29 @@ app.put('/games/:id/finish', authMiddleware, async (req, res) => {
   if (!result) return res.status(400).json({ error: 'result is required (WIN or LOSS)' });
 
   try {
-    const game = await Game.findById(req.params.id);
+    const game = await repository.findGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
     if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-    game.status = 'FINISHED';
-    game.result = result;
-    game.yen_final_state = yen_final_state;
-    game.duration_seconds = duration_seconds || 0;
-    await game.save();
+    const updatedGame = await repository.updateGame(req.params.id, {
+      status: 'FINISHED',
+      result,
+      yen_final_state,
+      duration_seconds: duration_seconds || 0
+    });
 
-    // Update user statistics
-    const statsUpdate = { $inc: { 'statistics.games_played': 1 } };
-    if (result === 'WIN')  statsUpdate.$inc['statistics.wins'] = 1;
-    if (result === 'LOSS') statsUpdate.$inc['statistics.losses'] = 1;
-    await User.findByIdAndUpdate(game.player_id, statsUpdate);
+    const updatedUser = await repository.updateStats(game.player_id, {
+      result,
+      type: game.game_type,
+      difficulty: game.difficulty_level
+    });
 
-    res.json(game);
+    const response = updatedGame.toObject();
+    response.games_played = updatedUser.statistics.total_games;
+    response.wins = updatedUser.statistics.total_wins;
+    response.losses = updatedUser.statistics.total_losses;
+
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -278,7 +254,7 @@ app.put('/games/:id/finish', authMiddleware, async (req, res) => {
 // Get all moves of a game ordered by move_number (for replay)
 app.get('/games/:id/moves', authMiddleware, async (req, res) => {
   try {
-    const game = await Game.findById(req.params.id).select('moves');
+    const game = await repository.findGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
     const sortedMoves = game.moves.sort((a, b) => a.move_number - b.move_number);
     res.json(sortedMoves);
