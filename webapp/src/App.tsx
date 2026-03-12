@@ -1,6 +1,4 @@
 import './App.css'
-import RegisterForm from './RegisterForm';
-import { Game } from './Game';
 import reactLogo from './assets/react.svg'
 
 function App() {
@@ -16,8 +14,6 @@ function App() {
       </div>
 
       <h2>Welcome to the Software Arquitecture 2025-2026 course</h2>
-      <RegisterForm />
-      <Game />
     </div>
   );
 }
