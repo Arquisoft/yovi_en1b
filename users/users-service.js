@@ -1,14 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 
-const setupSwagger      = require('config/swagger');
-const metricsMiddleware = require('config/metrics');
-const corsMiddleware    = require('middleware/cors');
-const MongoUserRepository = require('repository/MongoUserRepository');
+const setupSwagger      = require('./config/swagger');
+const metricsMiddleware = require('./config/metrics');
+const corsMiddleware    = require('./middleware/cors');
+const MongoUserRepository = require('./repository/MongoUserRepository');
 
-const authRoutes  = require('routes/authRoutes');
-const userRoutes  = require('routes/userRoutes');
-const gameRoutes  = require('routes/gameRoutes');
+const authRoutes  = require('./routes/authRoutes');
+const userRoutes  = require('./routes/userRoutes');
+const gameRoutes  = require('./routes/gameRoutes');
 
 const app  = express();
 const port = 3000;
