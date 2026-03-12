@@ -4,11 +4,11 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret';
 
-module.exports = (repository) => {
+module.exports = function authRoutes(repository) {
     const router = express.Router();
 
     // Register
-    router.post('/createuser', async (req, res) => {
+    router.post('/createuser', async function createUser(req, res) {
         const { username, password } = req.body || {};
 
         if (!username || !password) {
@@ -34,7 +34,7 @@ module.exports = (repository) => {
     });
 
     // Login
-    router.post('/login', async (req, res) => {
+    router.post('/login', async function login(req, res) {
         const { username, password } = req.body || {};
 
         if (!username || !password) {
@@ -59,8 +59,7 @@ module.exports = (repository) => {
     });
 
     // Check if username exists — public, no JWT needed
-    // URL: GET /exists/:username (mounted at / so full path is /exists/:username)
-    router.get('/exists/:username', async (req, res) => {
+    router.get('/exists/:username', async function usernameExists(req, res) {
         try {
             const exists = await repository.usernameExists(String(req.params.username));
             res.json({ exists });
