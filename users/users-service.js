@@ -16,9 +16,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret';
 
 const repository = new MongoUserRepository();
 
-mongoose.connect(mongoUri)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(mongoUri)
+    .then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB connection error:', err));
+}
 
 // Middleware
 
@@ -76,7 +78,7 @@ app.post('/createuser', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const newUser = await repository.create({ username, password_hash });
 
-    res.status(201).json({ message: 'Welcome ${username}!', userId: newUser._id });
+    res.status(201).json({ message: `Welcome ${username}!`, userId: newUser._id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -239,7 +241,7 @@ app.get('/games/:id/moves', authMiddleware, async (req, res) => {
 
 if (require.main === module) {
   app.listen(port, () => {
-    console.log('User Service listening at http://localhost:${port}');
+    console.log(`User Service listening at http://localhost:${port}`);
   });
 }
 
