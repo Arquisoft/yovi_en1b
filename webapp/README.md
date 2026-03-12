@@ -1,73 +1,90 @@
-# React + TypeScript + Vite
+# Game Y - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend for Game Y, a hexagonal board game built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Install dependencies
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### MSW worker initialization
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm run msw:init
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+This sets up the Mock Service Worker files in `public/`.
+
+## Development
+
+### Run dev server (real API)
+
+```bash
+npm run dev
+```
+
+Connects to the backend at `http://localhost:3000` by default (set `VITE_API_URL` to override).
+
+### Run dev server with mock API
+
+```bash
+npm run dev:mock
+```
+
+Activates MSW to mock auth and game endpoints locally.
+
+## Testing
+
+### Run unit tests
+
+```bash
+npm test
+```
+
+### Watch mode
+
+```bash
+npm run test:watch
+```
+
+### Coverage
+
+```bash
+npm run test:coverage
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Linting
+
+```bash
+npm run lint
+```
+
+## Project structure
+
+- **`src/api/`** - HTTP client and API endpoints (auth, games)
+- **`src/components/`** - UI components and layouts
+  - `ui/` - Atomic components (Panel, Button, etc.)
+  - `layout/` - Application shell (TopBar, AppLayout)
+- **`src/features/`** - Feature-specific logic
+  - `auth/` - Authentication (AuthProvider, context)
+- **`src/hooks/`** - Custom React hooks
+- **`src/mocks/`** - MSW mock handlers (dev/test)
+- **`src/pages/`** - Page components (Home, Game, Profile, etc.)
+- **`src/types/`** - TypeScript domain types
+- **`src/test/`** - Test utilities and setup
+- **`src/utils/`** - Helper functions
+
+## Environment variables
+
+- `VITE_API_URL` - Backend API root (default: `http://localhost:3000`)
+- `VITE_USE_MSW` - Enable MSW mocking in dev mode (set to `true`)
 ```
