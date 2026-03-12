@@ -269,4 +269,181 @@ mod tests {
         let result = build_movement(PlayerId::new(0), &req);
         assert!(result.is_err());
     }
+
+    #[tokio::test]
+    async fn test_new_game_success() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let res = new_game(params, req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.board_size, 3);
+    }
+
+    #[tokio::test]
+    async fn test_new_game_invalid_size() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let req = axum::Json(NewGameRequest { board_size: 0 });
+        let res = new_game(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid board size"));
+    }
+
+    #[tokio::test]
+    async fn test_new_game_too_large() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let req = axum::Json(NewGameRequest { board_size: 101 });
+        let res = new_game(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid board size"));
+    }
+
+    #[tokio::test]
+    async fn test_new_game_invalid_version() {
+        let params = axum::extract::Path(VersionParam { api_version: "v2".to_string() });
+        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let res = new_game(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Unsupported API version"));
+    }
+
+    #[tokio::test]
+    async fn test_make_move_success() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(MakeMoveRequest {
+            game: yen,
+            movement: crate::game_server::dto::MoveRequest {
+                player_id: 0,
+                coords: Some(Coordinates::new(0, 0, 1)),
+                action: None,
+            },
+        });
+        let res = make_move(params, req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.board_size, 2);
+    }
+
+    #[tokio::test]
+    async fn test_make_move_invalid_yen() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "123".to_string()); // invalid layout
+        let req = axum::Json(MakeMoveRequest {
+            game: yen,
+            movement: crate::game_server::dto::MoveRequest {
+                player_id: 0,
+                coords: Some(Coordinates::new(0, 0, 1)),
+                action: None,
+            },
+        });
+        let res = make_move(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_make_move_invalid_movement() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(MakeMoveRequest {
+            game: yen,
+            movement: crate::game_server::dto::MoveRequest {
+                player_id: 0,
+                coords: Some(Coordinates::new(0, 0, 1)),
+                action: Some("swap".to_string()), // both coords and action
+            },
+        });
+        let res = make_move(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Cannot specify both"));
+    }
+
+    #[tokio::test]
+    async fn test_make_move_game_error() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // B is occupied
+        let req = axum::Json(MakeMoveRequest {
+            game: yen,
+            movement: crate::game_server::dto::MoveRequest {
+                player_id: 0,
+                coords: Some(Coordinates::new(1, 0, 0)), // B is at (1,0,0) with size 2
+                action: None,
+            },
+        });
+        let res = make_move(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid move"));
+    }
+
+    #[tokio::test]
+    async fn test_make_move_invalid_version() {
+        let params = axum::extract::Path(VersionParam { api_version: "v2".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(MakeMoveRequest {
+            game: yen,
+            movement: crate::game_server::dto::MoveRequest {
+                player_id: 0,
+                coords: Some(Coordinates::new(0, 0, 1)),
+                action: None,
+            },
+        });
+        let res = make_move(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Unsupported API version"));
+    }
+
+    #[tokio::test]
+    async fn test_load_game_success() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(yen);
+        let res = load_game(params, req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.board_size, 2);
+    }
+
+    #[tokio::test]
+    async fn test_load_game_invalid_yen() {
+        let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "invalid".to_string());
+        let req = axum::Json(yen);
+        let res = load_game(params, req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN format"));
+    }
+
+    #[tokio::test]
+    async fn test_load_game_invalid_version() {
+        let params = axum::extract::Path(VersionParam { api_version: "v2".to_string() });
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(yen);
+        let res = load_game(params, req).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_board_info_success() {
+        let params = axum::extract::Path(BoardInfoParams { api_version: "v1".to_string(), board_size: 3 });
+        let res = board_info(params).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.board_size, 3);
+    }
+
+    #[tokio::test]
+    async fn test_board_info_invalid_version() {
+        let params = axum::extract::Path(BoardInfoParams { api_version: "v2".to_string(), board_size: 3 });
+        let res = board_info(params).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_board_info_invalid_size() {
+        let params = axum::extract::Path(BoardInfoParams { api_version: "v1".to_string(), board_size: 0 });
+        let res = board_info(params).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid board size"));
+        
+        let params2 = axum::extract::Path(BoardInfoParams { api_version: "v1".to_string(), board_size: 101 });
+        let res2 = board_info(params2).await;
+        assert!(res2.is_err());
+    }
 }
