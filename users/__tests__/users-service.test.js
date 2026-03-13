@@ -289,7 +289,12 @@ describe('GET /games/:id', () => {
 
 describe('POST /games/:id/move', () => {
     it('saves a move and returns updated game state with switched turn', async () => {
-        // Get current turn first
+        // Mock fetch so Gamey compute responds successfully
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R' })
+        }))
+
         const gameRes = await request(app)
             .get(`/games/${gameId}`)
             .set('Authorization', `Bearer ${token}`)
@@ -298,14 +303,15 @@ describe('POST /games/:id/move', () => {
 
         const res = await request(app)
             .post(`/games/${gameId}/move`)
-            .send({ coordinates: { x: 1, y: 1, z: 1 }, yen_state: 'B/.B/RB./B..R' })
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
         expect(res.body.moves.length).toBe(1)
         expect(res.body.moves[0].move_number).toBe(1)
-        expect(res.body.moves[0].player).toBe(firstTurn)      // player = who just moved
-        expect(res.body.current_turn).toBe(nextTurn)          // turn has switched
+        expect(res.body.moves[0].player).toBe(firstTurn)
+        expect(res.body.moves[0].yen_state).toBe('B/.B/RB./B..R')  // computed by Gamey
+        expect(res.body.current_turn).toBe(nextTurn)
         expect(res.body.moves[0].coordinates).toEqual({ x: 1, y: 1, z: 1 })
     })
 
@@ -318,7 +324,34 @@ describe('POST /games/:id/move', () => {
         expect(res.status).toBe(400)
     })
 
+    it('returns 503 when Gamey compute is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+        const res = await request(app)
+            .post(`/games/${gameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(503)
+    })
+
+    it('returns 502 when Gamey compute returns an error', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+        const res = await request(app)
+            .post(`/games/${gameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(502)
+    })
+
     it('returns 404 for non-existent game', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R' })
+        }))
+
         const fakeId = new mongoose.Types.ObjectId()
         const res = await request(app)
             .post(`/games/${fakeId}/move`)
@@ -327,6 +360,68 @@ describe('POST /games/:id/move', () => {
         expect(res.status).toBe(404)
     })
 })
+
+// ─── Bot play ─────────────────────────────────────────────────────────────────
+
+describe('GET /games/:id/play', () => {
+    it('saves bot move and returns { coordinates, yen_state } when Gamey responds', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R' })
+        }))
+
+        const res = await request(app)
+            .get(`/games/${gameId}/play`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.coordinates).toEqual({ x: 2, y: 1, z: 0 })
+        expect(res.body.yen_state).toBe('R/.B/RB./B..R')
+
+        // Verify bot move was saved in DB
+        const gameRes = await request(app)
+            .get(`/games/${gameId}`)
+            .set('Authorization', `Bearer ${token}`)
+        const botMove = gameRes.body.moves.at(-1)
+        expect(botMove.coordinates).toEqual({ x: 2, y: 1, z: 0 })
+        expect(botMove.yen_state).toBe('R/.B/RB./B..R')
+    })
+
+    it('returns 503 when Gamey is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+        const res = await request(app)
+            .get(`/games/${gameId}/play`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(503)
+    })
+
+    it('returns 502 when Gamey returns an error', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+        const res = await request(app)
+            .get(`/games/${gameId}/play`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(502)
+    })
+
+    it('returns 404 for non-existent game', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .get(`/games/${fakeId}/play`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
+    })
+
+    it('returns 401 without token', async () => {
+        const res = await request(app).get(`/games/${gameId}/play`)
+        expect(res.status).toBe(401)
+    })
+})
+
+
 
 // ─── Finish game ──────────────────────────────────────────────────────────────
 
