@@ -562,4 +562,134 @@ mod tests {
         let res2 = board_info(params2).await;
         assert!(res2.is_err());
     }
+
+    #[tokio::test]
+    async fn test_play_success_with_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_play_success_without_yen() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_play_invalid_board_size() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: None,
+            difficulty_level: None,
+            board_size: 0,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid board size"));
+    }
+
+    #[tokio::test]
+    async fn test_play_invalid_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_play_already_finished() {
+        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 1,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_success_with_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 1),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_compute_success_without_yen() {
+        // Size = 1 + 0 + 0 + 1 = 2
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: None,
+            coordinates: Coordinates::new(1, 0, 0),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_compute_invalid_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 1),
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_already_finished() {
+        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 0), // Already taken
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_invalid_move() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // Top cell occupied
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(1, 0, 0), // Same cell
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid move"));
+    }
 }
