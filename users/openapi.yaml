@@ -404,40 +404,6 @@ paths:
         '500':
           description: Internal server error
 
-  /games/play:
-    post:
-      summary: Request a bot move
-      description: Forwards a board position to the Gamey bot service and returns the bot's chosen move. Public endpoint, no authentication required.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [position]
-              properties:
-                position:
-                  type: string
-                  description: Current board in YEN notation
-                  example: "B/.B/RB./B..R"
-                bot_id:
-                  type: string
-                  nullable: true
-                  example: null
-                strategy:
-                  type: string
-                  nullable: true
-                  example: "random"
-      responses:
-        '200':
-          description: Bot move returned from Gamey service
-        '400':
-          description: position is required
-        '502':
-          description: Gamey service returned an error
-        '503':
-          description: Gamey service unreachable
-
   /games/{id}:
     get:
       summary: Get game state
@@ -467,8 +433,11 @@ paths:
 
   /games/{id}/move:
     post:
-      summary: Submit a move
-      description: Saves a move. The player (B or R) is inferred automatically from current_turn — do not send it. Turn switches after each move. Requires authentication.
+      summary: Submit a player move
+      description: >
+        Saves a player move. Only coordinates are required — the player (B or R) is inferred from
+        current_turn, and the backend calls Gamey to compute the new yen_state from the previous
+        yen_state and the coordinates. Turn switches after each move. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -488,10 +457,6 @@ paths:
               properties:
                 coordinates:
                   $ref: '#/components/schemas/Coordinates'
-                yen_state:
-                  type: string
-                  nullable: true
-                  example: "B/.B/RB./B..R"
       responses:
         '201':
           description: Move saved — returns full updated game state
@@ -505,8 +470,53 @@ paths:
           description: No token provided or invalid token
         '404':
           description: Game not found
+        '502':
+          description: Gamey compute service returned an error
+        '503':
+          description: Gamey compute service unreachable
         '500':
           description: Internal server error
+
+  /games/{id}/play:
+    get:
+      summary: Request bot move
+      description: >
+        Reads the yen_state from the last saved move in DB, and forwards it along with strategy,
+        difficulty_level and board_size to Gamey. Gamey returns the bot's chosen coordinates and
+        the resulting yen_state, which are saved automatically as a move. Returns only
+        { coordinates, yen_state } to the frontend. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      responses:
+        '201':
+          description: Bot move computed and saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coordinates:
+                    $ref: '#/components/schemas/Coordinates'
+                  yen_state:
+                    type: string
+                    example: "R/.B/RB./B..R"
+        '400':
+          description: Game is already finished
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '502':
+          description: Gamey service returned an error
+        '503':
+          description: Gamey service unreachable
 
   /games/{id}/finish:
     put:

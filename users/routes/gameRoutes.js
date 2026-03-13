@@ -4,33 +4,26 @@ const authMiddleware = require('../middleware/auth');
 
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
+// Helper: call Gamey to compute new yen_state after a move
+async function computeYenState(yen_state_prev, coordinates) {
+    const gameyResponse = await fetch(`${GAMEY_URL}/compute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yen_state_prev, coordinates })
+    });
+
+    if (!gameyResponse.ok) {
+        const err = new Error('Gamey compute error');
+        err.status = 502;
+        throw err;
+    }
+
+    const { yen_state } = await gameyResponse.json();
+    return yen_state;
+}
+
 module.exports = function gameRoutes(repository) {
     const router = express.Router();
-
-    // Bot play endpoint — public, no JWT needed — MUST be before /:id routes
-    router.post('/play', async function botPlay(req, res) {
-        const { position, bot_id, strategy } = req.body || {};
-
-        if (!position) return res.status(400).json({ error: 'position is required (YEN notation)' });
-
-        let gameyResponse;
-        try {
-            gameyResponse = await fetch(`${GAMEY_URL}/play`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ position, bot_id, strategy })
-            });
-        } catch {
-            return res.status(503).json({ error: 'Gamey service unreachable' });
-        }
-
-        if (!gameyResponse.ok) {
-            return res.status(502).json({ error: 'Gamey service returned an error' });
-        }
-
-        const data = await gameyResponse.json();
-        res.json(data);
-    });
 
     // Create a new game
     router.post('/', authMiddleware, async function createGame(req, res) {
@@ -71,7 +64,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Submit a move — player inferred from current_turn
+    // Submit a player move — only needs coordinates, Gamey computes new yen_state
     router.post('/:id/move', authMiddleware, async function submitMove(req, res) {
         const { coordinates } = req.body || {};
 
@@ -79,15 +72,30 @@ module.exports = function gameRoutes(repository) {
             return res.status(400).json({ error: 'coordinates (x, y, z) are required' });
         }
 
+        let game;
         try {
-            const game = await repository.findGameById(req.params.id);
-            if (!game) return res.status(404).json({ error: 'Game not found' });
-            if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
+            game = await repository.findGameById(req.params.id);
+        } catch {
+            return res.status(500).json({ error: 'Error retrieving game' });
+        }
 
+        if (!game) return res.status(404).json({ error: 'Game not found' });
+        if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
+
+        // Get current yen_state from last move (null if first move)
+        const yen_state_prev = game.moves.at(-1)?.yen_state ?? null;
+
+        // Ask Gamey to compute the new yen_state
+        let new_yen_state;
+        try {
+            new_yen_state = await computeYenState(yen_state_prev, coordinates);
+        } catch (err) {
+            return res.status(err.status || 503).json({ error: err.message });
+        }
+
+        try {
             const player = game.current_turn;
-            const yen_state = req.body?.yen_state ?? null;
-
-            game.moves.push({ move_number: game.moves.length + 1, player, coordinates, yen_state });
+            game.moves.push({ move_number: game.moves.length + 1, player, coordinates, yen_state: new_yen_state });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
 
@@ -95,6 +103,55 @@ module.exports = function gameRoutes(repository) {
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
+    });
+
+    // Request bot move — Gamey computes bot move from current yen_state, saves it
+    router.get('/:id/play', authMiddleware, async function botPlay(req, res) {
+        let game;
+        try {
+            game = await repository.findGameById(req.params.id);
+        } catch {
+            return res.status(500).json({ error: 'Error retrieving game' });
+        }
+
+        if (!game) return res.status(404).json({ error: 'Game not found' });
+        if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
+
+        // Get current yen_state from last move (null if first move — bot goes first)
+        const yen_state = game.moves.at(-1)?.yen_state ?? null;
+
+        let gameyResponse;
+        try {
+            gameyResponse = await fetch(`${GAMEY_URL}/play`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ yen_state, strategy: game.strategy, difficulty_level: game.difficulty_level, board_size: game.board_size })
+            });
+        } catch {
+            return res.status(503).json({ error: 'Gamey service unreachable' });
+        }
+
+        if (!gameyResponse.ok) {
+            return res.status(502).json({ error: 'Gamey service returned an error' });
+        }
+
+        const { coordinates, yen_state: botYenState } = await gameyResponse.json();
+
+        // Save bot move automatically
+        try {
+            game.moves.push({
+                move_number: game.moves.length + 1,
+                player:      game.current_turn,
+                coordinates,
+                yen_state:   botYenState
+            });
+            game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
+            await game.save();
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        res.status(201).json({ coordinates, yen_state: botYenState });
     });
 
     // Finish a game
