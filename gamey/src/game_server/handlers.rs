@@ -4,9 +4,10 @@
 
 use crate::bot_server::error::ErrorResponse;
 use crate::game_server::dto::{
-    BoardInfoResponse, GameStateResponse, MakeMoveRequest, NewGameRequest,
+    BoardInfoResponse, ComputeRequest, ComputeResponse, GameStateResponse, MakeMoveRequest,
+    NewGameRequest, PlayRequest, PlayResponse,
 };
-use crate::{GameAction, GameY, Movement, PlayerId, YEN, check_api_version};
+use crate::{GameAction, GameY, Movement, PlayerId, RandomBot, YBot, YEN, check_api_version};
 use axum::extract::Path;
 use axum::Json;
 use serde::Deserialize;
@@ -160,6 +161,121 @@ pub async fn board_info(
 
     let response = BoardInfoResponse::from_board_size(params.board_size, params.api_version);
     Ok(Json(response))
+}
+
+// ============================================================================
+// Partner API (Nacho) Endpoints
+// ============================================================================
+
+/// `POST /play`
+///
+/// Handles a bot move. Creates a game from the provided YEN state (or starts a
+/// new one if null), asks a bot for a move, applies it, and returns the result.
+#[axum::debug_handler]
+pub async fn play(
+    Json(req): Json<PlayRequest>,
+) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
+    let mut game = match req.yen_state {
+        Some(yen) => GameY::try_from(yen).map_err(|err| {
+            Json(ErrorResponse::error(
+                &format!("Invalid YEN state: {}", err),
+                None,
+                None,
+            ))
+        })?,
+        None => {
+            if req.board_size == 0 || req.board_size > 100 {
+                return Err(Json(ErrorResponse::error(
+                    &format!("Invalid board size: {}. Must be between 1 and 100.", req.board_size),
+                    None,
+                    None,
+                )));
+            }
+            GameY::new(req.board_size)
+        }
+    };
+
+    if let crate::GameStatus::Finished { .. } = game.status() {
+        return Err(Json(ErrorResponse::error("Game is already finished", None, None)));
+    }
+
+    let bot = RandomBot;
+    let coords = bot.choose_move(&game).ok_or_else(|| {
+        Json(ErrorResponse::error("Bot could not find a move", None, None))
+    })?;
+
+    let next_player = match game.status() {
+        crate::GameStatus::Ongoing { next_player } => next_player,
+        _ => return Err(Json(ErrorResponse::error("Game is already finished", None, None))),
+    };
+
+    game.add_move(Movement::Placement {
+        player: *next_player,
+        coords,
+    }).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Failed to apply bot move: {}", err),
+            None,
+            None,
+        ))
+    })?;
+
+    Ok(Json(PlayResponse {
+        coordinates: coords,
+        yen_state: (&game).into(),
+    }))
+}
+
+/// `POST /compute`
+///
+/// Handles a human move. Creates a game from state (or starts new if null),
+/// applies the given placement coordinates, and returns the updated state.
+#[axum::debug_handler]
+pub async fn compute(
+    Json(req): Json<ComputeRequest>,
+) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
+    let mut game = match req.yen_state_prev {
+        Some(yen) => GameY::try_from(yen).map_err(|err| {
+            Json(ErrorResponse::error(
+                &format!("Invalid YEN state: {}", err),
+                None,
+                None,
+            ))
+        })?,
+        None => {
+            // Reconstruct board size from first move coordinates
+            // In barycentric coordinates: x + y + z = board_size - 1
+            let c = req.coordinates;
+            let board_size = c.x() + c.y() + c.z() + 1;
+            GameY::new(board_size)
+        }
+    };
+
+    if let crate::GameStatus::Finished { .. } = game.status() {
+        return Err(Json(ErrorResponse::error("Game is already finished", None, None)));
+    }
+
+    let next_player = match game.status() {
+        crate::GameStatus::Ongoing { next_player } => next_player,
+        _ => return Err(Json(ErrorResponse::error("Game is already finished", None, None))),
+    };
+
+    game.add_move(Movement::Placement {
+        player: *next_player,
+        coords: req.coordinates,
+    }).map_err(|err| {
+        // Here we could check if it's the second move and they wanted to swap,
+        // but the API specifically provides coordinates, so it's a placement.
+        Json(ErrorResponse::error(
+            &format!("Invalid move: {}", err),
+            None,
+            None,
+        ))
+    })?;
+
+    Ok(Json(ComputeResponse {
+        yen_state: (&game).into(),
+    }))
 }
 
 /// Helper: converts a `MoveRequest` into a core `Movement`.
@@ -445,5 +561,135 @@ mod tests {
         let params2 = axum::extract::Path(BoardInfoParams { api_version: "v1".to_string(), board_size: 101 });
         let res2 = board_info(params2).await;
         assert!(res2.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_play_success_with_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_play_success_without_yen() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_play_invalid_board_size() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: None,
+            difficulty_level: None,
+            board_size: 0,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid board size"));
+    }
+
+    #[tokio::test]
+    async fn test_play_invalid_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_play_already_finished() {
+        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
+        let req = axum::Json(PlayRequest {
+            yen_state: Some(yen),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 1,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_success_with_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 1),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_compute_success_without_yen() {
+        // Size = 1 + 0 + 0 + 1 = 2
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: None,
+            coordinates: Coordinates::new(1, 0, 0),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_compute_invalid_yen() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 1),
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_already_finished() {
+        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(0, 0, 0), // Already taken
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_invalid_move() {
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // Top cell occupied
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(yen),
+            coordinates: Coordinates::new(1, 0, 0), // Same cell
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("Invalid move"));
     }
 }

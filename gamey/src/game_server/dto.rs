@@ -110,6 +110,48 @@ pub struct CellCoordInfo {
 }
 
 // ============================================================================
+// Partner API (Nacho) DTOs
+// ============================================================================
+
+/// Request format for the /play endpoint where the bot makes a move.
+#[derive(Deserialize, Debug)]
+pub struct PlayRequest {
+    /// The current game state (null if first move).
+    pub yen_state: Option<YEN>,
+    /// The bot strategy/difficulty (e.g., "random").
+    pub strategy: Option<String>,
+    /// The bot difficulty level.
+    pub difficulty_level: Option<String>,
+    /// The board size.
+    pub board_size: u32,
+}
+
+/// Response format for the /play endpoint.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlayResponse {
+    /// The coordinates where the bot placed its piece.
+    pub coordinates: Coordinates,
+    /// The new game state after the bot's move.
+    pub yen_state: YEN,
+}
+
+/// Request format for the /compute endpoint where a human move is processed.
+#[derive(Deserialize, Debug)]
+pub struct ComputeRequest {
+    /// The current game state before the human's move (null if first move).
+    pub yen_state_prev: Option<YEN>,
+    /// The coordinates where the human placed their piece.
+    pub coordinates: Coordinates,
+}
+
+/// Response format for the /compute endpoint.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ComputeResponse {
+    /// The new game state after the human's move.
+    pub yen_state: YEN,
+}
+
+// ============================================================================
 // Conversion helpers
 // ============================================================================
 
