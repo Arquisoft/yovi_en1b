@@ -27,17 +27,21 @@ export function NewGamePage() {
   const [opponentName, setOpponentName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const opponentNameError = error === 'Please enter opponent name';
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedOpponentName = opponentName.trim();
+    if (gameType === 'PLAYER' && !trimmedOpponentName) {
+      setError('Please enter opponent name');
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
-      if (gameType === 'PLAYER' && !opponentName.trim()) {
-        throw new Error('Please enter opponent name');
-      }
-
       const payload: CreateGamePayload = {
         board_size: boardSize,
         game_type: gameType,
@@ -47,7 +51,7 @@ export function NewGamePage() {
       };
 
       if (gameType === 'PLAYER') {
-        payload.name_of_enemy = opponentName;
+        payload.name_of_enemy = trimmedOpponentName;
       }
 
       const game = await createGame(payload);
@@ -107,7 +111,8 @@ export function NewGamePage() {
                 onChange={(e) => setOpponentName(e.target.value)}
                 placeholder="Enter opponent's name"
                 disabled={loading}
-                required
+                aria-invalid={opponentNameError}
+                aria-describedby={opponentNameError ? 'new-game-error' : undefined}
               />
             </div>
           )}
@@ -216,9 +221,8 @@ export function NewGamePage() {
           </button>
         </div>
 
-        {error && <div className="form-error">{error}</div>}
+        {error && <div id="new-game-error" className="form-error">{error}</div>}
       </form>
     </Panel>
   );
 }
-
