@@ -1,0 +1,42 @@
+.home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 320px));
+  gap: 16px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.home-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 20px;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #1e293b;
+  color: #e2e8f0;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.home-action:hover {
+  border-color: #64748b;
+  background: #334155;
+  color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.home-action--primary {
+  border-color: #0ea5e9;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: #ffffff;
+}
+
+.home-action--primary:hover {
+  border-color: #06b6d4;
+  background: linear-gradient(135deg, #0891b2 0%, #0ea5e9 100%);
+  color: #ffffff;
+}
+

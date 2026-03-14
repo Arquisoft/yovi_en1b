@@ -1,0 +1,37 @@
+.panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.panel:hover {
+  border-color: #475569;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+.panel-header {
+  padding: 32px 32px 16px;
+  border-bottom: 1px solid #334155;
+}
+
+.panel-header h1 {
+  margin: 0 0 12px 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.panel-header p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 1rem;
+}
+
+.panel-body {
+  padding: 32px;
+}
+
+
+
