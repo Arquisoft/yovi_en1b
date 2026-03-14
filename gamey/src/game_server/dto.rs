@@ -116,8 +116,8 @@ pub struct CellCoordInfo {
 /// Request format for the /play endpoint where the bot makes a move.
 #[derive(Deserialize, Debug)]
 pub struct PlayRequest {
-    /// The current game state (null if first move).
-    pub yen_state: Option<YEN>,
+    /// The current game state as a JSON string (null if first move).
+    pub yen_state: Option<String>,
     /// The bot strategy/difficulty (e.g., "random").
     pub strategy: Option<String>,
     /// The bot difficulty level.
@@ -131,15 +131,15 @@ pub struct PlayRequest {
 pub struct PlayResponse {
     /// The coordinates where the bot placed its piece.
     pub coordinates: Coordinates,
-    /// The new game state after the bot's move.
-    pub yen_state: YEN,
+    /// The new game state as a JSON string after the bot's move.
+    pub yen_state: String,
 }
 
 /// Request format for the /compute endpoint where a human move is processed.
 #[derive(Deserialize, Debug)]
 pub struct ComputeRequest {
-    /// The current game state before the human's move (null if first move).
-    pub yen_state_prev: Option<YEN>,
+    /// The current game state as a JSON string before the human's move (null if first move).
+    pub yen_state_prev: Option<String>,
     /// The coordinates where the human placed their piece.
     pub coordinates: Coordinates,
 }
@@ -147,8 +147,8 @@ pub struct ComputeRequest {
 /// Response format for the /compute endpoint.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ComputeResponse {
-    /// The new game state after the human's move.
-    pub yen_state: YEN,
+    /// The new game state as a JSON string after the human's move.
+    pub yen_state: String,
 }
 
 // ============================================================================

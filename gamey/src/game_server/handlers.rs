@@ -176,13 +176,20 @@ pub async fn play(
     Json(req): Json<PlayRequest>,
 ) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state {
-        Some(yen) => GameY::try_from(yen).map_err(|err| {
-            Json(ErrorResponse::error(
-                &format!("Invalid YEN state: {}", err),
-                None,
-                None,
-            ))
-        })?,
+        Some(layout_str) => {
+            let size = layout_str.split('/').count() as u32;
+            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
+            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
+            let turn = if b_count > r_count { 1 } else { 0 };
+            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
+            GameY::try_from(yen).map_err(|err| {
+                Json(ErrorResponse::error(
+                    &format!("Invalid YEN layout: {}", err),
+                    None,
+                    None,
+                ))
+            })?
+        }
         None => {
             if req.board_size == 0 || req.board_size > 100 {
                 return Err(Json(ErrorResponse::error(
@@ -220,9 +227,10 @@ pub async fn play(
         ))
     })?;
 
+    let response_yen: YEN = (&game).into();
     Ok(Json(PlayResponse {
         coordinates: coords,
-        yen_state: (&game).into(),
+        yen_state: response_yen.layout().to_string(),
     }))
 }
 
@@ -235,13 +243,20 @@ pub async fn compute(
     Json(req): Json<ComputeRequest>,
 ) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state_prev {
-        Some(yen) => GameY::try_from(yen).map_err(|err| {
-            Json(ErrorResponse::error(
-                &format!("Invalid YEN state: {}", err),
-                None,
-                None,
-            ))
-        })?,
+        Some(layout_str) => {
+            let size = layout_str.split('/').count() as u32;
+            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
+            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
+            let turn = if b_count > r_count { 1 } else { 0 };
+            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
+            GameY::try_from(yen).map_err(|err| {
+                Json(ErrorResponse::error(
+                    &format!("Invalid YEN layout: {}", err),
+                    None,
+                    None,
+                ))
+            })?
+        }
         None => {
             // Reconstruct board size from first move coordinates
             // In barycentric coordinates: x + y + z = board_size - 1
@@ -273,8 +288,9 @@ pub async fn compute(
         ))
     })?;
 
+    let response_yen: YEN = (&game).into();
     Ok(Json(ComputeResponse {
-        yen_state: (&game).into(),
+        yen_state: response_yen.layout().to_string(),
     }))
 }
 
@@ -565,9 +581,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_with_yen() {
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
         let req = axum::Json(PlayRequest {
-            yen_state: Some(yen),
+            yen_state: Some("./..".to_string()),
             strategy: Some("random".to_string()),
             difficulty_level: None,
             board_size: 2,
@@ -575,7 +590,7 @@ mod tests {
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
-        assert_eq!(res_json.yen_state.size(), 2);
+        assert_eq!(res_json.yen_state.split('/').count(), 2);
     }
 
     #[tokio::test]
@@ -589,7 +604,7 @@ mod tests {
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
-        assert_eq!(res_json.yen_state.size(), 2);
+        assert_eq!(res_json.yen_state.split('/').count(), 2);
     }
 
     #[tokio::test]
@@ -607,9 +622,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_invalid_yen() {
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
         let req = axum::Json(PlayRequest {
-            yen_state: Some(yen),
+            yen_state: Some("12".to_string()), // Invalid layout format
             strategy: None,
             difficulty_level: None,
             board_size: 2,
@@ -621,9 +635,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_already_finished() {
-        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
         let req = axum::Json(PlayRequest {
-            yen_state: Some(yen),
+            yen_state: Some("B".to_string()), // Size 1 full board
             strategy: None,
             difficulty_level: None,
             board_size: 1,
@@ -635,14 +648,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_success_with_yen() {
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "./..".to_string());
         let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some(yen),
+            yen_state_prev: Some("./..".to_string()),
             coordinates: Coordinates::new(0, 0, 1),
         });
         let res = compute(req).await;
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.split('/').count(), 2);
     }
 
     #[tokio::test]
@@ -654,14 +667,14 @@ mod tests {
         });
         let res = compute(req).await;
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().0.yen_state.size(), 2);
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.yen_state.split('/').count(), 2);
     }
 
     #[tokio::test]
     async fn test_compute_invalid_yen() {
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "12".to_string()); // Invalid
         let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some(yen),
+            yen_state_prev: Some("12".to_string()), // Invalid layout
             coordinates: Coordinates::new(0, 0, 1),
         });
         let res = compute(req).await;
@@ -671,9 +684,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_already_finished() {
-        let yen = crate::YEN::new(1, 0, vec!['B', 'R'], "B".to_string()); // Size 1 full board
         let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some(yen),
+            yen_state_prev: Some("B".to_string()), // Size 1 full board
             coordinates: Coordinates::new(0, 0, 0), // Already taken
         });
         let res = compute(req).await;
@@ -683,9 +695,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_invalid_move() {
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // Top cell occupied
         let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some(yen),
+            yen_state_prev: Some("B/..".to_string()), // Top cell occupied
             coordinates: Coordinates::new(1, 0, 0), // Same cell
         });
         let res = compute(req).await;
