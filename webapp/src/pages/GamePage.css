@@ -64,11 +64,6 @@
   color: #e2e8f0;
 }
 
-.center-panel-actions {
-  display: inline-flex;
-  gap: 8px;
-}
-
 .icon-btn {
   min-width: auto;
   width: 44px;
@@ -110,69 +105,87 @@
 }
 
 .board {
-  --hex-w: 68px;
-  --hex-h: 78px;
-  --hex-overlap-x: 16px;
-  --hex-overlap-y: 18px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0;
-  padding: 10px 10px 16px;
-  min-width: fit-content;
+  padding: 12px;
+  flex-shrink: 0;
 }
 
 .board-row {
   display: flex;
-  gap: 0;
-  margin-top: calc(-1 * var(--hex-overlap-y));
+  gap: 2px;
+  margin-bottom: -14px;
 }
 
-.board-row:first-child {
-  margin-top: 0;
+/* Hex wrapper draws border color, inner .hex draws fill color. */
+.hex-wrap {
+  --hex-size: 60px;
+  --hex-border: 3px;
+  width: var(--hex-size);
+  height: calc(var(--hex-size) * 1.1547);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: #334155;
+  transition: background 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hex-wrap:hover:not(.hex-wrap--disabled) {
+  background: #0ea5e9;
+}
+
+.hex-wrap.blue {
+  background: #3b82f6;
+}
+
+.hex-wrap.red {
+  background: #ef4444;
+}
+
+.hex-wrap--disabled {
+  cursor: default;
 }
 
 .hex {
-  width: var(--hex-w);
-  height: var(--hex-h);
-  margin-left: calc(-1 * var(--hex-overlap-x));
-  border: 1px solid #475569;
+  width: calc(var(--hex-size) - 2 * var(--hex-border));
+  height: calc((var(--hex-size) - 2 * var(--hex-border)) * 1.1547);
+  flex-shrink: 0;
   background: #1e293b;
   color: transparent;
+  font-size: 0.82rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  clip-path: polygon(50% 0%, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%);  transform-origin: 50% 50%;
-  transition: border-color 0.16s ease, background 0.16s ease;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  transition: background 0.15s ease;
+  pointer-events: none;
 }
 
-.board-row .hex:first-child {
-  margin-left: 0;
-}
-
-.hex-label {
-  color: inherit;
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1;
-  transform: rotate(0deg);
-}
-
-.hex:hover:enabled {
-  border-color: #0ea5e9;
+.hex-wrap:hover:not(.hex-wrap--disabled) .hex {
   background: #334155;
 }
 
 .hex.blue {
-  background: linear-gradient(180deg, #60a5fa 0%, #1d4ed8 100%);
-  border-color: #3b82f6;
+  background: linear-gradient(160deg, #60a5fa 0%, #1d4ed8 100%);
   color: #eff6ff;
 }
 
 .hex.red {
-  background: linear-gradient(180deg, #f87171 0%, #b91c1c 100%);
-  border-color: #ef4444;
+  background: linear-gradient(160deg, #f87171 0%, #b91c1c 100%);
   color: #fef2f2;
+}
+
+/* Focus ring for accessibility on div role=button */
+.hex-wrap:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
 }
 
 .move-history {
@@ -249,28 +262,4 @@
 
 .game-shell.turn-red {
   background: linear-gradient(180deg, rgba(127, 29, 29, 0.18) 0%, rgba(15, 23, 42, 0) 65%);
-}
-
-@media (max-width: 1380px) {
-  .game-header-panels {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1100px) {
-  .board {
-    --hex-w: 60px;
-    --hex-h: 70px;
-    --hex-overlap-x: 12px;
-    --hex-overlap-y: 16px;
-  }
-}
-
-@media (max-width: 900px) {
-  .board {
-    --hex-w: 52px;
-    --hex-h: 60px;
-    --hex-overlap-x: 12px;
-    --hex-overlap-y: 14px;
-  }
 }
