@@ -364,7 +364,7 @@ describe('POST /games/:id/move', () => {
 // ─── Bot play ─────────────────────────────────────────────────────────────────
 
 describe('GET /games/:id/play', () => {
-    it('saves bot move and returns { coordinates, yen_state } when Gamey responds', async () => {
+    it('saves bot move and returns full game state when Gamey responds', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R' })
@@ -375,8 +375,8 @@ describe('GET /games/:id/play', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
-        expect(res.body.coordinates).toEqual({ x: 2, y: 1, z: 0 })
-        expect(res.body.yen_state).toBe('R/.B/RB./B..R')
+        expect(res.body).toHaveProperty('_id')
+        expect(res.body).toHaveProperty('moves')
 
         // Verify bot move was saved in DB
         const gameRes = await request(app)
