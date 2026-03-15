@@ -4,7 +4,11 @@ import { AuthContext } from './authContext';
 import type { AuthContextValue } from './authContext';
 import type { LoginPayload, RegisterPayload } from '../../types/auth';
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  readonly children: React.ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState(readSession());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,4 +68,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-

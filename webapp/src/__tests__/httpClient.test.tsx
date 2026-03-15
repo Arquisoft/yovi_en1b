@@ -1,5 +1,12 @@
+import { faker } from '@faker-js/faker';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, requestJson } from '../api/httpClient';
+
+faker.seed(20260318);
+const HTTP_CLIENT_TEST_DATA = {
+  storedToken: faker.string.alphanumeric(24),
+  externalToken: faker.string.alphanumeric(24),
+} as const;
 
 type MockResponse = {
   ok: boolean;
@@ -39,7 +46,7 @@ describe('httpClient.requestJson', () => {
   });
 
   it('adds Bearer token from localStorage when missing Authorization header', async () => {
-    localStorage.setItem('auth_token', 'token-123');
+    localStorage.setItem('auth_token', HTTP_CLIENT_TEST_DATA.storedToken);
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(createResponse({ ok: true }) as unknown as Response);
@@ -48,22 +55,22 @@ describe('httpClient.requestJson', () => {
 
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers((init as RequestInit | undefined)?.headers);
-    expect(headers.get('Authorization')).toBe('Bearer token-123');
+    expect(headers.get('Authorization')).toBe(`Bearer ${HTTP_CLIENT_TEST_DATA.storedToken}`);
   });
 
   it('keeps explicit Authorization header unchanged', async () => {
-    localStorage.setItem('auth_token', 'token-123');
+    localStorage.setItem('auth_token', HTTP_CLIENT_TEST_DATA.storedToken);
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(createResponse({ ok: true }) as unknown as Response);
 
     await requestJson('/secure', {
-      headers: { Authorization: 'Bearer external-token' },
+      headers: { Authorization: `Bearer ${HTTP_CLIENT_TEST_DATA.externalToken}` },
     });
 
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers((init as RequestInit | undefined)?.headers);
-    expect(headers.get('Authorization')).toBe('Bearer external-token');
+    expect(headers.get('Authorization')).toBe(`Bearer ${HTTP_CLIENT_TEST_DATA.externalToken}`);
   });
 
   it('throws ApiError with backend error message when response is not ok', async () => {
