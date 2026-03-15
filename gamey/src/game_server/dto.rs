@@ -2,7 +2,7 @@
 //!
 //! These types define the JSON request and response formats used by the game endpoints.
 
-use crate::{Coordinates, GameStatus, GameY, PlayerId, YEN};
+use crate::{Coordinates, GameStatus, GameY, YEN};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -133,6 +133,8 @@ pub struct PlayResponse {
     pub coordinates: Coordinates,
     /// The new game state as a JSON string after the bot's move.
     pub yen_state: String,
+    /// The winner of the game ("B", "R", or null).
+    pub winner: Option<String>,
 }
 
 /// Request format for the /compute endpoint where a human move is processed.
@@ -149,6 +151,8 @@ pub struct ComputeRequest {
 pub struct ComputeResponse {
     /// The new game state as a JSON string after the human's move.
     pub yen_state: String,
+    /// The winner of the game ("B", "R", or null).
+    pub winner: Option<String>,
 }
 
 // ============================================================================
@@ -237,6 +241,7 @@ impl BoardInfoResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PlayerId;
 
     #[test]
     fn test_game_status_dto_ongoing() {

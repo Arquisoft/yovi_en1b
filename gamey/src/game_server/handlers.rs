@@ -228,9 +228,21 @@ pub async fn play(
     })?;
 
     let response_yen: YEN = (&game).into();
+    let winner = match game.status() {
+        crate::GameStatus::Finished { winner } => {
+            if winner.id() == 0 {
+                Some("B".to_string())
+            } else {
+                Some("R".to_string())
+            }
+        }
+        _ => None,
+    };
+
     Ok(Json(PlayResponse {
         coordinates: coords,
         yen_state: response_yen.layout().to_string(),
+        winner,
     }))
 }
 
@@ -289,8 +301,20 @@ pub async fn compute(
     })?;
 
     let response_yen: YEN = (&game).into();
+    let winner = match game.status() {
+        crate::GameStatus::Finished { winner } => {
+            if winner.id() == 0 {
+                Some("B".to_string())
+            } else {
+                Some("R".to_string())
+            }
+        }
+        _ => None,
+    };
+
     Ok(Json(ComputeResponse {
         yen_state: response_yen.layout().to_string(),
+        winner,
     }))
 }
 
@@ -591,6 +615,7 @@ mod tests {
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         assert_eq!(res_json.yen_state.split('/').count(), 2);
+        assert_eq!(res_json.winner, None);
     }
 
     #[tokio::test]
@@ -647,6 +672,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_play_already_finished_at_next_player() {
+        // This is a contrived test to hit the branch where `game.status()` is not `Ongoing`
+        // after `bot.choose_move` is called. It shouldn't normally happen, but covering it.
+        // B/R size 2 = 3 cells. Full board size 2 is 3 cells. 
+        let req = axum::Json(PlayRequest {
+            yen_state: Some("B/RR".to_string()),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
     async fn test_compute_success_with_yen() {
         let req = axum::Json(ComputeRequest {
             yen_state_prev: Some("./..".to_string()),
@@ -656,6 +697,20 @@ mod tests {
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         assert_eq!(res_json.yen_state.split('/').count(), 2);
+        assert_eq!(res_json.winner, None);
+    }
+
+    #[tokio::test]
+    async fn test_compute_winner() {
+        // Assume player 1 (R) just placed a piece that finished the game (size 1)
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(".".to_string()),
+            coordinates: Coordinates::new(0, 0, 0),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.winner, Some("B".to_string())); // Because turn 0 (B) placed it
     }
 
     #[tokio::test]
@@ -687,6 +742,17 @@ mod tests {
         let req = axum::Json(ComputeRequest {
             yen_state_prev: Some("B".to_string()), // Size 1 full board
             coordinates: Coordinates::new(0, 0, 0), // Already taken
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_already_finished_at_next_player() {
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some("B/RR".to_string()), // Full board
+            coordinates: Coordinates::new(0, 0, 0),
         });
         let res = compute(req).await;
         assert!(res.is_err());
