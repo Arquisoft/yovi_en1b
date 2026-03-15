@@ -151,7 +151,7 @@ module.exports = function gameRoutes(repository) {
             return res.status(500).json({ error: err.message });
         }
 
-        res.status(201).json({ coordinates, yen_state: botYenState });
+        res.status(201).json(game);
     });
 
     // Finish a game
