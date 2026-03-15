@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
@@ -8,10 +9,20 @@ import { NewGamePage } from '../pages/NewGamePage';
 import { server } from '../mocks/server';
 import { http, HttpResponse } from 'msw';
 
+faker.seed(20260317);
+const NEW_GAME_TEST_DATA = {
+  authToken: faker.string.alphanumeric(24),
+  username: faker.internet.username().toLowerCase(),
+  userId: faker.string.alphanumeric(8),
+  gameIdOne: faker.string.alphanumeric(10),
+  gameIdTwo: faker.string.alphanumeric(10),
+  opponentName: faker.person.firstName(),
+} as const;
+
 function setSession() {
-  localStorage.setItem('auth_token', 'mock-token-u1');
-  localStorage.setItem('auth_username', 'alice');
-  localStorage.setItem('auth_user_id', 'u1');
+  localStorage.setItem('auth_token', NEW_GAME_TEST_DATA.authToken);
+  localStorage.setItem('auth_username', NEW_GAME_TEST_DATA.username);
+  localStorage.setItem('auth_user_id', NEW_GAME_TEST_DATA.userId);
 }
 
 function renderNewGamePage() {
@@ -95,8 +106,8 @@ describe('NewGamePage — game creation', () => {
     server.use(
       http.post('*/games', () =>
         HttpResponse.json({
-          _id: 'game-1',
-          player_id: 'u1',
+          _id: NEW_GAME_TEST_DATA.gameIdOne,
+          player_id: NEW_GAME_TEST_DATA.userId,
           game_type: 'BOT',
           name_of_enemy: null,
           board_size: 5,
@@ -126,7 +137,7 @@ describe('NewGamePage — game creation', () => {
           return HttpResponse.json({ error: 'name_of_enemy is required' }, { status: 400 });
         }
         return HttpResponse.json({
-          _id: 'game-2', player_id: 'u1', game_type: 'PLAYER',
+          _id: NEW_GAME_TEST_DATA.gameIdTwo, player_id: NEW_GAME_TEST_DATA.userId, game_type: 'PLAYER',
           name_of_enemy: body.name_of_enemy, board_size: 5,
           strategy: 'random', difficulty_level: 'medium', rule_set: 'normal',
           current_turn: 'B', status: 'IN_PROGRESS', result: null,
@@ -136,11 +147,10 @@ describe('NewGamePage — game creation', () => {
     );
     renderNewGamePage();
     await userEvent.click(screen.getByLabelText(/play vs player/i));
-    await userEvent.type(screen.getByLabelText(/opponent name/i), 'Bob');
+    await userEvent.type(screen.getByLabelText(/opponent name/i), NEW_GAME_TEST_DATA.opponentName);
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
     // error must NOT appear
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.queryByText(/name_of_enemy is required/i)).not.toBeInTheDocument();
   });
 });
-

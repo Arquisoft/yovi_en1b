@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
@@ -7,6 +8,19 @@ import { AuthProvider } from '../features/auth/AuthProvider';
 import { EntryPage } from '../pages/EntryPage';
 import { server } from '../mocks/server';
 import { http, HttpResponse } from 'msw';
+
+faker.seed(20260315);
+const AUTH_TEST_DATA = {
+  existingUsername: faker.internet.username().toLowerCase(),
+  newUsername: faker.internet.username().toLowerCase(),
+  validSecret: faker.string.alphanumeric(14),
+  invalidSecret: faker.string.alphanumeric(12),
+  anotherSecret: faker.string.alphanumeric(16),
+  existingToken: faker.string.alphanumeric(24),
+  newToken: faker.string.alphanumeric(24),
+  existingUserId: faker.string.alphanumeric(8),
+  newUserId: faker.string.alphanumeric(8),
+} as const;
 
 function renderEntryPage() {
   return render(
@@ -37,14 +51,14 @@ describe('EntryPage — username stage', () => {
 
   test('Continue button is enabled after typing a username', async () => {
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'alice');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.existingUsername);
     expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
   });
 
   test('clicking Continue for existing user shows Sign In heading', async () => {
     server.use(http.get('*/exists/:username', () => HttpResponse.json({ exists: true })));
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'alice');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.existingUsername);
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     await screen.findByRole('heading', { name: /sign in/i });
     expect(screen.queryByPlaceholderText(/confirm your password/i)).not.toBeInTheDocument();
@@ -53,7 +67,7 @@ describe('EntryPage — username stage', () => {
   test('clicking Continue for new user shows Create Account heading with confirm field', async () => {
     server.use(http.get('*/exists/:username', () => HttpResponse.json({ exists: false })));
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'newuser');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.newUsername);
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     await screen.findByRole('heading', { name: /create account/i });
     expect(screen.getByPlaceholderText(/confirm your password/i)).toBeInTheDocument();
@@ -66,7 +80,7 @@ describe('EntryPage — username stage', () => {
       )
     );
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'alice');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.existingUsername);
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     await screen.findByText(/service unavailable/i);
   });
@@ -90,7 +104,7 @@ describe('EntryPage — sign in', () => {
   async function goToSignIn() {
     server.use(http.get('*/exists/:username', () => HttpResponse.json({ exists: true })));
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'alice');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.existingUsername);
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     await screen.findByRole('heading', { name: /sign in/i });
   }
@@ -99,13 +113,17 @@ describe('EntryPage — sign in', () => {
     await goToSignIn();
     server.use(
       http.post('*/login', () =>
-        HttpResponse.json({ token: 'mock-token-u1', username: 'alice', userId: 'u1' })
+        HttpResponse.json({
+          token: AUTH_TEST_DATA.existingToken,
+          username: AUTH_TEST_DATA.existingUsername,
+          userId: AUTH_TEST_DATA.existingUserId,
+        })
       )
     );
-    await userEvent.type(screen.getByPlaceholderText(/enter your password/i), 'Secret123');
+    await userEvent.type(screen.getByPlaceholderText(/enter your password/i), AUTH_TEST_DATA.validSecret);
     await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
     await waitFor(() => {
-      expect(localStorage.getItem('auth_token')).toBe('mock-token-u1');
+      expect(localStorage.getItem('auth_token')).toBe(AUTH_TEST_DATA.existingToken);
     });
   });
 
@@ -116,7 +134,7 @@ describe('EntryPage — sign in', () => {
         HttpResponse.json({ error: 'Invalid credentials' }, { status: 401 })
       )
     );
-    await userEvent.type(screen.getByPlaceholderText(/enter your password/i), 'wrong');
+    await userEvent.type(screen.getByPlaceholderText(/enter your password/i), AUTH_TEST_DATA.invalidSecret);
     await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
     await screen.findByText(/invalid credentials/i);
   });
@@ -134,7 +152,7 @@ describe('EntryPage — registration', () => {
   async function goToRegister() {
     server.use(http.get('*/exists/:username', () => HttpResponse.json({ exists: false })));
     renderEntryPage();
-    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), 'newuser');
+    await userEvent.type(screen.getByPlaceholderText(/enter your username/i), AUTH_TEST_DATA.newUsername);
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     await screen.findByRole('heading', { name: /create account/i });
   }
@@ -146,15 +164,15 @@ describe('EntryPage — registration', () => {
 
   test('Create Account button is disabled when passwords do not match', async () => {
     await goToRegister();
-    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), 'Secret123');
-    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), 'Different456');
+    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), AUTH_TEST_DATA.validSecret);
+    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), AUTH_TEST_DATA.anotherSecret);
     expect(screen.getByRole('button', { name: /create account/i })).toBeDisabled();
   });
 
   test('Create Account button is enabled when passwords match', async () => {
     await goToRegister();
-    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), 'Secret123');
-    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), 'Secret123');
+    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), AUTH_TEST_DATA.validSecret);
+    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), AUTH_TEST_DATA.validSecret);
     expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
   });
 
@@ -162,17 +180,21 @@ describe('EntryPage — registration', () => {
     await goToRegister();
     server.use(
       http.post('*/createuser', () =>
-        HttpResponse.json({ message: 'User newuser created', userId: 'u2' }, { status: 201 })
+        HttpResponse.json({ message: `User ${AUTH_TEST_DATA.newUsername} created`, userId: AUTH_TEST_DATA.newUserId }, { status: 201 })
       ),
       http.post('*/login', () =>
-        HttpResponse.json({ token: 'mock-token-u2', username: 'newuser', userId: 'u2' })
+        HttpResponse.json({
+          token: AUTH_TEST_DATA.newToken,
+          username: AUTH_TEST_DATA.newUsername,
+          userId: AUTH_TEST_DATA.newUserId,
+        })
       )
     );
-    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), 'Secret123');
-    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), 'Secret123');
+    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), AUTH_TEST_DATA.validSecret);
+    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), AUTH_TEST_DATA.validSecret);
     await userEvent.click(screen.getByRole('button', { name: /create account/i }));
     await waitFor(() => {
-      expect(localStorage.getItem('auth_token')).toBe('mock-token-u2');
+      expect(localStorage.getItem('auth_token')).toBe(AUTH_TEST_DATA.newToken);
     });
   });
 
@@ -183,8 +205,8 @@ describe('EntryPage — registration', () => {
         HttpResponse.json({ error: 'Username already taken' }, { status: 409 })
       )
     );
-    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), 'Secret123');
-    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), 'Secret123');
+    await userEvent.type(screen.getByPlaceholderText(/^enter your password$/i), AUTH_TEST_DATA.validSecret);
+    await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), AUTH_TEST_DATA.validSecret);
     await userEvent.click(screen.getByRole('button', { name: /create account/i }));
     await screen.findByText(/username already taken/i);
   });

@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createGame,
@@ -9,6 +10,11 @@ import {
   undoMove,
 } from '../api/gamesApi';
 import { requestJson } from '../api/httpClient';
+
+faker.seed(20260319);
+const GAMES_API_TEST_DATA = {
+  gameId: faker.string.alphanumeric(10),
+} as const;
 
 vi.mock('../api/httpClient', () => ({
   requestJson: vi.fn(),
@@ -22,7 +28,7 @@ describe('gamesApi', () => {
   });
 
   it('createGame sends POST with JSON payload', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
     await createGame({ board_size: 5, game_type: 'BOT', rule_set: 'normal' });
 
@@ -34,27 +40,27 @@ describe('gamesApi', () => {
   });
 
   it('getGame uses game id in path', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await getGame('game-1');
+    await getGame(GAMES_API_TEST_DATA.gameId);
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1');
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}`);
   });
 
   it('getMoves calls moves endpoint', async () => {
     requestJsonMock.mockResolvedValueOnce([]);
 
-    await getMoves('game-1');
+    await getMoves(GAMES_API_TEST_DATA.gameId);
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1/moves');
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/moves`);
   });
 
   it('submitMove sends coordinates in POST body', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await submitMove('game-1', { coordinates: { x: 0, y: 0, z: 4 } });
+    await submitMove(GAMES_API_TEST_DATA.gameId, { coordinates: { x: 0, y: 0, z: 4 } });
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1/move', {
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ coordinates: { x: 0, y: 0, z: 4 } }),
@@ -62,27 +68,27 @@ describe('gamesApi', () => {
   });
 
   it('playBotTurn uses /play endpoint', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await playBotTurn('game-1');
+    await playBotTurn(GAMES_API_TEST_DATA.gameId);
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1/play');
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/play`);
   });
 
   it('undoMove uses POST without body', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await undoMove('game-1');
+    await undoMove(GAMES_API_TEST_DATA.gameId);
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1/undo', { method: 'POST' });
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/undo`, { method: 'POST' });
   });
 
   it('finishGame sends PUT with result payload', async () => {
-    requestJsonMock.mockResolvedValueOnce({ _id: 'game-1' });
+    requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await finishGame('game-1', { result: 'DRAW', duration_seconds: 123 });
+    await finishGame(GAMES_API_TEST_DATA.gameId, { result: 'DRAW', duration_seconds: 123 });
 
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/game-1/finish', {
+    expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/finish`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ result: 'DRAW', duration_seconds: 123 }),

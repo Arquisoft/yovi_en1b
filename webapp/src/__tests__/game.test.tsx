@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
@@ -9,13 +10,22 @@ import { server } from '../mocks/server';
 import { http, HttpResponse } from 'msw';
 import type { GameRecord } from '../types/games';
 
+faker.seed(20260316);
+const GAME_TEST_DATA = {
+  gameId: faker.string.alphanumeric(10),
+  userId: faker.string.alphanumeric(8),
+  authToken: faker.string.alphanumeric(24),
+  username: faker.internet.username().toLowerCase(),
+  enemyName: faker.person.firstName(),
+} as const;
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const BASE_GAME: GameRecord = {
-  _id: 'game-1',
-  player_id: 'u1',
+  _id: GAME_TEST_DATA.gameId,
+  player_id: GAME_TEST_DATA.userId,
   game_type: 'PLAYER',
-  name_of_enemy: 'Bob',
+  name_of_enemy: GAME_TEST_DATA.enemyName,
   board_size: 3,
   strategy: 'random',
   difficulty_level: 'medium',
@@ -29,12 +39,12 @@ const BASE_GAME: GameRecord = {
 };
 
 function setSession() {
-  localStorage.setItem('auth_token', 'mock-token-u1');
-  localStorage.setItem('auth_username', 'alice');
-  localStorage.setItem('auth_user_id', 'u1');
+  localStorage.setItem('auth_token', GAME_TEST_DATA.authToken);
+  localStorage.setItem('auth_username', GAME_TEST_DATA.username);
+  localStorage.setItem('auth_user_id', GAME_TEST_DATA.userId);
 }
 
-function renderGamePage(gameId = 'game-1') {
+function renderGamePage(gameId = GAME_TEST_DATA.gameId) {
   setSession();
   return render(
     <MemoryRouter initialEntries={[`/games/${gameId}`]}>
@@ -53,29 +63,29 @@ function renderGamePage(gameId = 'game-1') {
 
 describe('GamePage — loading', () => {
   test('shows loading indicator initially', () => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     expect(screen.getByText(/loading game/i)).toBeInTheDocument();
   });
 
   test('renders game board after loading', async () => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.getByLabelText('game board')).toBeInTheDocument();
   });
 
   test('shows both player panels', async () => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.getByText(/you \(blue\)/i)).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByText(GAME_TEST_DATA.enemyName)).toBeInTheDocument();
   });
 
   test('shows error message when game is not found', async () => {
     server.use(
-      http.get('*/games/game-1', () =>
+      http.get(`*/games/${GAME_TEST_DATA.gameId}`, () =>
         HttpResponse.json({ error: 'Game not found' }, { status: 404 })
       )
     );
@@ -84,7 +94,7 @@ describe('GamePage — loading', () => {
   });
 
   test('board has correct number of hexes for board_size 3 (6 hexes total)', async () => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     const board = await screen.findByLabelText('game board');
     // triangle: 1+2+3 = 6 hex wrappers
@@ -97,12 +107,12 @@ describe('GamePage — loading', () => {
 
 describe('GamePage — move', () => {
   beforeEach(() => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
   });
 
   test('clicking a hex adds a move to history', async () => {
     server.use(
-      http.post('*/games/game-1/move', async ({ request }) => {
+      http.post(`*/games/${GAME_TEST_DATA.gameId}/move`, async ({ request }) => {
         const body = (await request.json()) as { coordinates: { x: number; y: number; z: number } };
         return HttpResponse.json({
           ...BASE_GAME,
@@ -134,7 +144,7 @@ describe('GamePage — move', () => {
         created_at: new Date().toISOString()
       }]
     };
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(redTurnGame)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(redTurnGame)));
     renderGamePage();
 
     const board = await screen.findByLabelText('game board');
@@ -152,7 +162,7 @@ describe('GamePage — move', () => {
   test('move on occupied hex is not sent to server', async () => {
     let moveCalled = false;
     server.use(
-      http.post('*/games/game-1/move', () => {
+      http.post(`*/games/${GAME_TEST_DATA.gameId}/move`, () => {
         moveCalled = true;
         return HttpResponse.json({}, { status: 400 });
       })
@@ -166,7 +176,7 @@ describe('GamePage — move', () => {
         created_at: new Date().toISOString()
       }]
     };
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(gameWithMove)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(gameWithMove)));
     renderGamePage();
     const board = await screen.findByLabelText('game board');
     // First hex is occupied by Blue — it must be aria-disabled
@@ -180,7 +190,7 @@ describe('GamePage — move', () => {
 
 describe('GamePage — undo', () => {
   test('undo button is disabled when there are no moves', async () => {
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.getByRole('button', { name: /undo/i })).toBeDisabled();
@@ -198,8 +208,8 @@ describe('GamePage — undo', () => {
       }]
     };
     server.use(
-      http.get('*/games/game-1', () => HttpResponse.json(gameWithMove)),
-      http.post('*/games/game-1/undo', () =>
+      http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(gameWithMove)),
+      http.post(`*/games/${GAME_TEST_DATA.gameId}/undo`, () =>
         HttpResponse.json({ ...BASE_GAME, moves: [] })
       )
     );
@@ -218,8 +228,8 @@ describe('GamePage — undo', () => {
 describe('GamePage — finish', () => {
   test('finish button sends DRAW result and shows it in UI', async () => {
     server.use(
-      http.get('*/games/game-1', () => HttpResponse.json(BASE_GAME)),
-      http.put('*/games/game-1/finish', () =>
+      http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)),
+      http.put(`*/games/${GAME_TEST_DATA.gameId}/finish`, () =>
         HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'DRAW' })
       )
     );
@@ -240,7 +250,7 @@ describe('GamePage — finish', () => {
         created_at: new Date().toISOString()
       }]
     };
-    server.use(http.get('*/games/game-1', () => HttpResponse.json(finishedGame)));
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(finishedGame)));
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.getByRole('button', { name: /finish/i })).toBeDisabled();
