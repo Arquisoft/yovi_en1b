@@ -176,20 +176,7 @@ pub async fn play(
     Json(req): Json<PlayRequest>,
 ) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state {
-        Some(layout_str) => {
-            let size = layout_str.split('/').count() as u32;
-            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
-            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
-            let turn = if b_count > r_count { 1 } else { 0 };
-            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
-            GameY::try_from(yen).map_err(|err| {
-                Json(ErrorResponse::error(
-                    &format!("Invalid YEN layout: {}", err),
-                    None,
-                    None,
-                ))
-            })?
-        }
+        Some(layout_str) => parse_yen_layout(layout_str)?,
         None => {
             if req.board_size == 0 || req.board_size > 100 {
                 return Err(Json(ErrorResponse::error(
@@ -228,21 +215,10 @@ pub async fn play(
     })?;
 
     let response_yen: YEN = (&game).into();
-    let winner = match game.status() {
-        crate::GameStatus::Finished { winner } => {
-            if winner.id() == 0 {
-                Some("B".to_string())
-            } else {
-                Some("R".to_string())
-            }
-        }
-        _ => None,
-    };
-
     Ok(Json(PlayResponse {
         coordinates: coords,
         yen_state: response_yen.layout().to_string(),
-        winner,
+        winner: get_winner_string(&game),
     }))
 }
 
@@ -255,20 +231,7 @@ pub async fn compute(
     Json(req): Json<ComputeRequest>,
 ) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state_prev {
-        Some(layout_str) => {
-            let size = layout_str.split('/').count() as u32;
-            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
-            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
-            let turn = if b_count > r_count { 1 } else { 0 };
-            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
-            GameY::try_from(yen).map_err(|err| {
-                Json(ErrorResponse::error(
-                    &format!("Invalid YEN layout: {}", err),
-                    None,
-                    None,
-                ))
-            })?
-        }
+        Some(layout_str) => parse_yen_layout(layout_str)?,
         None => {
             // Reconstruct board size from first move coordinates
             // In barycentric coordinates: x + y + z = board_size - 1
@@ -301,7 +264,31 @@ pub async fn compute(
     })?;
 
     let response_yen: YEN = (&game).into();
-    let winner = match game.status() {
+    Ok(Json(ComputeResponse {
+        yen_state: response_yen.layout().to_string(),
+        winner: get_winner_string(&game),
+    }))
+}
+
+/// Helper: parses a YEN layout string into a GameY instance.
+fn parse_yen_layout(layout_str: String) -> Result<GameY, Json<ErrorResponse>> {
+    let size = layout_str.split('/').count() as u32;
+    let b_count = layout_str.chars().filter(|c| *c == 'B').count();
+    let r_count = layout_str.chars().filter(|c| *c == 'R').count();
+    let turn = if b_count > r_count { 1 } else { 0 };
+    let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
+    GameY::try_from(yen).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Invalid YEN layout: {}", err),
+            None,
+            None,
+        ))
+    })
+}
+
+/// Helper: returns the winner string ("B" or "R") if the game is finished.
+fn get_winner_string(game: &GameY) -> Option<String> {
+    match game.status() {
         crate::GameStatus::Finished { winner } => {
             if winner.id() == 0 {
                 Some("B".to_string())
@@ -310,12 +297,7 @@ pub async fn compute(
             }
         }
         _ => None,
-    };
-
-    Ok(Json(ComputeResponse {
-        yen_state: response_yen.layout().to_string(),
-        winner,
-    }))
+    }
 }
 
 /// Helper: converts a `MoveRequest` into a core `Movement`.
