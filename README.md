@@ -7,7 +7,7 @@
 
 **Claim all three sides of the triangle. Sounds simple. It's not.**
 
-🚀 [**Live → http://4.233.184.98**](http://4.233.184.98)
+🚀 [**Wanna try? Play now → http://4.233.184.98**](http://4.233.184.98)
 
 </div>
 
@@ -110,5 +110,5 @@ cd gamey && cargo run
 <div align="center">
 <img src="https://capsule-render.vercel.app/api?type=venom&color=0:24243e,50:302b63,100:0f0c29&height=80&section=footer" width="100%"/>
 
-*Built with ❤️ at Universidad de Oviedo — ASW 2025/26*
+*Built with ️a little help of the University of Oviedo — ASW 2025/26*
 </div>
