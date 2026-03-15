@@ -1,7 +1,11 @@
 import { When, Then } from '@cucumber/cucumber'
-import assert from 'assert'
+import assert from 'node:assert'
 
 const APP_URL = 'http://localhost:5173'
+
+function escapeRegExp(value) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+}
 
 When('I open the new game page', async function () {
   const page = this.page
@@ -62,14 +66,17 @@ Then('move history should contain at least 1 move', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  const historyItems = page.locator('.move-history-item')
+  const history = page.locator('.move-history')
+  await history.getByRole('heading', { name: 'Move History' }).waitFor({ timeout: 10_000 })
+
+  const historyItems = history.locator('li')
   await historyItems.first().waitFor({ timeout: 10_000 })
   const count = await historyItems.count()
   assert.ok(count >= 1, `Expected at least 1 move in history, got ${count}`)
 
   if (this.lastPlayedHexBaseLabel) {
-    const filled = page.getByRole('button', { name: `${this.lastPlayedHexBaseLabel} - Blue` })
+    const base = escapeRegExp(this.lastPlayedHexBaseLabel)
+    const filled = page.getByRole('button', { name: new RegExp(`^${base} - (Blue|Red)$`) })
     await filled.first().waitFor({ timeout: 10_000 })
   }
 })
-

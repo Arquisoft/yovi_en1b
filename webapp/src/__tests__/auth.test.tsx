@@ -87,13 +87,10 @@ describe('EntryPage — username stage', () => {
 
   test('empty username triggers inline error without API call', async () => {
     renderEntryPage();
-    // button is disabled so we call Enter on the empty input
     const input = screen.getByPlaceholderText(/enter your username/i);
-    await userEvent.type(input, ' '); // whitespace only
-    await userEvent.clear(input);
-    // force click via keyboard path: type space then delete to trigger the guard
     await userEvent.type(input, '{enter}');
-    // continue button stays disabled, no navigation
+
+    await screen.findByText(/username is required/i);
     expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
   });
 });

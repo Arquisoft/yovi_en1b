@@ -37,9 +37,9 @@ export function EntryPage() {
   };
 
   const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && username.trim()) {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      checkUsername();
+      void checkUsername();
     }
   };
 
@@ -59,6 +59,12 @@ export function EntryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (stage === 'username') {
+      await checkUsername();
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -170,6 +176,3 @@ export function EntryPage() {
     </Panel>
   );
 }
-
-
-
