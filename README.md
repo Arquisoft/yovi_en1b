@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=slice&color=0:0f0c29,50:302b63,100:24243e&height=160&section=header&text=YOVI&fontSize=72&fontColor=ffffff&fontAlignY=50&desc=Game%20Y%20%E2%80%94%20Universidad%20de%20Oviedo&descAlignY=75&descSize=16&descColor=cccccc" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=venom&color=0:0f0c29,50:302b63,100:24243e&height=200&section=header&text=YOVI&fontSize=80&fontColor=ffffff&fontAlignY=40&desc=Game%20Y%20%E2%80%94%20Universidad%20de%20Oviedo&descAlignY=58&descSize=18&descColor=dddddd" width="100%"/>
 
 [![Release — Test, Build, Publish, Deploy](https://github.com/arquisoft/yovi_en1b/actions/workflows/release-deploy.yml/badge.svg)](https://github.com/arquisoft/yovi_en1b/actions/workflows/release-deploy.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Arquisoft_yovi_en1b&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Arquisoft_yovi_en1b)
@@ -108,7 +108,7 @@ cd gamey && cargo run
 ---
 
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=slice&color=0:24243e,50:302b63,100:0f0c29&height=80&section=footer&reversal=true" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=venom&color=0:24243e,50:302b63,100:0f0c29&height=80&section=footer" width="100%"/>
 
-*Built with a little help of Universidad de Oviedo — ASW 2025/26*
+*Built with a little help of Universidad of Oviedo — ASW 2025/26*
 </div>
