@@ -586,6 +586,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_computation_false_win() {
+        // Based on visually disconnected pieces that might be falsely triggering a win.
+        // Size 5: Red at corners (4,0,0), (1,3,0), (1,0,3)? Wait, let's just make Red disconnected.
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some("R/B./.B./R..R/.....".to_string()),
+            coordinates: Coordinates::new(0, 2, 2), // random move on size 5
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok(), "Should successfully parse state and make move");
+        let res_json = res.unwrap().0;
+        // In this state, R pieces are NOT connected. Winner should be None!
+        assert_eq!(res_json.winner, None, "Red pieces are disconnected, should not win!");
+    }
+
+    #[tokio::test]
     async fn test_play_success_with_yen() {
         let req = axum::Json(PlayRequest {
             yen_state: Some("./..".to_string()),
