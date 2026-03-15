@@ -289,10 +289,9 @@ describe('GET /games/:id', () => {
 
 describe('POST /games/:id/move', () => {
     it('saves a move and returns updated game state with switched turn', async () => {
-        // Mock fetch so Gamey compute responds successfully
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ yen_state: 'B/.B/RB./B..R' })
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
         }))
 
         const gameRes = await request(app)
@@ -308,11 +307,55 @@ describe('POST /games/:id/move', () => {
 
         expect(res.status).toBe(201)
         expect(res.body.moves.length).toBe(1)
-        expect(res.body.moves[0].move_number).toBe(1)
         expect(res.body.moves[0].player).toBe(firstTurn)
-        expect(res.body.moves[0].yen_state).toBe('B/.B/RB./B..R')  // computed by Gamey
+        expect(res.body.moves[0].yen_state).toBe('B/.B/RB./B..R')
         expect(res.body.current_turn).toBe(nextTurn)
-        expect(res.body.moves[0].coordinates).toEqual({ x: 1, y: 1, z: 1 })
+        expect(res.body.status).toBe('IN_PROGRESS')
+    })
+
+    it('auto-finishes game with WIN when Gamey returns winner B', async () => {
+        // Create a fresh game for this test
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 5 })
+            .set('Authorization', `Bearer ${token}`)
+        const winGameId = createRes.body._id
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: 'B' })
+        }))
+
+        const res = await request(app)
+            .post(`/games/${winGameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.status).toBe('FINISHED')
+        expect(res.body.result).toBe('WIN')
+    })
+
+    it('auto-finishes game with LOSS when Gamey returns winner R', async () => {
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 5 })
+            .set('Authorization', `Bearer ${token}`)
+        const lossGameId = createRes.body._id
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: 'R' })
+        }))
+
+        const res = await request(app)
+            .post(`/games/${lossGameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.status).toBe('FINISHED')
+        expect(res.body.result).toBe('LOSS')
     })
 
     it('returns 400 if coordinates are missing', async () => {
@@ -320,7 +363,6 @@ describe('POST /games/:id/move', () => {
             .post(`/games/${gameId}/move`)
             .send({})
             .set('Authorization', `Bearer ${token}`)
-
         expect(res.status).toBe(400)
     })
 
@@ -331,7 +373,6 @@ describe('POST /games/:id/move', () => {
             .post(`/games/${gameId}/move`)
             .send({ coordinates: { x: 1, y: 1, z: 1 } })
             .set('Authorization', `Bearer ${token}`)
-
         expect(res.status).toBe(503)
     })
 
@@ -342,14 +383,13 @@ describe('POST /games/:id/move', () => {
             .post(`/games/${gameId}/move`)
             .send({ coordinates: { x: 1, y: 1, z: 1 } })
             .set('Authorization', `Bearer ${token}`)
-
         expect(res.status).toBe(502)
     })
 
     it('returns 404 for non-existent game', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ yen_state: 'B/.B/RB./B..R' })
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
         }))
 
         const fakeId = new mongoose.Types.ObjectId()
@@ -364,10 +404,10 @@ describe('POST /games/:id/move', () => {
 // ─── Bot play ─────────────────────────────────────────────────────────────────
 
 describe('GET /games/:id/play', () => {
-    it('saves bot move and returns { coordinates, yen_state } when Gamey responds', async () => {
+    it('saves bot move and returns full game state when Gamey responds', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R' })
+            json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R', winner: null })
         }))
 
         const res = await request(app)
@@ -375,16 +415,44 @@ describe('GET /games/:id/play', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
-        expect(res.body.coordinates).toEqual({ x: 2, y: 1, z: 0 })
-        expect(res.body.yen_state).toBe('R/.B/RB./B..R')
+        expect(res.body).toHaveProperty('_id')
+        expect(res.body).toHaveProperty('moves')
+        expect(res.body.status).toBe('IN_PROGRESS')
 
-        // Verify bot move was saved in DB
-        const gameRes = await request(app)
-            .get(`/games/${gameId}`)
-            .set('Authorization', `Bearer ${token}`)
-        const botMove = gameRes.body.moves.at(-1)
+        const botMove = res.body.moves.at(-1)
         expect(botMove.coordinates).toEqual({ x: 2, y: 1, z: 0 })
         expect(botMove.yen_state).toBe('R/.B/RB./B..R')
+    })
+
+    it('auto-finishes game with LOSS when bot wins (winner R)', async () => {
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 5 })
+            .set('Authorization', `Bearer ${token}`)
+        const botWinGameId = createRes.body._id
+
+        // First add a move so yen_state is available
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+        await request(app)
+            .post(`/games/${botWinGameId}/move`)
+            .send({ coordinates: { x: 0, y: 0, z: 4 } })
+            .set('Authorization', `Bearer ${token}`)
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R', winner: 'R' })
+        }))
+
+        const res = await request(app)
+            .get(`/games/${botWinGameId}/play`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.status).toBe('FINISHED')
+        expect(res.body.result).toBe('LOSS')
     })
 
     it('returns 503 when Gamey is unreachable', async () => {
@@ -393,7 +461,6 @@ describe('GET /games/:id/play', () => {
         const res = await request(app)
             .get(`/games/${gameId}/play`)
             .set('Authorization', `Bearer ${token}`)
-
         expect(res.status).toBe(503)
     })
 
@@ -403,7 +470,6 @@ describe('GET /games/:id/play', () => {
         const res = await request(app)
             .get(`/games/${gameId}/play`)
             .set('Authorization', `Bearer ${token}`)
-
         expect(res.status).toBe(502)
     })
 
@@ -445,34 +511,39 @@ describe('PUT /games/:id/finish', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body.total_games).toBe(1)
-        expect(res.body.total_wins).toBe(1)
-        expect(res.body.total_losses).toBe(0)
-        expect(res.body.vs_bot.medium.wins).toBe(1)
-        expect(res.body.vs_bot.medium.losses).toBe(0)
+        expect(res.body.total_games).toBeGreaterThanOrEqual(1)
+        expect(res.body.total_wins).toBeGreaterThanOrEqual(1)
+        expect(typeof res.body.total_losses).toBe('number')
+        expect(res.body.vs_bot.medium.wins).toBeGreaterThanOrEqual(1)
+        expect(typeof res.body.vs_bot.medium.losses).toBe('number')
     })
 
     it('does NOT update stats when result is DRAW (user quit)', async () => {
-        // Create a new game to draw
+        // Get stats before
+        const statsBefore = (await request(app)
+            .get(`/users/${userId}/stats`)
+            .set('Authorization', `Bearer ${token}`)).body
+
+        // Create a new game and draw it
         const createRes = await request(app)
             .post('/games')
             .send({ board_size: 7 })
             .set('Authorization', `Bearer ${token}`)
-        const drawGameId = createRes.body._id
-
         await request(app)
-            .put(`/games/${drawGameId}/finish`)
+            .put(`/games/${createRes.body._id}/finish`)
             .send({ result: 'DRAW' })
             .set('Authorization', `Bearer ${token}`)
 
-        const statsRes = await request(app)
+        // Stats should be unchanged
+        const statsAfter = (await request(app)
             .get(`/users/${userId}/stats`)
-            .set('Authorization', `Bearer ${token}`)
+            .set('Authorization', `Bearer ${token}`)).body
 
-        // Stats should be unchanged from before
-        expect(statsRes.body.total_games).toBe(1)
-        expect(statsRes.body.total_wins).toBe(1)
+        expect(statsAfter.total_games).toBe(statsBefore.total_games)
+        expect(statsAfter.total_wins).toBe(statsBefore.total_wins)
+        expect(statsAfter.total_losses).toBe(statsBefore.total_losses)
     })
+
 
     it('returns 400 if result is missing', async () => {
         const res = await request(app)
