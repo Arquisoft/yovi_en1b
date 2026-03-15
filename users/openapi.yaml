@@ -436,8 +436,9 @@ paths:
       summary: Submit a player move
       description: >
         Saves a player move. Only coordinates are required — the player (B or R) is inferred from
-        current_turn, and the backend calls Gamey to compute the new yen_state from the previous
-        yen_state and the coordinates. Turn switches after each move. Requires authentication.
+        current_turn. The backend calls Gamey to compute the new yen_state and check for a winner.
+        If Gamey returns a winner the game is automatically finished and statistics updated.
+        Returns the full updated game state (check status and result fields). Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -459,7 +460,7 @@ paths:
                   $ref: '#/components/schemas/Coordinates'
       responses:
         '201':
-          description: Move saved — returns full updated game state
+          description: Move saved — returns full updated game state. If game is over, status=FINISHED and result=WIN or LOSS.
           content:
             application/json:
               schema:
@@ -482,9 +483,10 @@ paths:
       summary: Request bot move
       description: >
         Reads the yen_state from the last saved move in DB, and forwards it along with strategy,
-        difficulty_level and board_size to Gamey. Gamey returns the bot's chosen coordinates and
-        the resulting yen_state, which are saved automatically as a move. Returns only
-        { coordinates, yen_state } to the frontend. Requires authentication.
+        difficulty_level and board_size to Gamey. Gamey returns the bot's chosen coordinates,
+        yen_state, and winner. The bot move is saved automatically. If Gamey returns a winner
+        the game is automatically finished and statistics updated.
+        Returns the full updated game state. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -496,17 +498,11 @@ paths:
           example: "64b1f2e3c4d5e6f7a8b9c0d1"
       responses:
         '201':
-          description: Bot move computed and saved
+          description: Bot move saved — returns full updated game state. If game is over, status=FINISHED and result=WIN or LOSS.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  coordinates:
-                    $ref: '#/components/schemas/Coordinates'
-                  yen_state:
-                    type: string
-                    example: "R/.B/RB./B..R"
+                $ref: '#/components/schemas/Game'
         '400':
           description: Game is already finished
         '401':
@@ -518,12 +514,7 @@ paths:
         '503':
           description: Gamey service unreachable
 
-  /games/{id}/finish:
-    put:
-      summary: Finish a game
-      description: Marks a game as FINISHED. WIN/LOSS update user statistics. DRAW (user quit) does not update statistics. Requires authentication.
-      security:
-        - bearerAuth: []
+          - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -588,6 +579,54 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Move'
+        '401':
+          description: No token provided or invalid token
+        '404':
+          description: Game not found
+        '500':
+          description: Internal server error
+
+  /games/{id}/finish:
+    put:
+      summary: Finish a game
+      description: Marks a game as FINISHED manually — used when a user quits (DRAW). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Requires authentication.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "64b1f2e3c4d5e6f7a8b9c0d1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result]
+              properties:
+                result:
+                  type: string
+                  enum: [WIN, LOSS, DRAW]
+                  example: "DRAW"
+                yen_final_state:
+                  type: string
+                  nullable: true
+                  example: "B/.B/RB./B..R"
+                duration_seconds:
+                  type: integer
+                  example: 120
+      responses:
+        '200':
+          description: Game finished
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: result is required, or game is already finished
         '401':
           description: No token provided or invalid token
         '404':
