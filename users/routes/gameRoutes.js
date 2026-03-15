@@ -4,6 +4,24 @@ const authMiddleware = require('../middleware/auth');
 
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
+// Helper: auto-finish a game if Gamey reports a winner
+async function autoFinishIfWinner(game, winner, repository) {
+    if (!winner) return;
+    // winner is 'B' or 'R' — the logged-in player is always 'B'
+    const result = winner === 'B' ? 'WIN' : 'LOSS';
+    await repository.updateGame(game._id, {
+        status: 'FINISHED',
+        result,
+        yen_final_state: game.moves.at(-1)?.yen_state ?? null,
+        duration_seconds: 0
+    });
+    await repository.updateStats(game.player_id, {
+        result,
+        type: game.game_type,
+        difficulty: game.difficulty_level
+    });
+}
+
 // Helper: call Gamey to compute new yen_state after a move
 async function computeYenState(yen_state_prev, coordinates) {
     const gameyResponse = await fetch(`${GAMEY_URL}/compute`, {
@@ -18,8 +36,7 @@ async function computeYenState(yen_state_prev, coordinates) {
         throw err;
     }
 
-    const { yen_state } = await gameyResponse.json();
-    return yen_state;
+    return await gameyResponse.json(); // { yen_state, winner }
 }
 
 module.exports = function gameRoutes(repository) {
@@ -64,7 +81,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Submit a player move — only needs coordinates, Gamey computes new yen_state
+    // Submit a player move — only needs coordinates, Gamey computes new yen_state and checks winner
     router.post('/:id/move', authMiddleware, async function submitMove(req, res) {
         const { coordinates } = req.body || {};
 
@@ -82,30 +99,31 @@ module.exports = function gameRoutes(repository) {
         if (!game) return res.status(404).json({ error: 'Game not found' });
         if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-        // Get current yen_state from last move (null if first move)
         const yen_state_prev = game.moves.at(-1)?.yen_state ?? null;
 
-        // Ask Gamey to compute the new yen_state
-        let new_yen_state;
+        let gameyResult;
         try {
-            new_yen_state = await computeYenState(yen_state_prev, coordinates);
+            gameyResult = await computeYenState(yen_state_prev, coordinates);
         } catch (err) {
             return res.status(err.status || 503).json({ error: err.message });
         }
+
+        const { yen_state: new_yen_state, winner } = gameyResult;
 
         try {
             const player = game.current_turn;
             game.moves.push({ move_number: game.moves.length + 1, player, coordinates, yen_state: new_yen_state });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
-
-            res.status(201).json(game);
+            await autoFinishIfWinner(game, winner, repository);
+            const updatedGame = await repository.findGameById(game._id);
+            res.status(201).json(updatedGame);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     });
 
-    // Request bot move — Gamey computes bot move from current yen_state, saves it
+    // Request bot move — Gamey computes bot move, checks winner, saves it automatically
     router.get('/:id/play', authMiddleware, async function botPlay(req, res) {
         let game;
         try {
@@ -117,7 +135,6 @@ module.exports = function gameRoutes(repository) {
         if (!game) return res.status(404).json({ error: 'Game not found' });
         if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-        // Get current yen_state from last move (null if first move — bot goes first)
         const yen_state = game.moves.at(-1)?.yen_state ?? null;
 
         let gameyResponse;
@@ -135,9 +152,8 @@ module.exports = function gameRoutes(repository) {
             return res.status(502).json({ error: 'Gamey service returned an error' });
         }
 
-        const { coordinates, yen_state: botYenState } = await gameyResponse.json();
+        const { coordinates, yen_state: botYenState, winner } = await gameyResponse.json();
 
-        // Save bot move automatically
         try {
             game.moves.push({
                 move_number: game.moves.length + 1,
@@ -147,14 +163,15 @@ module.exports = function gameRoutes(repository) {
             });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
+            await autoFinishIfWinner(game, winner, repository);
+            const updatedGame = await repository.findGameById(game._id);
+            res.status(201).json(updatedGame);
         } catch (err) {
             return res.status(500).json({ error: err.message });
         }
-
-        res.status(201).json(game);
     });
 
-    // Finish a game
+    // Finish a game (manual — DRAW when user quits)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state, duration_seconds } = req.body || {};
 
@@ -172,7 +189,6 @@ module.exports = function gameRoutes(repository) {
                 duration_seconds: duration_seconds || 0
             });
 
-            // Skip stats update if DRAW (user quit)
             if (result !== 'DRAW') {
                 await repository.updateStats(game.player_id, {
                     result,
