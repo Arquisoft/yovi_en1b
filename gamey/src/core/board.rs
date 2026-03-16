@@ -129,17 +129,15 @@ impl Board {
 
         if root_i != root_j {
             self.sets[root_i].parent = root_j;
-            // Merge side properties
             self.sets[root_j].touches_side_a |= self.sets[root_i].touches_side_a;
             self.sets[root_j].touches_side_b |= self.sets[root_i].touches_side_b;
             self.sets[root_j].touches_side_c |= self.sets[root_i].touches_side_c;
-            return self.sets[root_j].touches_side_a
-                && self.sets[root_j].touches_side_b
-                && self.sets[root_j].touches_side_c;
         }
-        false
+        
+        self.sets[root_j].touches_side_a
+            && self.sets[root_j].touches_side_b
+            && self.sets[root_j].touches_side_c
     }
-}
 
 #[cfg(test)]
 mod tests {
