@@ -13,10 +13,10 @@
 
 ---
 
-## 🧑‍🤝‍🧑 The Team
+## The Team
 
-| | Name | Role |
-|---|---|---|
+| Name | Role |
+|---|---|
 | Alejandro | Database |
 | Tobias | Frontend |
 | Bilal | Game Logic (Rust) |
@@ -39,8 +39,8 @@ yovi_en1b/
 
 ## What can you do?
 
-| | Feature | Description |
-|---|---|---|
+| Feature | Description |
+|---|---|
 | **Auth** | Register and log in securely — bcrypt + JWT |
 | **vs Bot** | Face the AI at easy, medium or hard |
 | **vs Player** | Local multiplayer, same device |
@@ -48,7 +48,7 @@ yovi_en1b/
 | **Replay** | Watch any game back move by move |
 | **Stats** | Wins, losses, performance by difficulty |
 | **Monitoring** | Prometheus metrics on the backend |
-
+| **Database** | It's possible accesing the database via MongoDB Compass on mongodb://127.0.0.1:27017/app_database
 ---
 
 ## Quickstart
@@ -59,13 +59,13 @@ yovi_en1b/
 docker-compose up --build
 ```
 
-| | Service | URL |
-|---|---|---|
+| Service | URL |
+|---|---|
 | Web App | http://localhost |
 | Users API | http://localhost:3000 |
 | Swagger Docs | http://localhost:3000/api-docs |
 | Gamey Engine | http://localhost:4000 |
-
+| Database | mongodb://127.0.0.1:27017/app_database | 
 ### Local (no Docker)
 
 ```bash
@@ -112,6 +112,7 @@ cd gamey && cargo run
 |`docker-compose up -d mongodb` | Start database at the background |
 | `docker-compose stop mongodb` | Stop database without destroying the instance |
 | `docker-compose down` | Shut the environment down |
+
 
 ---
 
