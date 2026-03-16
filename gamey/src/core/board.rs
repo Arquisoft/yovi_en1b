@@ -138,6 +138,7 @@ impl Board {
             && self.sets[root_j].touches_side_b
             && self.sets[root_j].touches_side_c
     }
+}
 
 #[cfg(test)]
 mod tests {
