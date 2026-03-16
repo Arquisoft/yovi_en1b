@@ -348,17 +348,24 @@ impl From<&GameY> for YEN {
             GameStatus::Ongoing { next_player } => next_player.id(),
         };
         let mut layout = String::new();
-        let total_cells = game.board.total_cells();
         let players = vec!['B', 'R'];
-        for idx in 0..total_cells {
-            let coords = Coordinates::from_index(idx, size);
-            let cell_char = match game.board.board_map().get(&coords) {
-                Some((_, player)) if player.id() == 0 => 'B',
-                Some((_, player)) if player.id() == 1 => 'R',
-                _ => '.',
-            };
-            layout.push(cell_char);
-            if coords.y() == 0 && coords.z() > 0 {
+
+        for row in 0..size {
+            for col in 0..=row {
+                let x = col;
+                let y = row - col;
+                let z = size - 1 - row;
+                let coords = Coordinates::new(x, y, z);
+
+                let cell_char = match game.board.board_map().get(&coords) {
+                    Some((_, player)) if player.id() == 0 => 'B',
+                    Some((_, player)) if player.id() == 1 => 'R',
+                    _ => '.',
+                };
+                layout.push(cell_char);
+            }
+            // Añadir el separador de fila, excepto en la última
+            if row < size - 1 {
                 layout.push('/');
             }
         }
