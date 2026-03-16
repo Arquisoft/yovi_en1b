@@ -622,9 +622,62 @@ mod tests {
     fn test_try_from_turn_logic_bug() {
         let yen = YEN::new(3, 0, vec!['B', 'R'], "R/../B..".to_string()); // 1 B, 1 R. Last is 'B'.
         let game = GameY::try_from(yen).unwrap();
-        // `YEN` explicitly says turn is 0 (Blue).
-        // Since B and R count is equal (1 each), blue should be next.
-        // The last parsed piece was B. Without our fix, GameY would toggle the turn to R (1).
         assert_eq!(game.next_player(), Some(crate::PlayerId::new(0)), "Should be Blue's turn according to YEN!");
+    }
+
+    #[test]
+    fn test_false_win_from_screenshot_moves() {
+        let mut game = GameY::new(5); // Wait, screenshot shows size 6! Let's count rows. 
+        // 1 (top) -> 2 -> 3 -> 4 -> 5 -> 6 (bottom). Size 6. Total 21 cells.
+        // We have 15 moves. Let's write them down based on the screenshot history:
+        // Move 15 (Blue): (1, 1, 2) ? Wait, in size 6, x+y+z = 5. (1,1,2) sum is 4. So it must be (1, 1, 3).
+        // Let's create a game of size 6 and place the pieces visually seen in the screenshot.
+        let mut game = GameY::new(6);
+        
+        // Let's just place the Blue pieces, because if Blue falsely wins, we can isolate it.
+        // Visually from screenshot: 
+        // Top row (x=0? no, top is x=5, y=0, z=0 if we look at `format_cell` or x=0,y=?,z=?).
+        // In GameY, `x` is distance from bottom (side A), `y` is distance from left (side B), `z` is distance from right (side C).
+        // Let's read `test_interior_cell_has_six_neighbors` or `from_index`:
+        // For size 6, x+y+z = 5.
+        // Top cell: Touches B and C, so y=0, z=0 => (5, 0, 0). Screenshot top cell is BLUE.
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(5, 0, 0) }).unwrap();
+        
+        // Row 2 (from top): (4, 0, 1) and (4, 1, 0).
+        // Left cell is BLUE.
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(4, 0, 1) }).unwrap();
+        // Right cell is RED.
+        
+        // Row 3: (3, 0, 2), (3, 1, 1), (3, 2, 0).
+        // Left is RED. Middle is BLUE. Right is BLUE.
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(3, 1, 1) }).unwrap();
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(3, 2, 0) }).unwrap();
+        
+        // Row 4: (2, 0, 3) RED, (2, 1, 2) BLUE, (2, 2, 1) BLUE, (2, 3, 0) BLUE.
+        // Wait, screenshot shows:
+        // Row 1: B
+        // Row 2: B, R
+        // Row 3: R, B, B
+        // Row 4: R, B, B, B
+        // Row 5: R, R, R, B, B
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(2, 1, 2) }).unwrap();
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(2, 2, 1) }).unwrap();
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(2, 3, 0) }).unwrap();
+        
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(1, 3, 1) }).unwrap(); // 4th cell
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(1, 4, 0) }).unwrap(); // 5th cell
+        
+        // Bottom Row (x=0): R, R, R, R, B, B
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(0, 4, 1) }).unwrap(); // 5th cell
+        game.add_move(Movement::Placement { player: PlayerId::new(0), coords: Coordinates::new(0, 5, 0) }).unwrap(); // 6th cell
+        
+        // This is exactly the Blue pieces from the screenshot.
+        // Let's check status.
+        match game.status {
+            crate::GameStatus::Ongoing { .. } => {} // Correct
+            crate::GameStatus::Finished { winner } => {
+                panic!("False positive win detected for Player {}! The blue cluster is big but doesn't reach the left side (B) at all! It only touches right (C) and bottom (A)", winner);
+            }
+        }
     }
 }

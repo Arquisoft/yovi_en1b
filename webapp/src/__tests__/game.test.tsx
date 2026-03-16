@@ -140,7 +140,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -172,7 +172,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -203,7 +203,7 @@ describe('GamePage — undo', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -246,7 +246,7 @@ describe('GamePage — finish', () => {
       result: 'WIN',
       moves: [{
         move_number: 1, player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };

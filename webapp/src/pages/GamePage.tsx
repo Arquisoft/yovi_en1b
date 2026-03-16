@@ -28,7 +28,7 @@ interface MoveHistoryProps {
 function buildBoard(size: number): HexCell[][] {
   return Array.from({ length: size }, (_, row) =>
     Array.from({ length: row + 1 }, (_, col) => ({
-      coordinates: { x: col, y: row - col, z: size - 1 - row }
+      coordinates: { x: size - 1 - row, y: col, z: row - col }
     }))
   );
 }

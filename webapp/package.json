@@ -57,5 +57,13 @@
     "workerDirectory": [
       "public"
     ]
-  }
+  },
+  "description": "Frontend for Game Y, a hexagonal board game built with React, TypeScript, and Vite.",
+  "main": "eslint.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
