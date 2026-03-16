@@ -15,8 +15,8 @@
 
 ## 🧑‍🤝‍🧑 The Team
 
-| | Name | Role |
-|---|---|---|
+| Name | Role |
+|---|---|
 | Alejandro | Database |
 | Tobias | Frontend |
 | Bilal | Game Logic (Rust) |
@@ -39,8 +39,8 @@ yovi_en1b/
 
 ## What can you do?
 
-| | Feature | Description |
-|---|---|---|
+| Feature | Description |
+|---|---|
 | **Auth** | Register and log in securely — bcrypt + JWT |
 | **vs Bot** | Face the AI at easy, medium or hard |
 | **vs Player** | Local multiplayer, same device |
@@ -59,8 +59,8 @@ yovi_en1b/
 docker-compose up --build
 ```
 
-| | Service | URL |
-|---|---|---|
+| Service | URL |
+|---|---|
 | Web App | http://localhost |
 | Users API | http://localhost:3000 |
 | Swagger Docs | http://localhost:3000/api-docs |
