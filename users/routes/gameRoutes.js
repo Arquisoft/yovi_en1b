@@ -53,8 +53,8 @@ module.exports = function gameRoutes(repository) {
         }
 
         try {
-            //WE WILL MAKE IT RANDOM WHEN WE IMPLEMENT BOT STARTING
-            const current_turn = 'B';
+            //It needs to be random.
+            const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
 
             const game = await repository.createGame({
                 player_id: req.user.userId,
