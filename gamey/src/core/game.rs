@@ -301,9 +301,9 @@ impl TryFrom<YEN> for GameY {
                 });
             }
             for (col, cell) in cells.iter().enumerate() {
-                let x = game.size() - 1 - (row as u32);
-                let y = col as u32;
-                let z = game.size() - 1 - x - y;
+                let x = col as u32;
+                let y = (row as u32) - (col as u32);
+                let z = game.size() - 1 - (row as u32);
                 let coords = Coordinates::new(x, y, z);
                 match cell {
                     'B' => {
@@ -330,10 +330,6 @@ impl TryFrom<YEN> for GameY {
             }
         }
         
-        // Restore correct turn order if the game hasn't finished.
-        // During piece placement, `next_player` toggles automatically, 
-        // meaning it ends up as the opponent of the LAST parsed character.
-        // We override this to respect the explicit turn value supplied in the YEN structure.
         if let GameStatus::Ongoing { .. } = ygame.status {
             ygame.status = GameStatus::Ongoing {
                 next_player: PlayerId::new(game.turn()),
@@ -362,7 +358,7 @@ impl From<&GameY> for YEN {
                 _ => '.',
             };
             layout.push(cell_char);
-            if coords.z() == 0 && coords.x() > 0 {
+            if coords.y() == 0 && coords.z() > 0 {
                 layout.push('/');
             }
         }
