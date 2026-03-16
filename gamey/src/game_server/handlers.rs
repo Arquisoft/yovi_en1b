@@ -495,7 +495,7 @@ mod tests {
         assert!(res.unwrap_err().0.message.contains("Cannot specify both"));
     }
 
-    #[tokio::test]
+   #[tokio::test]
     async fn test_make_move_game_error() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
         let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // B is occupied
@@ -503,7 +503,7 @@ mod tests {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(1, 0, 0)), // B is at (1,0,0) with size 2
+                coords: Some(Coordinates::new(0, 0, 1)), // B is at (0,0,1) with the new React-synced coords
                 action: None,
             },
         });
@@ -756,11 +756,11 @@ mod tests {
         assert!(res.unwrap_err().0.message.contains("finished"));
     }
 
-    #[tokio::test]
+ #[tokio::test]
     async fn test_compute_invalid_move() {
         let req = axum::Json(ComputeRequest {
             yen_state_prev: Some("B/..".to_string()), // Top cell occupied
-            coordinates: Coordinates::new(1, 0, 0), // Same cell
+            coordinates: Coordinates::new(0, 0, 1), // Same cell as the top one
         });
         let res = compute(req).await;
         assert!(res.is_err());
