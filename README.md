@@ -7,7 +7,7 @@
 
 **Claim all three sides of the triangle. Sounds simple. It's not.**
 
-🚀 [**Wanna try? Play now → http://4.233.184.98**](http://4.233.184.98)
+ [**Wanna try? Play now → http://4.233.184.98**](http://4.233.184.98)
 
 </div>
 
@@ -17,42 +17,43 @@
 
 | | Name | Role |
 |---|---|---|
-| 🛠️ | Alejandro | DevOps & Database |
-| 🎨 | Tobias | Frontend |
-| ⚙️ | Bilal | Game Logic (Rust) |
-| 🔧 | Nacho | Backend |
+| Alejandro | Database |
+| Tobias | Frontend |
+| Bilal | Game Logic (Rust) |
+| Nacho | Backend |
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 yovi_en1b/
-├── webapp/       ⚛️  React + Vite + TypeScript
-├── users/        🟩  Node.js + Express + MongoDB
-├── gamey/        🦀  Rust game engine & bot
-└── docs/         📐  Arc42 architecture docs
+├── webapp/       React + Vite + TypeScript
+├── users/        Node.js + Express + MongoDB
+├── gamey/        Rust game engine & bot
+├── mongo-init/   Javascript + MongoDB
+└── docs/         Arc42 architecture docs
 ```
 
 ---
 
-## 🎯 What can you do?
+## What can you do?
 
 | | Feature | Description |
 |---|---|---|
-| 🔐 | **Auth** | Register and log in securely — bcrypt + JWT |
-| 🤖 | **vs Bot** | Face the AI at easy, medium or hard |
-| 🧑‍🤝‍🧑 | **vs Player** | Local multiplayer, same device |
-| 🕰️ | **History** | Browse all your past games |
-| ⏪ | **Replay** | Watch any game back move by move |
-| 🏆 | **Stats** | Wins, losses, performance by difficulty |
-| 📡 | **Monitoring** | Prometheus metrics on the backend |
+| **Auth** | Register and log in securely — bcrypt + JWT |
+| **vs Bot** | Face the AI at easy, medium or hard |
+| **vs Player** | Local multiplayer, same device |
+| **History** | Browse all your past games |
+| **Replay** | Watch any game back move by move |
+| **Stats** | Wins, losses, performance by difficulty |
+| **Monitoring** | Prometheus metrics on the backend |
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
-### 🐳 Docker (recommended)
+### Docker (recommended)
 
 ```bash
 docker-compose up --build
@@ -60,12 +61,12 @@ docker-compose up --build
 
 | | Service | URL |
 |---|---|---|
-| 🌐 | Web App | http://localhost |
-| 🟩 | Users API | http://localhost:3000 |
-| 📖 | Swagger Docs | http://localhost:3000/api-docs |
-| 🦀 | Gamey Engine | http://localhost:4000 |
+| Web App | http://localhost |
+| Users API | http://localhost:3000 |
+| Swagger Docs | http://localhost:3000/api-docs |
+| Gamey Engine | http://localhost:4000 |
 
-### 🖥️ Local (no Docker)
+### Local (no Docker)
 
 ```bash
 # Backend
@@ -80,9 +81,9 @@ cd gamey && cargo run
 
 ---
 
-## 📋 Scripts
+## Scripts
 
-### 🎨 Webapp
+### Webapp
 | Command | Description |
 |---|---|
 | `npm run dev` | Start dev server |
@@ -90,20 +91,27 @@ cd gamey && cargo run
 | `npm run test:e2e` | Run end-to-end tests |
 | `npm run start:all` | Start webapp + users together |
 
-### 🟩 Users
+### Users
 | Command | Description |
 |---|---|
 | `npm start` | Start the service |
 | `npm test` | Run tests |
 | `npm run test:coverage` | Run tests with coverage report |
 
-### 🦀 Gamey (Cargo)
+### Gamey (Cargo)
 | Command | Description |
 |---|---|
 | `cargo build` | Build the engine |
 | `cargo test` | Run tests |
 | `cargo run` | Run the engine |
 | `cargo doc` | Generate docs |
+
+### Database (MongoDB)
+| Command | Description |
+|---|---|
+|`docker-compose up -d mongodb` | Start database at the background |
+| `docker-compose stop mongodb` | Stop database without destroying the instance |
+| `docker-compose down` | Shut the environment down |
 
 ---
 
