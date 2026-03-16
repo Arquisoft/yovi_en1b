@@ -31,12 +31,14 @@
 pub mod bot;
 pub mod cli;
 pub mod core;
+pub mod game_server;
 pub mod gamey_error;
 pub mod notation;
 pub mod bot_server;
 pub use bot::*;
 pub use cli::*;
 pub use core::*;
+pub use game_server::*;
 pub use gamey_error::*;
 pub use notation::*;
 pub use bot_server::*;

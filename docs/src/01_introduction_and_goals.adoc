@@ -80,7 +80,13 @@ The following individuals have a significant interest in the architectural succe
 
 [options="header",cols="1,2,3"]
 |===
-|Role or Name|Contact|Expectations
-|Jose Emilio Labra Gayo|University of Oviedo | 
-|Pablo Gonzalez|University of Oviedo | 
+|Role or Name|Contact|Job Definition
+|Jose Emilio Labra Gayo|University of Oviedo | Investor 1
+|Pablo Gonzalez|University of Oviedo | Investor 2
+|Diego Martín Fernández|University of Oviedo | Investor 3
+|Celia Melendi Lavandera|University of Oviedo | Investor 4
+|bilalyazicioglu|University of Oviedo | GameY(Rust) Developer
+|UO300896|University of Oviedo | Database Engineer
+|Th0be|University of Oviedo | Frontend Developer
+|nacho50900|University of Oviedo | Backend Developer
 |===

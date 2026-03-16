@@ -1,24 +1,39 @@
-import './App.css'
-import RegisterForm from './RegisterForm';
-import { Game } from './Game';
-import reactLogo from './assets/react.svg'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './features/auth/AuthProvider';
+import { AppLayout } from './components/layout/AppLayout';
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { EntryPage } from './pages/EntryPage';
+import { HomePage } from './pages/HomePage';
+import { NewGamePage } from './pages/NewGamePage';
+import { GamePage } from './pages/GamePage';
+import { GameHistoryPage } from './pages/GameHistoryPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { useAuth } from './hooks/useAuth';
+import './App.css';
+
+function RootPage() {
+  const { isLoggedIn } = useAuth();
+  return isLoggedIn ? <HomePage /> : <EntryPage />;
+}
 
 function App() {
   return (
-    <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noreferrer">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-
-      <h2>Welcome to the Software Arquitecture 2025-2026 course</h2>
-      <RegisterForm />
-      <Game />
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<RootPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/games/new" element={<NewGamePage />} />
+              <Route path="/games/:id" element={<GamePage />} />
+              <Route path="/games/history" element={<GameHistoryPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

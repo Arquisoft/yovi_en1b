@@ -26,7 +26,7 @@ pub mod version;
 use axum::response::IntoResponse;
 use axum::http::Method;
 use std::sync::Arc;
-use tower_http::cors::{CorsLayer, AllowOrigin};
+use tower_http::cors::CorsLayer;
 pub use choose::MoveResponse;
 pub use error::ErrorResponse;
 pub use version::*;
@@ -52,6 +52,32 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route(
             "/{api_version}/ybot/choose/{bot_id}",
             axum::routing::post(choose::choose),
+        )
+        // Game endpoints
+        .route(
+            "/{api_version}/game/new",
+            axum::routing::post(crate::game_server::handlers::new_game),
+        )
+        .route(
+            "/{api_version}/game/move",
+            axum::routing::post(crate::game_server::handlers::make_move),
+        )
+        .route(
+            "/{api_version}/game/load",
+            axum::routing::post(crate::game_server::handlers::load_game),
+        )
+        .route(
+            "/{api_version}/game/board-info/{board_size}",
+            axum::routing::get(crate::game_server::handlers::board_info),
+        )
+        // Partner API
+        .route(
+            "/play",
+            axum::routing::post(crate::game_server::handlers::play),
+        )
+        .route(
+            "/compute",
+            axum::routing::post(crate::game_server::handlers::compute),
         )
         .with_state(state)
         .layer(cors)

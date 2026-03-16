@@ -1,5 +1,6 @@
 use crate::core::Board;
 use crate::{Coordinates, GameAction, GameYError, Movement, PlayerId, RenderOptions, YEN};
+use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 use std::path::Path;
 
@@ -27,7 +28,7 @@ pub struct GameY {
 }
 
 /// Represents the state of a single cell on the board.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Cell {
     /// The cell has no piece.
     Empty,
@@ -328,6 +329,17 @@ impl TryFrom<YEN> for GameY {
                 }
             }
         }
+        
+        // Restore correct turn order if the game hasn't finished.
+        // During piece placement, `next_player` toggles automatically, 
+        // meaning it ends up as the opponent of the LAST parsed character.
+        // We override this to respect the explicit turn value supplied in the YEN structure.
+        if let GameStatus::Ongoing { .. } = ygame.status {
+            ygame.status = GameStatus::Ongoing {
+                next_player: PlayerId::new(game.turn()),
+            };
+        }
+
         Ok(ygame)
     }
 }
@@ -376,7 +388,7 @@ fn apply_player_color(symbol: String, player: Option<PlayerId>) -> String {
 }
 
 /// Represents the current status of a game.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GameStatus {
     /// The game is still in progress with the specified player to move next.
     Ongoing { next_player: PlayerId },
@@ -604,5 +616,15 @@ mod tests {
             }
             _ => panic!("Game should be ongoing"),
         }
+    }
+
+    #[test]
+    fn test_try_from_turn_logic_bug() {
+        let yen = YEN::new(3, 0, vec!['B', 'R'], "R/../B..".to_string()); // 1 B, 1 R. Last is 'B'.
+        let game = GameY::try_from(yen).unwrap();
+        // `YEN` explicitly says turn is 0 (Blue).
+        // Since B and R count is equal (1 each), blue should be next.
+        // The last parsed piece was B. Without our fix, GameY would toggle the turn to R (1).
+        assert_eq!(game.next_player(), Some(crate::PlayerId::new(0)), "Should be Blue's turn according to YEN!");
     }
 }

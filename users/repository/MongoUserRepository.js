@@ -1,8 +1,9 @@
 const UserRepository = require('./UserRepository');
-const User = require('../models/User');
-const Game = require('../models/Game');
+const User = require('../models/user');
+const Game = require('../models/game');
 
 class MongoUserRepository extends UserRepository {
+
   async findByUsername(username) {
     return await User.findOne({ username: String(username) });
   }
@@ -14,6 +15,11 @@ class MongoUserRepository extends UserRepository {
   async create(userData) {
     const user = new User(userData);
     return await user.save();
+  }
+
+  async usernameExists(username) {
+    const user = await User.findOne({ username: String(username) }).select('_id');
+    return !!user;
   }
 
   async findGamesByPlayer(playerId) {
@@ -35,18 +41,18 @@ class MongoUserRepository extends UserRepository {
 
   async updateStats(userId, { result, type, difficulty }) {
     const update = { $inc: { 'statistics.total_games': 1 } };
-    const winIncr = result === 'WIN' ? 1 : 0;
+    const winIncr  = result === 'WIN'  ? 1 : 0;
     const lossIncr = result === 'LOSS' ? 1 : 0;
 
-    update.$inc['statistics.total_wins'] = winIncr;
+    update.$inc['statistics.total_wins']   = winIncr;
     update.$inc['statistics.total_losses'] = lossIncr;
 
     if (type === 'PLAYER') {
-      update.$inc['statistics.vs_player.wins'] = winIncr;
+      update.$inc['statistics.vs_player.wins']   = winIncr;
       update.$inc['statistics.vs_player.losses'] = lossIncr;
     } else {
       const diffKey = difficulty.toLowerCase();
-      update.$inc[`statistics.vs_bot.${diffKey}.wins`] = winIncr;
+      update.$inc[`statistics.vs_bot.${diffKey}.wins`]   = winIncr;
       update.$inc[`statistics.vs_bot.${diffKey}.losses`] = lossIncr;
     }
 
@@ -55,4 +61,3 @@ class MongoUserRepository extends UserRepository {
 }
 
 module.exports = MongoUserRepository;
-

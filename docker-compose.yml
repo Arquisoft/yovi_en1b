@@ -32,8 +32,8 @@ services:
     build:
       context: ./webapp
       args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
-        - VITE_GAMEY_URL=${VITE_GAMEY_URL:-http://localhost:4000}
+        - VITE_API_URL=http://4.233.184.98:3000
+        - VITE_GAMEY_URL=http://4.233.184.98:4000
     container_name: webapp
     restart: always
     ports:
