@@ -53,14 +53,15 @@ module.exports = function gameRoutes(repository) {
         }
 
         try {
-            const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
+            //WE WILL MAKE IT RANDOM WHEN WE IMPLEMENT BOT STARTING
+            const current_turn = 'B';
 
             const game = await repository.createGame({
-                player_id:        req.user.userId,
-                game_type:        game_type || 'BOT',
-                name_of_enemy:    name_of_enemy || null,
+                player_id: req.user.userId,
+                game_type: game_type || 'BOT',
+                name_of_enemy: name_of_enemy || null,
                 board_size,
-                strategy:         strategy || 'random',
+                strategy: strategy || 'random',
                 difficulty_level: difficulty_level || 'medium',
                 current_turn
             });
@@ -157,9 +158,9 @@ module.exports = function gameRoutes(repository) {
         try {
             game.moves.push({
                 move_number: game.moves.length + 1,
-                player:      game.current_turn,
+                player: game.current_turn,
                 coordinates,
-                yen_state:   botYenState
+                yen_state: botYenState
             });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
