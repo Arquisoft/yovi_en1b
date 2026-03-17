@@ -19,10 +19,13 @@ interface BoardProps {
   readonly canPlay: boolean;
   readonly movesByCell: Map<string, Move>;
   readonly onPlayMove: (coordinates: Coordinates) => Promise<void>;
+  readonly visualTurn: 'B' | 'R';
 }
 
 interface MoveHistoryProps {
   readonly moves: Move[];
+  readonly bluePlayerName: string;
+  readonly redPlayerName: string;
 }
 
 function buildBoard(size: number): HexCell[][] {
@@ -103,7 +106,7 @@ function getRowKey(row: HexCell[]): string {
   return first ? `row-${first.x}-${first.y}-${first.z}-${row.length}` : `row-empty-${row.length}`;
 }
 
-function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove }: BoardProps) {
+function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }: BoardProps) {
   return (
     <section className="board-wrap">
       <div className="board" aria-label="game board">
@@ -119,12 +122,13 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove }: BoardProps
               const ownerClass = getOwnerClass(owner);
               const disabled = !canPlay || Boolean(owner);
               const cellLabel = getCellAriaLabel(cell.coordinates, owner);
+              const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''} turn-indicator-${visualTurn}`;
 
               return (
                 <button
                   key={key}
                   type="button"
-                  className={`hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''}`}
+                  className={cellClass}
                   disabled={disabled}
                   aria-disabled={disabled}
                   aria-label={cellLabel}
@@ -143,7 +147,13 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove }: BoardProps
   );
 }
 
-function MoveHistory({ moves }: MoveHistoryProps) {
+interface MoveHistoryProps {
+  readonly moves: Move[];
+  readonly bluePlayerName: string;
+  readonly redPlayerName: string;
+}
+
+function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps) {
   const orderedMoves = useMemo(() => [...moves].reverse(), [moves]);
 
   if (moves.length === 0) {
@@ -160,15 +170,16 @@ function MoveHistory({ moves }: MoveHistoryProps) {
       <h3>Move History</h3>
       <ol className="move-history-list">
         {orderedMoves.map((move) => {
-          const playerName = move.player === 'B' ? 'Blue' : 'Red';
-          const badgeClass = move.player === 'B' ? 'blue' : 'red';
+          const isBlue = move.player === 'B';
+          const playerName = isBlue ? bluePlayerName : redPlayerName;
+          const badgeClass = isBlue ? 'blue' : 'red';
 
           return (
             <li key={move.move_number} className="move-history-item">
+              <span className="move-number">#{move.move_number}</span>
               <span className={`move-player-badge ${badgeClass}`}>{playerName}</span>
               <span className="move-text">
-                Move #{move.move_number}: places a stone on{' '}
-                <strong>({move.coordinates.x}, {move.coordinates.y}, {move.coordinates.z})</strong>
+                ({move.coordinates.x}, {move.coordinates.y}, {move.coordinates.z})
               </span>
             </li>
           );
@@ -368,40 +379,62 @@ export function GamePage() {
   const enemyTitle = getEnemyTitle(game);
   const statusText = getTurnStatusText(game, botThinking);
 
+  const getResultBoxClass = (): string => {
+    if (game.result === 'WIN') return 'blue';
+    if (game.result === 'LOSS') return 'red';
+    return 'draw';
+  };
+
+  const getResultText = (): string => {
+    if (game.result === 'WIN') return 'YOU WIN';
+    if (game.result === 'LOSS') return 'YOU LOSE';
+    return 'DRAW';
+  };
+
   return (
     <Panel title="Game" subtitle="Ongoing game session">
       <div className={shellClass}>
         <header className="game-header-panels">
           <article className={bluePanelClass}>
-            <h3>You (Blue)</h3>
+            <h3>You</h3>
             <p>Moves: {blueMoves}</p>
           </article>
 
           <article className="center-panel">
             <div className="center-panel-top">
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={handleUndo}
-                disabled={actionLoading || game.moves.length === 0 || !inProgress}
-                title="Undo last move"
-                aria-label="Undo last move"
-              >
-                ↶
-              </button>
-              <p className="center-time">{formatDuration(displayedDuration)}</p>
-              <button
-                type="button"
-                className="icon-btn icon-btn--danger"
-                onClick={handleFinish}
-                disabled={actionLoading || !inProgress}
-                title="Finish game as draw"
-                aria-label="Finish game as draw"
-              >
-                ⏹
-              </button>
+              {inProgress && (
+                <>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={handleUndo}
+                    disabled={actionLoading || game.moves.length === 0 || !inProgress}
+                    title="Undo last move"
+                    aria-label="Undo last move"
+                  >
+                    ↶
+                  </button>
+                  <p className="center-time">{formatDuration(displayedDuration)}</p>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn--danger"
+                    onClick={handleFinish}
+                    disabled={actionLoading || !inProgress}
+                    title="Finish game as draw"
+                    aria-label="Finish game as draw"
+                  >
+                    ⏹
+                  </button>
+                </>
+              )}
+              {!inProgress && (
+                <div className={`game-result-box game-result-box--${getResultBoxClass()}`}>
+                  <p className="game-result-time">{formatDuration(displayedDuration)}</p>
+                  <p className="game-result-text">{getResultText()}</p>
+                </div>
+              )}
             </div>
-            <p>{statusText}</p>
+            {inProgress && <p>{statusText}</p>}
           </article>
 
           <article className={redPanelClass}>
@@ -419,9 +452,14 @@ export function GamePage() {
           canPlay={canPlay}
           movesByCell={movesByCell}
           onPlayMove={playMoveAt}
+          visualTurn={visualTurn}
         />
 
-        <MoveHistory moves={game.moves} />
+        <MoveHistory
+          moves={game.moves}
+          bluePlayerName="You"
+          redPlayerName={enemyTitle}
+        />
       </div>
     </Panel>
   );
