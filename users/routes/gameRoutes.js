@@ -236,7 +236,7 @@ module.exports = function gameRoutes(repository) {
 
             game.moves.pop(); //erases last move
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
-            game.save();
+            await game.save();
 
             const updatedGame = await repository.findGameById(game._id);
             res.json(updatedGame);
