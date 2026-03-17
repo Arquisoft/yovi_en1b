@@ -506,7 +506,7 @@ describe('GET /games/options', () => {
 
         expect(res.body.strategies).toContain('Random')
         expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (soming soon)')
+        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
     })
 
     it('returns the expected difficulty levels', async () => {

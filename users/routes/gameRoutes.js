@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const authMiddleware = require('../middleware/auth');
+const app = require("../users-service");
 
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
@@ -45,9 +46,9 @@ module.exports = function gameRoutes(repository) {
     // Get available game options (strategies, difficulty levels, game variants)
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
-            strategies: ['random', 'dijkstra', 'ai-x'],
-            difficulty_levels: ['easy', 'medium', 'hard'],
-            variants: ['classic', 'master', 'pie']
+            strategies: ['Random', 'AI (coming soon)', 'Dijkstra (coming soon)'],
+            difficulty_levels: ['Easy 😄', 'Medium 😐', 'Hard 😈'],
+            variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
         });
     });
 
