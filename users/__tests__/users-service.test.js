@@ -506,7 +506,7 @@ describe('GET /games/options', () => {
 
         expect(res.body.strategies).toContain('Random')
         expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (soming soon)')
+        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
     })
 
     it('returns the expected difficulty levels', async () => {
@@ -537,7 +537,6 @@ describe('POST /games/:id/undo', () => {
     let botGameId;
 
     beforeAll(async () => {
-        // Create a BOT game for rejection test (no fetch needed)
         const botRes = await request(app)
             .post('/games')
             .send({ board_size: 7, game_type: 'BOT' })
@@ -546,22 +545,23 @@ describe('POST /games/:id/undo', () => {
     })
 
     it('removes the last move and switches turn back', async () => {
-        // Create a fresh PLAYER game and add a move inside the test
+        // Create fresh PLAYER game
         const createRes = await request(app)
             .post('/games')
             .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
             .set('Authorization', `Bearer ${token}`)
         const freshGameId = createRes.body._id
 
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        // Add a move using spyOn so afterEach restoreAllMocks doesn't interfere
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
             ok: true,
             json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
-        }))
+        })
         await request(app)
             .post(`/games/${freshGameId}/move`)
             .send({ coordinates: { x: 1, y: 1, z: 1 } })
             .set('Authorization', `Bearer ${token}`)
-        vi.unstubAllGlobals()
+        fetchSpy.mockRestore()
 
         const beforeRes = await request(app)
             .get(`/games/${freshGameId}`)
@@ -632,7 +632,7 @@ describe('POST /games/:id/undo', () => {
     })
 
     it('returns 401 without token', async () => {
-        const res = await request(app).post(`/games/${playerGameId}/undo`)
+        const res = await request(app).post(`/games/${botGameId}/undo`)
         expect(res.status).toBe(401)
     })
 })
