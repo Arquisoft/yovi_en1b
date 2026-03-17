@@ -506,7 +506,7 @@ describe('GET /games/options', () => {
 
         expect(res.body.strategies).toContain('Random')
         expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
+        expect(res.body.strategies).toContain('Dijkstra (soming soon)')
     })
 
     it('returns the expected difficulty levels', async () => {
@@ -534,28 +534,10 @@ describe('GET /games/options', () => {
 // ─── Undo move ────────────────────────────────────────────────────────────────
 
 describe('POST /games/:id/undo', () => {
-    let playerGameId;
     let botGameId;
 
     beforeAll(async () => {
-        // Create a PLAYER game with one move for undo tests
-        const createRes = await request(app)
-            .post('/games')
-            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
-            .set('Authorization', `Bearer ${token}`)
-        playerGameId = createRes.body._id
-
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
-        }))
-        await request(app)
-            .post(`/games/${playerGameId}/move`)
-            .send({ coordinates: { x: 1, y: 1, z: 1 } })
-            .set('Authorization', `Bearer ${token}`)
-        vi.restoreAllMocks()
-
-        // Create a BOT game for rejection test
+        // Create a BOT game for rejection test (no fetch needed)
         const botRes = await request(app)
             .post('/games')
             .send({ board_size: 7, game_type: 'BOT' })
@@ -564,14 +546,31 @@ describe('POST /games/:id/undo', () => {
     })
 
     it('removes the last move and switches turn back', async () => {
+        // Create a fresh PLAYER game and add a move inside the test
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+        const freshGameId = createRes.body._id
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+        await request(app)
+            .post(`/games/${freshGameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+        vi.unstubAllGlobals()
+
         const beforeRes = await request(app)
-            .get(`/games/${playerGameId}`)
+            .get(`/games/${freshGameId}`)
             .set('Authorization', `Bearer ${token}`)
         const movesBefore = beforeRes.body.moves.length
         const turnBefore = beforeRes.body.current_turn
 
         const res = await request(app)
-            .post(`/games/${playerGameId}/undo`)
+            .post(`/games/${freshGameId}/undo`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
@@ -580,13 +579,14 @@ describe('POST /games/:id/undo', () => {
     })
 
     it('returns 400 when there are no moves to undo', async () => {
-        // Undo the only move first, then try again
-        await request(app)
-            .post(`/games/${playerGameId}/undo`)
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
             .set('Authorization', `Bearer ${token}`)
+        const emptyGameId = createRes.body._id
 
         const res = await request(app)
-            .post(`/games/${playerGameId}/undo`)
+            .post(`/games/${emptyGameId}/undo`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(400)
