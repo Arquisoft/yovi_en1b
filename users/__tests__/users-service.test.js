@@ -489,6 +489,154 @@ describe('GET /games/:id/play', () => {
 
 
 
+// ─── Game options ─────────────────────────────────────────────────────────────
+
+describe('GET /games/options', () => {
+    it('returns strategies, difficulty levels and variants', async () => {
+        const res = await request(app).get('/games/options')
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body.strategies)).toBe(true)
+        expect(Array.isArray(res.body.difficulty_levels)).toBe(true)
+        expect(Array.isArray(res.body.variants)).toBe(true)
+    })
+
+    it('returns the expected strategies', async () => {
+        const res = await request(app).get('/games/options')
+
+        expect(res.body.strategies).toContain('Random')
+        expect(res.body.strategies).toContain('AI (coming soon)')
+        expect(res.body.strategies).toContain('Dijkstra (soming soon)')
+    })
+
+    it('returns the expected difficulty levels', async () => {
+        const res = await request(app).get('/games/options')
+
+        expect(res.body.difficulty_levels).toContain('Easy 😄')
+        expect(res.body.difficulty_levels).toContain('Medium 😐')
+        expect(res.body.difficulty_levels).toContain('Hard 😈')
+    })
+
+    it('returns the expected variants', async () => {
+        const res = await request(app).get('/games/options')
+
+        expect(res.body.variants).toContain('Classic Y')
+        expect(res.body.variants).toContain('Master Y (coming soon)')
+        expect(res.body.variants).toContain('Pie Rule (coming soon)')
+    })
+
+    it('does not require authentication', async () => {
+        const res = await request(app).get('/games/options')
+        expect(res.status).toBe(200)
+    })
+})
+
+// ─── Undo move ────────────────────────────────────────────────────────────────
+
+describe('POST /games/:id/undo', () => {
+    let playerGameId;
+    let botGameId;
+
+    beforeAll(async () => {
+        // Create a PLAYER game with one move for undo tests
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+        playerGameId = createRes.body._id
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+        await request(app)
+            .post(`/games/${playerGameId}/move`)
+            .send({ coordinates: { x: 1, y: 1, z: 1 } })
+            .set('Authorization', `Bearer ${token}`)
+        vi.restoreAllMocks()
+
+        // Create a BOT game for rejection test
+        const botRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'BOT' })
+            .set('Authorization', `Bearer ${token}`)
+        botGameId = botRes.body._id
+    })
+
+    it('removes the last move and switches turn back', async () => {
+        const beforeRes = await request(app)
+            .get(`/games/${playerGameId}`)
+            .set('Authorization', `Bearer ${token}`)
+        const movesBefore = beforeRes.body.moves.length
+        const turnBefore = beforeRes.body.current_turn
+
+        const res = await request(app)
+            .post(`/games/${playerGameId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body.moves.length).toBe(movesBefore - 1)
+        expect(res.body.current_turn).not.toBe(turnBefore)
+    })
+
+    it('returns 400 when there are no moves to undo', async () => {
+        // Undo the only move first, then try again
+        await request(app)
+            .post(`/games/${playerGameId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        const res = await request(app)
+            .post(`/games/${playerGameId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/no moves/i)
+    })
+
+    it('returns 400 for BOT games', async () => {
+        const res = await request(app)
+            .post(`/games/${botGameId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/player vs player/i)
+    })
+
+    it('returns 400 for a finished game', async () => {
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+        const finishedId = createRes.body._id
+
+        await request(app)
+            .put(`/games/${finishedId}/finish`)
+            .send({ result: 'DRAW' })
+            .set('Authorization', `Bearer ${token}`)
+
+        const res = await request(app)
+            .post(`/games/${finishedId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/finished/i)
+    })
+
+    it('returns 404 for a non-existent game', async () => {
+        const fakeId = new mongoose.Types.ObjectId()
+        const res = await request(app)
+            .post(`/games/${fakeId}/undo`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(404)
+    })
+
+    it('returns 401 without token', async () => {
+        const res = await request(app).post(`/games/${playerGameId}/undo`)
+        expect(res.status).toBe(401)
+    })
+})
+
 // ─── Finish game ──────────────────────────────────────────────────────────────
 
 describe('PUT /games/:id/finish', () => {
