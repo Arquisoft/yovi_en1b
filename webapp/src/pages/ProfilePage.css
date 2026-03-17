@@ -154,22 +154,31 @@
   background: #334155;
   min-height: 0.9rem;
   overflow: hidden;
+  display: flex;
 }
 
-.profile-meter__fill {
+.profile-meter__wins,
+.profile-meter__losses {
   min-height: 0.9rem;
+}
+
+.profile-meter__wins {
   background: linear-gradient(120deg, #2563eb, #60a5fa);
 }
 
-.profile-meter__fill.profile-kpi--rate-low {
+.profile-meter__losses {
+  background: linear-gradient(120deg, #8e4f56, #b66a72);
+}
+
+.profile-meter__wins.profile-kpi--rate-low {
   background: linear-gradient(120deg, #b56a73, #9f5760);
 }
 
-.profile-meter__fill.profile-kpi--rate-mid {
+.profile-meter__wins.profile-kpi--rate-mid {
   background: linear-gradient(120deg, #b9944a, #9f7f39);
 }
 
-.profile-meter__fill.profile-kpi--rate-high {
+.profile-meter__wins.profile-kpi--rate-high {
   background: linear-gradient(120deg, #5a9877, #467e63);
 }
 

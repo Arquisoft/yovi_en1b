@@ -3,8 +3,85 @@ import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/a
 import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
 import type { UserProfile, UserStatistics, WinLossStats } from '../types/users';
 
-const mockUsers = new Map<string, { password: string; userId: string }>();
-const mockGames = new Map<string, GameRecord>();
+const DEFAULT_MOCK_USER = {
+  username: 'user',
+  password: 'user',
+  userId: 'user'
+} as const;
+
+const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
+  {
+    _id: 'seed-game-player-win',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'PLAYER',
+    name_of_enemy: 'Local Opponent',
+    board_size: 5,
+    strategy: 'random',
+    difficulty_level: 'medium',
+    rule_set: 'normal',
+    current_turn: 'R',
+    status: 'FINISHED',
+    result: 'WIN',
+    duration_seconds: 180,
+    created_at: '2026-03-16T10:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-easy-win',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'random',
+    difficulty_level: 'easy',
+    rule_set: 'normal',
+    current_turn: 'R',
+    status: 'FINISHED',
+    result: 'WIN',
+    duration_seconds: 120,
+    created_at: '2026-03-16T11:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-medium-loss',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'balanced',
+    difficulty_level: 'medium',
+    rule_set: 'normal',
+    current_turn: 'B',
+    status: 'FINISHED',
+    result: 'LOSS',
+    duration_seconds: 240,
+    created_at: '2026-03-16T12:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-hard-loss',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'aggressive',
+    difficulty_level: 'hard',
+    rule_set: 'normal',
+    current_turn: 'B',
+    status: 'FINISHED',
+    result: 'LOSS',
+    duration_seconds: 300,
+    created_at: '2026-03-16T13:00:00.000Z',
+    moves: []
+  }
+];
+
+const mockUsers = new Map<string, { password: string; userId: string }>([
+  [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
+]);
+const mockGames = new Map<string, GameRecord>(
+  SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
+);
 let gameCounter = 1;
 
 function coordinateKey(c: Coordinates): string {

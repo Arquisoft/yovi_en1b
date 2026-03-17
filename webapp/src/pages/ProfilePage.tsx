@@ -106,7 +106,8 @@ export function ProfilePage() {
     ].map((category) => {
       const games = category.wins + category.losses;
       const winRate = percent(category.wins, games);
-      return { ...category, games, winRate, tone: getWinRateTone(winRate) };
+      const lossRate = percent(category.losses, games);
+      return { ...category, games, winRate, lossRate, tone: getWinRateTone(winRate) };
     });
 
     return {
@@ -175,7 +176,8 @@ export function ProfilePage() {
                     <span>{derived.playerCategory.games} games</span>
                   </div>
                   <div className="profile-meter" role="img" aria-label={`${derived.playerCategory.label} win rate ${derived.playerCategory.winRate} percent`}>
-                    <div className={`profile-meter__fill ${derived.playerCategory.tone}`} style={{ width: `${derived.playerCategory.winRate}%` }} />
+                    <div className={`profile-meter__wins ${derived.playerCategory.tone}`} style={{ width: `${derived.playerCategory.winRate}%` }} />
+                    <div className="profile-meter__losses" style={{ width: `${derived.playerCategory.lossRate}%` }} />
                   </div>
                   <p className="profile-meter-caption">
                     Win rate {derived.playerCategory.winRate}% | W {derived.playerCategory.wins} / L {derived.playerCategory.losses}
@@ -195,7 +197,8 @@ export function ProfilePage() {
                         <span>{category.games} games</span>
                       </div>
                       <div className="profile-meter" role="img" aria-label={`${category.label} win rate ${category.winRate} percent`}>
-                        <div className={`profile-meter__fill ${category.tone}`} style={{ width: `${category.winRate}%` }} />
+                        <div className={`profile-meter__wins ${category.tone}`} style={{ width: `${category.winRate}%` }} />
+                        <div className="profile-meter__losses" style={{ width: `${category.lossRate}%` }} />
                       </div>
                       <p className="profile-meter-caption">
                         Win rate {category.winRate}% | W {category.wins} / L {category.losses}

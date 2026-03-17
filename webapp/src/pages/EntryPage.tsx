@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkUsernameExists } from '../api/authApi';
 import { useAuth } from '../hooks/useAuth';
@@ -15,6 +15,7 @@ export function EntryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<'username' | 'password'>('username');
+  const confirmPasswordInputRef = useRef<HTMLInputElement | null>(null);
 
   const checkUsername = async () => {
     if (!username.trim()) {
@@ -44,10 +45,20 @@ export function EntryPage() {
   };
 
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && password && (usernameExists || confirmPassword)) {
-      e.preventDefault();
-      handleSubmit(new Event('submit') as unknown as React.FormEvent);
+    if (e.key !== 'Enter' || !password) {
+      return;
     }
+
+    e.preventDefault();
+
+    if (!usernameExists) {
+      if (!confirmPassword) {
+        confirmPasswordInputRef.current?.focus();
+        return;
+      }
+    }
+
+    handleSubmit(new Event('submit') as unknown as React.FormEvent);
   };
 
   const handleConfirmPasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -141,6 +152,7 @@ export function EntryPage() {
               <label>
                 Confirm Password
                 <input
+                  ref={confirmPasswordInputRef}
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
