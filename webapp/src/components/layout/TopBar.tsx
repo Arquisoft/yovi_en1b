@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import logo from '../../assets/logo.svg';
 import './TopBar.css';
 
 export function TopBar() {
@@ -12,8 +13,8 @@ export function TopBar() {
   return (
     <header className="topbar">
       <Link to="/" className="topbar-brand" aria-label="YOVI home">
-        <img src="/vite.svg" alt="YOVI logo" className="topbar-logo" />
-        <span>YOVI</span>
+        <img src={logo} alt="YOVI logo" className="topbar-logo" />
+        <span className="topbar-text">YOVI</span>
       </Link>
 
       <div className="topbar-actions">

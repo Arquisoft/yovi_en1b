@@ -21,18 +21,27 @@
   color: inherit;
   text-decoration: none;
   font-weight: 700;
-  font-size: 1.25rem;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .topbar-brand:hover {
-  color: #06b6d4;
+  transform: translateY(-1px);
 }
 
 .topbar-logo {
-  width: 32px;
-  height: 32px;
-  filter: brightness(0.9);
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.topbar-text {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .topbar-actions {

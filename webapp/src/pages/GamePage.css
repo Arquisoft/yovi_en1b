@@ -1,8 +1,9 @@
 .game-header-panels {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(300px, 380px) minmax(220px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 18px;
+  width: 100%;
 }
 
 .player-panel,
