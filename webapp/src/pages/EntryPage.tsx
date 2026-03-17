@@ -94,7 +94,7 @@ export function EntryPage() {
   };
 
   return (
-    <Panel title="Welcome to Game Y" subtitle="Sign in or create an account">
+    <Panel title="Welcome to YOVI" subtitle="Sign in or create an account">
       <form onSubmit={handleSubmit} className="entry-form">
         {stage === 'username' ? (
           <>

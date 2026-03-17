@@ -4,7 +4,7 @@
   z-index: 20;
   height: 64px;
   display: grid;
-  grid-template-columns: 240px 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
   padding: 0 32px;
@@ -33,14 +33,6 @@
   width: 32px;
   height: 32px;
   filter: brightness(0.9);
-}
-
-.topbar-title {
-  margin: 0;
-  justify-self: center;
-  font-weight: 600;
-  font-size: 1.1rem;
-  color: #94a3b8;
 }
 
 .topbar-actions {
@@ -76,6 +68,3 @@
   border-color: #64748b;
   color: #e5e7eb;
 }
-
-
-

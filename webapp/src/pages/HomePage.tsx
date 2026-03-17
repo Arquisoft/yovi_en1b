@@ -4,7 +4,7 @@ import './HomePage.css';
 
 export function HomePage() {
   return (
-    <Panel title="Home" subtitle="Welcome to Game Y">
+    <Panel title="Home" subtitle="Welcome to YOVI">
       <div className="home-actions">
         <Link to="/games/new" className="home-action home-action--primary">
           Create New Game
