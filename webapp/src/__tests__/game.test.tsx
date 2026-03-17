@@ -79,7 +79,7 @@ describe('GamePage — loading', () => {
     server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
     renderGamePage();
     await screen.findByLabelText('game board');
-    expect(screen.getByText(/you \(blue\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/^you$/i)).toBeInTheDocument();
     expect(screen.getByText(GAME_TEST_DATA.enemyName)).toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe('GamePage — move', () => {
     const board = await screen.findByLabelText('game board');
     const firstHex = within(board).getAllByRole('button')[0];
     await userEvent.click(firstHex);
-    await screen.findByText(/move #1/i);
+    await screen.findByText('#1');
   });
 
   test("in PLAYER mode on Red turn, occupied hexes are disabled but free hexes stay enabled", async () => {
@@ -214,10 +214,10 @@ describe('GamePage — undo', () => {
       )
     );
     renderGamePage();
-    await screen.findByText(/move #1/i);
+    await screen.findByText('#1');
     await userEvent.click(screen.getByRole('button', { name: /undo/i }));
     await waitFor(() => {
-      expect(screen.queryByText(/move #1/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('#1')).not.toBeInTheDocument();
     });
     expect(screen.getByText(/no moves yet/i)).toBeInTheDocument();
   });
@@ -239,7 +239,7 @@ describe('GamePage — finish', () => {
     await screen.findByText(/draw/i);
   });
 
-  test('finish button is disabled after game is already finished', async () => {
+  test('finish action is not available after game is already finished', async () => {
     const finishedGame: GameRecord = {
       ...BASE_GAME,
       status: 'FINISHED',
@@ -253,7 +253,7 @@ describe('GamePage — finish', () => {
     server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(finishedGame)));
     renderGamePage();
     await screen.findByLabelText('game board');
-    expect(screen.getByRole('button', { name: /finish/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /finish/i })).not.toBeInTheDocument();
   });
 });
 

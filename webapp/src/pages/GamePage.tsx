@@ -70,7 +70,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
 
 function getEnemyTitle(game: GameRecord): string {
   if (game.game_type === 'BOT') {
-    return 'AI (Red)';
+    return 'AI';
   }
 
   return game.name_of_enemy ?? 'Player 2 (Red)';
