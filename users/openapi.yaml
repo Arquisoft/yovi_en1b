@@ -513,8 +513,8 @@ paths:
           description: Gamey service returned an error
         '503':
           description: Gamey service unreachable
-
-          - bearerAuth: []
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
