@@ -1,7 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
 const authMiddleware = require('../middleware/auth');
-const app = require("../users-service");
 
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
