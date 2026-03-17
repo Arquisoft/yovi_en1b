@@ -93,6 +93,25 @@ components:
         vs_bot:
           $ref: '#/components/schemas/VsBotStats'
 
+    GameOptions:
+      type: object
+      properties:
+        strategies:
+          type: array
+          items:
+            type: string
+          example: ['Random', 'AI (coming soon)', 'Dijkstra (soming soon)']
+        difficulty_levels:
+          type: array
+          items:
+            type: string
+          example: ['Easy 😄', 'Medium 😐', 'Hard 😈']
+        variants:
+          type: array
+          items:
+            type: string
+          example: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+
     Game:
       type: object
       properties:
@@ -356,6 +375,20 @@ paths:
 
   # Games
 
+  /games/options:
+    get:
+      summary: Get available game options
+      description: Returns the available strategies, difficulty levels and game variants. Public endpoint, no authentication required.
+      responses:
+        '200':
+          description: Available game options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameOptions'
+        '500':
+          description: Internal server error
+
   /games:
     post:
       summary: Create a new game
@@ -513,6 +546,11 @@ paths:
           description: Gamey service returned an error
         '503':
           description: Gamey service unreachable
+
+  /games/{id}/undo:
+    post:
+      summary: Undo last move
+      description: Removes the last move and reverts the turn. Only allowed in PLAYER vs PLAYER games that are still IN_PROGRESS. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -522,34 +560,15 @@ paths:
           schema:
             type: string
           example: "64b1f2e3c4d5e6f7a8b9c0d1"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [result]
-              properties:
-                result:
-                  type: string
-                  enum: [WIN, LOSS, DRAW]
-                  example: "WIN"
-                yen_final_state:
-                  type: string
-                  nullable: true
-                  example: "B/.B/RB./B..R"
-                duration_seconds:
-                  type: integer
-                  example: 120
       responses:
         '200':
-          description: Game finished
+          description: Last move removed — returns updated game state
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Game'
         '400':
-          description: result is required, or game is already finished
+          description: No moves to undo, game is already finished, or game is not a PLAYER vs PLAYER game
         '401':
           description: No token provided or invalid token
         '404':

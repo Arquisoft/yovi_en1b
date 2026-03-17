@@ -7,7 +7,7 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 // Helper: auto-finish a game if Gamey reports a winner
 async function autoFinishIfWinner(game, winner, repository) {
     if (!winner) return;
-    // winner is 'B' or 'R' — the logged-in player is always 'B'
+    // winner is 'B' or 'R' - the logged-in player is always 'B'
     const result = winner === 'B' ? 'WIN' : 'LOSS';
     await repository.updateGame(game._id, {
         status: 'FINISHED',
@@ -41,6 +41,15 @@ async function computeYenState(yen_state_prev, coordinates) {
 
 module.exports = function gameRoutes(repository) {
     const router = express.Router();
+
+    // Get available game options (strategies, difficulty levels, game variants)
+    router.get('/options', async function getGameOptions(req, res) {
+        res.json({
+            strategies: ['Random', 'AI (coming soon)', 'Dijkstra (coming soon)'],
+            difficulty_levels: ['Easy 😄', 'Medium 😐', 'Hard 😈'],
+            variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+        });
+    });
 
     // Create a new game
     router.post('/', authMiddleware, async function createGame(req, res) {
@@ -82,7 +91,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Submit a player move — only needs coordinates, Gamey computes new yen_state and checks winner
+    // Submit a player move - only needs coordinates, Gamey computes new yen_state and checks winner
     router.post('/:id/move', authMiddleware, async function submitMove(req, res) {
         const { coordinates } = req.body || {};
 
@@ -124,7 +133,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Request bot move — Gamey computes bot move, checks winner, saves it automatically
+    // Request bot move - Gamey computes bot move, checks winner, saves it automatically
     router.get('/:id/play', authMiddleware, async function botPlay(req, res) {
         let game;
         try {
@@ -172,7 +181,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Finish a game (manual — DRAW when user quits)
+    // Finish a game (manual - DRAW when user quits)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state, duration_seconds } = req.body || {};
 
@@ -211,6 +220,26 @@ module.exports = function gameRoutes(repository) {
             if (!game) return res.status(404).json({ error: 'Game not found' });
             const sortedMoves = game.moves.sort((a, b) => a.move_number - b.move_number);
             res.json(sortedMoves);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Undo last move - only allowed in PLAYER vs PLAYER games
+    router.post('/:id/undo', authMiddleware, async function undoMove(req, res) {
+        try {
+            const game = await repository.findGameById(req.params.id);
+            if (!game) return res.status(404).json({ error: 'Game not found' });
+            if (game.status === 'FINISHED') return res.status(400).json({ error: 'Cannot undo a finished game' });
+            if (game.game_type !== 'PLAYER') return res.status(400).json({ error: 'Undo is only allowed in player vs player games' });
+            if (game.moves.length === 0) return res.status(400).json({ error: 'No moves to undo' });
+
+            game.moves.pop(); //erases last move
+            game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
+            await game.save();
+
+            const updatedGame = await repository.findGameById(game._id);
+            res.json(updatedGame);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
