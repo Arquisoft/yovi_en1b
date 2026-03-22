@@ -40,7 +40,7 @@ function renderEntryPage() {
 describe('EntryPage — username stage', () => {
   test('renders heading and username input', () => {
     renderEntryPage();
-    expect(screen.getByRole('heading', { name: /welcome to game y/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome to yovi/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/enter your username/i)).toBeInTheDocument();
   });
 
@@ -206,6 +206,37 @@ describe('EntryPage — registration', () => {
     await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), AUTH_TEST_DATA.validSecret);
     await userEvent.click(screen.getByRole('button', { name: /create account/i }));
     await screen.findByText(/username already taken/i);
+  });
+
+  test('Enter in password focuses confirm password, then Enter submits', async () => {
+    await goToRegister();
+
+    server.use(
+      http.post('*/createuser', () =>
+        HttpResponse.json({ message: `User ${AUTH_TEST_DATA.newUsername} created`, userId: AUTH_TEST_DATA.newUserId }, { status: 201 })
+      ),
+      http.post('*/login', () =>
+        HttpResponse.json({
+          token: AUTH_TEST_DATA.newToken,
+          username: AUTH_TEST_DATA.newUsername,
+          userId: AUTH_TEST_DATA.newUserId,
+        })
+      )
+    );
+
+    const passwordInput = screen.getByPlaceholderText(/^enter your password$/i);
+    const confirmInput = screen.getByPlaceholderText(/confirm your password/i);
+
+    await userEvent.type(passwordInput, AUTH_TEST_DATA.validSecret);
+    await userEvent.keyboard('{Enter}');
+    expect(confirmInput).toHaveFocus();
+
+    await userEvent.type(confirmInput, AUTH_TEST_DATA.validSecret);
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(localStorage.getItem('auth_token')).toBe(AUTH_TEST_DATA.newToken);
+    });
   });
 
   test('Back button returns to username stage', async () => {

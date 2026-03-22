@@ -1,18 +1,33 @@
 import { Link } from 'react-router-dom';
-import { Panel } from '../components/ui/Panel';
+import logo from '../assets/logo.svg';
 import './HomePage.css';
 
 export function HomePage() {
   return (
-    <Panel title="Home" subtitle="Welcome to Game Y">
-      <div className="home-actions">
-        <Link to="/games/new" className="home-action home-action--primary">
-          Create New Game
-        </Link>
-        <Link to="/games/history" className="home-action">
-          Game History
-        </Link>
+    <section className="home-card">
+      <header className="home-hero">
+        <div className="home-logo-glow" aria-hidden="true" />
+        <img src={logo} alt="YOVI logo" className="home-logo" />
+        <h1>Welcome to YOVI</h1>
+        <p>Ready to play? Create a new game or check your history.</p>
+      </header>
+
+      <div className="home-actions-shell">
+        <div className="home-actions">
+          <Link to="/games/new" className="home-action">
+            <span className="action-icon">+</span>
+            <span>Create New Game</span>
+          </Link>
+          <Link to="/games/history" className="home-action">
+            <span className="action-icon">📊</span>
+            <span>Game History</span>
+          </Link>
+          <Link to="/profile" className="home-action">
+            <span className="action-icon">👤</span>
+            <span>View Statistics</span>
+          </Link>
+        </div>
       </div>
-    </Panel>
+    </section>
   );
 }

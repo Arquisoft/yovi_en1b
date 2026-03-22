@@ -8,7 +8,7 @@
 .app-main {
   flex: 1;
   max-width: 1400px;
-  width: 100%;
+  width: 90%;
   margin: 0 auto;
   padding: 40px 32px;
 }
