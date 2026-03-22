@@ -58,6 +58,11 @@ impl GameY {
         &self.status
     }
 
+    /// Returns the history of moves made in the game.
+    pub fn history(&self) -> &Vec<Movement> {
+        &self.history
+    }
+
     /// Returns true if the game has ended (has a winner).
     pub fn check_game_over(&self) -> bool {
         match self.status {
