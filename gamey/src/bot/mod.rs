@@ -7,9 +7,12 @@
 //! - [`YBotRegistry`] - A registry for managing multiple bot implementations
 //! - [`RandomBot`] - A simple bot that makes random valid moves
 
+pub mod defensive;
 pub mod random;
 pub mod ybot;
 pub mod ybot_registry;
-pub use random::*;
-pub use ybot::*;
-pub use ybot_registry::*;
+
+pub use defensive::DefensiveBot;
+pub use random::RandomBot;
+pub use ybot::YBot;
+pub use ybot_registry::YBotRegistry;
