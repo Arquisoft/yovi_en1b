@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=venom&color=0:0f0c29,50:302b63,100:24243e&height=200&section=header&text=YOVI&fontSize=80&fontColor=e0e0e0&fontAlignY=40&desc=Game%20Y%20%E2%80%94%20Universidad%20de%20Oviedo&descAlignY=58&descSize=18&descColor=dddddd" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=venom&color=0:0f0c29,50:302b63,100:24243e&height=200&section=header&text=YOVI&fontSize=80&fontColor=e0e0e0&fontAlignY=40&desc=Game%20Y%20%E2%80%94%20Universidad%20de%20Oviedo&descAlignY=58&descSize=18&descColor=dddddd" width="100%" alt=""/>
 
 [![Release — Test, Build, Publish, Deploy](https://github.com/arquisoft/yovi_en1b/actions/workflows/release-deploy.yml/badge.svg)](https://github.com/arquisoft/yovi_en1b/actions/workflows/release-deploy.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Arquisoft_yovi_en1b&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Arquisoft_yovi_en1b)
@@ -39,16 +39,17 @@ yovi_en1b/
 
 ## What can you do?
 
-| Feature | Description |
-|---|---|
-| **Auth** | Register and log in securely — bcrypt + JWT |
-| **vs Bot** | Face the AI at easy, medium or hard |
-| **vs Player** | Local multiplayer, same device |
-| **History** | Browse all your past games |
-| **Replay** | Watch any game back move by move |
-| **Stats** | Wins, losses, performance by difficulty |
-| **Monitoring** | Prometheus metrics on the backend |
-| **Database** | It's possible accesing the database via MongoDB Compass on mongodb://127.0.0.1:27017/app_database
+| Feature        | Description                                                                                       |
+|----------------|---------------------------------------------------------------------------------------------------|
+| **Auth**       | Register and log in securely — bcrypt + JWT                                                       |
+| **vs Bot**     | Face the AI at easy, medium or hard                                                               |
+| **vs Player**  | Local multiplayer, same device                                                                    |
+| **History**    | Browse all your past games                                                                        |
+| **Replay**     | Watch any game back move by move                                                                  |
+| **Stats**      | Wins, losses, performance by difficulty                                                           |
+| **Monitoring** | Prometheus metrics on the backend                                                                 |
+| **Database**   | It's possible accesing the database via MongoDB Compass on mongodb://127.0.0.1:27017/app_database |
+
 ---
 
 ## Quickstart
@@ -117,7 +118,7 @@ cd gamey && cargo run
 ---
 
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=venom&color=0:24243e,50:302b63,100:0f0c29&height=80&section=footer" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=venom&color=0:24243e,50:302b63,100:0f0c29&height=80&section=footer" width="100%" alt=""/>
 
 *Built with ️a little help of the University of Oviedo — ASW 2025/26*
 </div>

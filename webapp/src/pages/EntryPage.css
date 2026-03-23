@@ -1,9 +1,84 @@
+.entry-card {
+  max-width: 960px;
+  margin: 0 auto;
+  border: 1px solid #2b3f5f;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 120% at 50% -10%, rgba(56, 189, 248, 0.2), transparent 45%),
+    linear-gradient(160deg, #101a2f 0%, #111d33 35%, #0f172a 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.entry-hero {
+  position: relative;
+  padding: 60px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  border-bottom: 1px solid #253753;
+}
+
+.entry-logo-glow {
+  position: absolute;
+  top: 22px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(14, 165, 233, 0) 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.entry-logo {
+  width: min(340px, 60vw);
+  height: auto;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.4));
+}
+
+.entry-hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 3.2vw, 2.7rem);
+  letter-spacing: 0.02em;
+}
+
+.entry-hero p {
+  margin: 0;
+  max-width: 600px;
+  color: #c7d2e3;
+}
+
+.entry-form-shell {
+  padding: 28px 32px 34px;
+}
+
 .entry-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 520px;
+  gap: 22px;
+  max-width: 540px;
   margin: 0 auto;
+}
+
+.entry-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.entry-stage-header h3 {
+  margin: 0;
+}
+
+.entry-stage-header span {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .entry-form label {
@@ -16,58 +91,50 @@
 
 .entry-form input {
   padding: 14px 16px;
-  border: 1px solid #334155;
-  border-radius: 8px;
+  border: 1px solid #334e74;
+  border-radius: 10px;
   font-size: 1rem;
-  color: #e5e7eb;
+  color: #e8edf5;
   background-color: #0f172a;
   transition: all 0.2s ease;
 }
 
 .entry-form input::placeholder {
-  color: #64748b;
+  color: #7487a5;
 }
 
 .entry-form input:focus {
   outline: none;
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
-  background-color: #1e293b;
+  border-color: #22c4ff;
+  box-shadow: 0 0 0 3px rgba(34, 196, 255, 0.18);
+  background-color: #15213a;
 }
 
 .entry-form input:disabled {
-  background: #0f172a;
-  color: #64748b;
-  border-color: #1e293b;
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
 .entry-form button {
   padding: 14px 20px;
-  border: 1px solid #0ea5e9;
-  border-radius: 8px;
-  font-weight: 600;
+  border: 1px solid #17b4eb;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
-  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  background: linear-gradient(135deg, #0891b2 0%, #0ea5e9 100%);
   color: #ffffff;
   font-size: 1rem;
   transition: all 0.2s ease;
 }
 
 .entry-form button:hover:not(:disabled) {
-  border-color: #06b6d4;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.5);
-}
-
-.entry-form button:active:not(:disabled) {
-  transform: translateY(0);
+  box-shadow: 0 8px 16px rgba(12, 123, 177, 0.45);
 }
 
 .entry-form button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
-  transform: none;
 }
 
 .entry-actions {
@@ -81,33 +148,43 @@
 }
 
 .entry-actions button:nth-child(2) {
-  background: transparent;
-  border: 1px solid #475569;
-  color: #cbd5e1;
+  background: #1b2b46;
+  border: 1px solid #456089;
+  color: #d9e6f8;
 }
 
 .entry-actions button:nth-child(2):hover:not(:disabled) {
-  background: #334155;
-  border-color: #64748b;
-  color: #e5e7eb;
-}
-
-.entry-error {
-  margin: 0;
-  padding: 16px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
-  border: 1px solid #7f1d1d;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 500;
+  background: #253a5d;
 }
 
 .entry-hint {
   text-align: center;
-  color: #64748b;
+  color: #8ea0bc;
   font-size: 0.9rem;
 }
 
+.entry-error {
+  margin: 0;
+  padding: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+}
 
+@media (max-width: 700px) {
+  .entry-hero {
+    padding: 40px 20px 24px;
+  }
 
+  .entry-form-shell {
+    padding: 22px 18px 24px;
+  }
+
+  .entry-logo {
+    width: min(260px, 70vw);
+  }
+}
