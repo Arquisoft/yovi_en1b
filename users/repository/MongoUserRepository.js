@@ -58,9 +58,9 @@ class MongoUserRepository extends UserRepository {
       update.$inc['statistics.vs_player.wins']   = winIncr;
       update.$inc['statistics.vs_player.losses'] = lossIncr;
     } else {
-      const diffKey = STRATEGY_DIFFICULTY[strategy?.toLowerCase()] || 'easy';
-      update.$inc[`statistics.vs_bot.${diffKey}.wins`]   = winIncr;
-      update.$inc[`statistics.vs_bot.${diffKey}.losses`] = lossIncr;
+      const stratKey = strategy?.toLowerCase() || 'random';
+      update.$inc[`statistics.vs_bot.${stratKey}.wins`]   = winIncr;
+      update.$inc[`statistics.vs_bot.${stratKey}.losses`] = lossIncr;
     }
 
     return await User.findByIdAndUpdate(userId, update, { new: true });

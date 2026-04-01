@@ -497,7 +497,7 @@ describe('POST /play', () => {
         }))
 
         const res = await request(app)
-            .post('/games/play')
+            .post('/play')
             .send({ yen_state: null, strategy: 'random', board_size: 7 })
 
         expect(res.status).toBe(200)
@@ -507,7 +507,7 @@ describe('POST /play', () => {
 
     it('returns 400 if board_size is missing', async () => {
         const res = await request(app)
-            .post('/games/play')
+            .post('/play')
             .send({ strategy: 'random' })
 
         expect(res.status).toBe(400)
@@ -517,7 +517,7 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
 
         const res = await request(app)
-            .post('/games/play')
+            .post('/play')
             .send({ board_size: 7 })
 
         expect(res.status).toBe(503)
@@ -527,7 +527,7 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
 
         const res = await request(app)
-            .post('/games/play')
+            .post('/play')
             .send({ board_size: 7 })
 
         expect(res.status).toBe(502)
@@ -540,7 +540,7 @@ describe('POST /play', () => {
         }))
 
         const res = await request(app)
-            .post('/games/play')
+            .post('/play')
             .send({ board_size: 7 })
 
         expect(res.status).toBe(200)
