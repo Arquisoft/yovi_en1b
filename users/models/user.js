@@ -13,15 +13,15 @@ const userSchema = new mongoose.Schema({
             losses: { type: Number, default: 0 }
         },
         vs_bot: {
-            easy: {
+            random: {
                 wins:   { type: Number, default: 0 },
                 losses: { type: Number, default: 0 }
             },
-            medium: {
+            dijkstra: {
                 wins:   { type: Number, default: 0 },
                 losses: { type: Number, default: 0 }
             },
-            hard: {
+            ai: {
                 wins:   { type: Number, default: 0 },
                 losses: { type: Number, default: 0 }
             }
