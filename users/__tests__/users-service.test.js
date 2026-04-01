@@ -204,13 +204,75 @@ describe('GET /users/:id/history', () => {
     })
 })
 
+// ─── Game options ─────────────────────────────────────────────────────────────
+
+describe('GET /games/options', () => {
+    it('returns available strategies and variants', async () => {
+        const res = await request(app).get('/games/options')
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body.strategies)).toBe(true)
+        expect(res.body.strategies.length).toBeGreaterThan(0)
+        expect(res.body.strategies[0]).toHaveProperty('name')
+        expect(res.body.strategies[0]).toHaveProperty('difficulty')
+        expect(Array.isArray(res.body.variants)).toBe(true)
+    })
+})
+
+// ─── Public bot play ──────────────────────────────────────────────────────────
+
+describe('POST /play', () => {
+    it('returns bot move when Gamey responds', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 4 }, yen_state: 'R/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/games/play')
+            .send({ board_size: 5, strategy: 'random', yen_state: null })
+
+        expect(res.status).toBe(200)
+        expect(res.body).toHaveProperty('coordinates')
+        expect(res.body).toHaveProperty('yen_state')
+    })
+
+    it('returns 400 if board_size is missing', async () => {
+        const res = await request(app)
+            .post('/games/play')
+            .send({ strategy: 'random' })
+
+        expect(res.status).toBe(400)
+    })
+
+    it('returns 503 when Gamey is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+        const res = await request(app)
+            .post('/games/play')
+            .send({ board_size: 5 })
+
+        expect(res.status).toBe(503)
+    })
+
+    it('returns 502 when Gamey returns an error', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+        const res = await request(app)
+            .post('/games/play')
+            .send({ board_size: 5 })
+
+        expect(res.status).toBe(502)
+    })
+})
+
 // ─── Create game ──────────────────────────────────────────────────────────────
 
 describe('POST /games', () => {
     it('creates a new BOT game', async () => {
         const res = await request(app)
             .post('/games')
-            .send({ board_size: 7, strategy: 'random', difficulty_level: 'medium', game_type: 'BOT' })
+            .send({ board_size: 7, strategy: 'random', game_type: 'BOT' })
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
@@ -489,48 +551,6 @@ describe('GET /games/:id/play', () => {
 
 
 
-// ─── Game options ─────────────────────────────────────────────────────────────
-
-describe('GET /games/options', () => {
-    it('returns strategies, difficulty levels and variants', async () => {
-        const res = await request(app).get('/games/options')
-
-        expect(res.status).toBe(200)
-        expect(Array.isArray(res.body.strategies)).toBe(true)
-        expect(Array.isArray(res.body.difficulty_levels)).toBe(true)
-        expect(Array.isArray(res.body.variants)).toBe(true)
-    })
-
-    it('returns the expected strategies', async () => {
-        const res = await request(app).get('/games/options')
-
-        expect(res.body.strategies).toContain('Random')
-        expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
-    })
-
-    it('returns the expected difficulty levels', async () => {
-        const res = await request(app).get('/games/options')
-
-        expect(res.body.difficulty_levels).toContain('Easy 😄')
-        expect(res.body.difficulty_levels).toContain('Medium 😐')
-        expect(res.body.difficulty_levels).toContain('Hard 😈')
-    })
-
-    it('returns the expected variants', async () => {
-        const res = await request(app).get('/games/options')
-
-        expect(res.body.variants).toContain('Classic Y')
-        expect(res.body.variants).toContain('Master Y (coming soon)')
-        expect(res.body.variants).toContain('Pie Rule (coming soon)')
-    })
-
-    it('does not require authentication', async () => {
-        const res = await request(app).get('/games/options')
-        expect(res.status).toBe(200)
-    })
-})
-
 // ─── Undo move ────────────────────────────────────────────────────────────────
 
 describe('POST /games/:id/undo', () => {
@@ -662,8 +682,8 @@ describe('PUT /games/:id/finish', () => {
         expect(res.body.total_games).toBeGreaterThanOrEqual(1)
         expect(res.body.total_wins).toBeGreaterThanOrEqual(1)
         expect(typeof res.body.total_losses).toBe('number')
-        expect(res.body.vs_bot.medium.wins).toBeGreaterThanOrEqual(1)
-        expect(typeof res.body.vs_bot.medium.losses).toBe('number')
+        expect(res.body.vs_bot.easy.wins).toBeGreaterThanOrEqual(1)
+        expect(typeof res.body.vs_bot.easy.losses).toBe('number')
     })
 
     it('does NOT update stats when result is DRAW (user quit)', async () => {
