@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkUsernameExists } from '../api/authApi';
 import { useAuth } from '../hooks/useAuth';
-import { Panel } from '../components/ui/Panel';
+import logo from '../assets/logo.svg';
 import './EntryPage.css';
 
 export function EntryPage() {
@@ -15,6 +15,7 @@ export function EntryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<'username' | 'password'>('username');
+  const confirmPasswordInputRef = useRef<HTMLInputElement | null>(null);
 
   const checkUsername = async () => {
     if (!username.trim()) {
@@ -37,17 +38,25 @@ export function EntryPage() {
   };
 
   const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && username.trim()) {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      checkUsername();
+      void checkUsername();
     }
   };
 
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && password && (usernameExists || confirmPassword)) {
-      e.preventDefault();
-      handleSubmit(new Event('submit') as unknown as React.FormEvent);
+    if (e.key !== 'Enter' || !password) {
+      return;
     }
+
+    e.preventDefault();
+
+    if (!usernameExists && !confirmPassword) {
+      confirmPasswordInputRef.current?.focus();
+      return;
+    }
+
+    handleSubmit(new Event('submit') as unknown as React.FormEvent);
   };
 
   const handleConfirmPasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -59,6 +68,12 @@ export function EntryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (stage === 'username') {
+      await checkUsername();
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -88,88 +103,91 @@ export function EntryPage() {
   };
 
   return (
-    <Panel title="Welcome to Game Y" subtitle="Sign in or create an account">
-      <form onSubmit={handleSubmit} className="entry-form">
-        {stage === 'username' ? (
-          <>
-            <label>
-              Username
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={handleUsernameKeyDown}
-                disabled={loading}
-                placeholder="Enter your username"
-                autoFocus
-              />
-            </label>
+    <section className="entry-card">
+      <header className="entry-hero">
+        <div className="entry-logo-glow" aria-hidden="true" />
+        <img src={logo} alt="YOVI logo" className="entry-logo" />
+        <h1>Welcome to YOVI</h1>
+        <p>Plan your moves, challenge opponents, and track your progress over time.</p>
+      </header>
 
-            <button type="button" onClick={checkUsername} disabled={loading || !username.trim()}>
-              {loading ? 'Checking...' : 'Continue'}
-            </button>
-
-            <p className="entry-hint">Press Enter or click Continue to proceed</p>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>{usernameExists ? 'Sign In' : 'Create Account'}</h3>
-              <span style={{ fontSize: '0.9rem', color: '#64748b' }}>{username}</span>
-            </div>
-
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handlePasswordKeyDown}
-                disabled={loading}
-                placeholder="Enter your password"
-                autoFocus
-              />
-            </label>
-
-            {!usernameExists && (
+      <div className="entry-form-shell">
+        <form onSubmit={handleSubmit} className="entry-form">
+          {stage === 'username' ? (
+            <>
               <label>
-                Confirm Password
+                Username
                 <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onKeyDown={handleConfirmPasswordKeyDown}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={handleUsernameKeyDown}
                   disabled={loading}
-                  placeholder="Confirm your password"
+                  placeholder="Enter your username"
+                  autoFocus
                 />
               </label>
-            )}
 
-            <div className="entry-actions">
-              <button
-                type="submit"
-                disabled={loading || !password || (!usernameExists && password !== confirmPassword)}
-              >
-                {loading ? 'Processing...' : usernameExists ? 'Sign In' : 'Create Account'}
+              <button type="button" onClick={checkUsername} disabled={loading || !username.trim()}>
+                {loading ? 'Checking...' : 'Continue'}
               </button>
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={loading}
-              >
-                Back
-              </button>
-            </div>
 
-            <p className="entry-hint">Press Enter in the last field to submit, or click the button</p>
-          </>
-        )}
+              <p className="entry-hint">Press Enter or click Continue to proceed</p>
+            </>
+          ) : (
+            <>
+              <div className="entry-stage-header">
+                <h3>{usernameExists ? 'Sign In' : 'Create Account'}</h3>
+                <span>{username}</span>
+              </div>
 
-        {error ? <p className="entry-error">⚠️ {error}</p> : null}
-      </form>
-    </Panel>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handlePasswordKeyDown}
+                  disabled={loading}
+                  placeholder="Enter your password"
+                  autoFocus
+                />
+              </label>
+
+              {!usernameExists && (
+                <label>
+                  Repeat Password
+                  <input
+                    ref={confirmPasswordInputRef}
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onKeyDown={handleConfirmPasswordKeyDown}
+                    disabled={loading}
+                    placeholder="Confirm your password"
+                  />
+                </label>
+              )}
+
+              <div className="entry-actions">
+                <button
+                  type="submit"
+                  disabled={loading || !password || (!usernameExists && password !== confirmPassword)}
+                >
+                  {loading ? 'Processing...' : usernameExists ? 'Sign In' : 'Create Account'}
+                </button>
+                <button type="button" onClick={handleBack} disabled={loading}>
+                  Back
+                </button>
+              </div>
+
+              <p className="entry-hint">Press Enter in the last field to submit, or click the button</p>
+            </>
+          )}
+
+          {error ? <p className="entry-error">{error}</p> : null}
+        </form>
+      </div>
+    </section>
   );
 }
-
-
-

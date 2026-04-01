@@ -7,7 +7,7 @@ use crate::game_server::dto::{
     BoardInfoResponse, ComputeRequest, ComputeResponse, GameStateResponse, MakeMoveRequest,
     NewGameRequest, PlayRequest, PlayResponse,
 };
-use crate::{GameAction, GameY, Movement, PlayerId, RandomBot, YBot, YEN, check_api_version};
+use crate::{DefensiveBot, GameAction, GameY, Movement, PlayerId, RandomBot, YBot, YEN, check_api_version};
 use axum::extract::Path;
 use axum::Json;
 use serde::Deserialize;
@@ -176,20 +176,7 @@ pub async fn play(
     Json(req): Json<PlayRequest>,
 ) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state {
-        Some(layout_str) => {
-            let size = layout_str.split('/').count() as u32;
-            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
-            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
-            let turn = if b_count > r_count { 1 } else { 0 };
-            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
-            GameY::try_from(yen).map_err(|err| {
-                Json(ErrorResponse::error(
-                    &format!("Invalid YEN layout: {}", err),
-                    None,
-                    None,
-                ))
-            })?
-        }
+        Some(layout_str) => parse_yen_layout(layout_str)?,
         None => {
             if req.board_size == 0 || req.board_size > 100 {
                 return Err(Json(ErrorResponse::error(
@@ -206,7 +193,17 @@ pub async fn play(
         return Err(Json(ErrorResponse::error("Game is already finished", None, None)));
     }
 
-    let bot = RandomBot;
+    let strategy = req.strategy.as_deref().unwrap_or("random");
+    let difficulty = req.difficulty_level.as_deref().unwrap_or("easy");
+
+    let bot: Box<dyn YBot> = match (strategy, difficulty) {
+        ("defensive", "medium") | ("balanced", "medium") | ("medium", "medium") => {
+            Box::new(DefensiveBot)
+        }
+        ("random", _) | (_, "easy") => Box::new(RandomBot),
+        _ => Box::new(RandomBot), // Default to random for other cases
+    };
+
     let coords = bot.choose_move(&game).ok_or_else(|| {
         Json(ErrorResponse::error("Bot could not find a move", None, None))
     })?;
@@ -231,6 +228,7 @@ pub async fn play(
     Ok(Json(PlayResponse {
         coordinates: coords,
         yen_state: response_yen.layout().to_string(),
+        winner: get_winner_string(&game),
     }))
 }
 
@@ -243,20 +241,7 @@ pub async fn compute(
     Json(req): Json<ComputeRequest>,
 ) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state_prev {
-        Some(layout_str) => {
-            let size = layout_str.split('/').count() as u32;
-            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
-            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
-            let turn = if b_count > r_count { 1 } else { 0 };
-            let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
-            GameY::try_from(yen).map_err(|err| {
-                Json(ErrorResponse::error(
-                    &format!("Invalid YEN layout: {}", err),
-                    None,
-                    None,
-                ))
-            })?
-        }
+        Some(layout_str) => parse_yen_layout(layout_str)?,
         None => {
             // Reconstruct board size from first move coordinates
             // In barycentric coordinates: x + y + z = board_size - 1
@@ -291,7 +276,38 @@ pub async fn compute(
     let response_yen: YEN = (&game).into();
     Ok(Json(ComputeResponse {
         yen_state: response_yen.layout().to_string(),
+        winner: get_winner_string(&game),
     }))
+}
+
+/// Helper: parses a YEN layout string into a GameY instance.
+fn parse_yen_layout(layout_str: String) -> Result<GameY, Json<ErrorResponse>> {
+    let size = layout_str.split('/').count() as u32;
+    let b_count = layout_str.chars().filter(|c| *c == 'B').count();
+    let r_count = layout_str.chars().filter(|c| *c == 'R').count();
+    let turn = if b_count > r_count { 1 } else { 0 };
+    let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
+    GameY::try_from(yen).map_err(|err| {
+        Json(ErrorResponse::error(
+            &format!("Invalid YEN layout: {}", err),
+            None,
+            None,
+        ))
+    })
+}
+
+/// Helper: returns the winner string ("B" or "R") if the game is finished.
+fn get_winner_string(game: &GameY) -> Option<String> {
+    match game.status() {
+        crate::GameStatus::Finished { winner } => {
+            if winner.id() == 0 {
+                Some("B".to_string())
+            } else {
+                Some("R".to_string())
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Helper: converts a `MoveRequest` into a core `Movement`.
@@ -489,7 +505,7 @@ mod tests {
         assert!(res.unwrap_err().0.message.contains("Cannot specify both"));
     }
 
-    #[tokio::test]
+   #[tokio::test]
     async fn test_make_move_game_error() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
         let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // B is occupied
@@ -497,7 +513,7 @@ mod tests {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(1, 0, 0)), // B is at (1,0,0) with size 2
+                coords: Some(Coordinates::new(0, 0, 1)), // B is at (0,0,1) with the new React-synced coords
                 action: None,
             },
         });
@@ -580,6 +596,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_computation_false_win() {
+        // Based on visually disconnected pieces that might be falsely triggering a win.
+        // Size 5: Red at corners (4,0,0), (1,3,0), (1,0,3)? Wait, let's just make Red disconnected.
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some("R/B./.B./R..R/.....".to_string()),
+            coordinates: Coordinates::new(0, 2, 2), // random move on size 5
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok(), "Should successfully parse state and make move");
+        let res_json = res.unwrap().0;
+        // In this state, R pieces are NOT connected. Winner should be None!
+        assert_eq!(res_json.winner, None, "Red pieces are disconnected, should not win!");
+    }
+
+    #[tokio::test]
+    async fn test_play_success_with_defensive_strategy() {
+        let req = axum::Json(PlayRequest {
+            yen_state: Some("R/..".to_string()), // Size 2, R at top corner (1,0,0)
+            strategy: Some("defensive".to_string()),
+            difficulty_level: Some("medium".to_string()),
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        
+        // Size 2 board, R at top corner (1,0,0). Neighbors are (0,1,0) and (0,0,1).
+        // The bot (B) should have picked one of these.
+        let chosen_coords = res_json.coordinates;
+        let r_coords = Coordinates::new(1, 0, 0);
+        let neighbors = r_coords.neighbors(2);
+        assert!(neighbors.contains(&chosen_coords), "Defensive bot should pick a neighbor of R's move");
+    }
+
+    #[tokio::test]
     async fn test_play_success_with_yen() {
         let req = axum::Json(PlayRequest {
             yen_state: Some("./..".to_string()),
@@ -591,6 +642,7 @@ mod tests {
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         assert_eq!(res_json.yen_state.split('/').count(), 2);
+        assert_eq!(res_json.winner, None);
     }
 
     #[tokio::test]
@@ -647,6 +699,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_play_already_finished_at_next_player() {
+        // This is a contrived test to hit the branch where `game.status()` is not `Ongoing`
+        // after `bot.choose_move` is called. It shouldn't normally happen, but covering it.
+        // B/R size 2 = 3 cells. Full board size 2 is 3 cells. 
+        let req = axum::Json(PlayRequest {
+            yen_state: Some("B/RR".to_string()),
+            strategy: None,
+            difficulty_level: None,
+            board_size: 2,
+        });
+        let res = play(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+    #[tokio::test]
     async fn test_compute_success_with_yen() {
         let req = axum::Json(ComputeRequest {
             yen_state_prev: Some("./..".to_string()),
@@ -656,6 +724,20 @@ mod tests {
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         assert_eq!(res_json.yen_state.split('/').count(), 2);
+        assert_eq!(res_json.winner, None);
+    }
+
+    #[tokio::test]
+    async fn test_compute_winner() {
+        // Assume player 1 (R) just placed a piece that finished the game (size 1)
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some(".".to_string()),
+            coordinates: Coordinates::new(0, 0, 0),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        assert_eq!(res_json.winner, Some("B".to_string())); // Because turn 0 (B) placed it
     }
 
     #[tokio::test]
@@ -694,10 +776,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_compute_already_finished_at_next_player() {
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: Some("B/RR".to_string()), // Full board
+            coordinates: Coordinates::new(0, 0, 0),
+        });
+        let res = compute(req).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().0.message.contains("finished"));
+    }
+
+ #[tokio::test]
     async fn test_compute_invalid_move() {
         let req = axum::Json(ComputeRequest {
             yen_state_prev: Some("B/..".to_string()), // Top cell occupied
-            coordinates: Coordinates::new(1, 0, 0), // Same cell
+            coordinates: Coordinates::new(0, 0, 1), // Same cell as the top one
         });
         let res = compute(req).await;
         assert!(res.is_err());

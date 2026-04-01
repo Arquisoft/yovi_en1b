@@ -58,6 +58,11 @@ impl GameY {
         &self.status
     }
 
+    /// Returns the history of moves made in the game.
+    pub fn history(&self) -> &Vec<Movement> {
+        &self.history
+    }
+
     /// Returns true if the game has ended (has a winner).
     pub fn check_game_over(&self) -> bool {
         match self.status {
@@ -301,9 +306,9 @@ impl TryFrom<YEN> for GameY {
                 });
             }
             for (col, cell) in cells.iter().enumerate() {
-                let x = game.size() - 1 - (row as u32);
-                let y = col as u32;
-                let z = game.size() - 1 - x - y;
+                let x = col as u32;
+                let y = (row as u32) - (col as u32);
+                let z = game.size() - 1 - (row as u32);
                 let coords = Coordinates::new(x, y, z);
                 match cell {
                     'B' => {
@@ -329,6 +334,13 @@ impl TryFrom<YEN> for GameY {
                 }
             }
         }
+        
+        if let GameStatus::Ongoing { .. } = ygame.status {
+            ygame.status = GameStatus::Ongoing {
+                next_player: PlayerId::new(game.turn()),
+            };
+        }
+
         Ok(ygame)
     }
 }
@@ -341,17 +353,24 @@ impl From<&GameY> for YEN {
             GameStatus::Ongoing { next_player } => next_player.id(),
         };
         let mut layout = String::new();
-        let total_cells = game.board.total_cells();
         let players = vec!['B', 'R'];
-        for idx in 0..total_cells {
-            let coords = Coordinates::from_index(idx, size);
-            let cell_char = match game.board.board_map().get(&coords) {
-                Some((_, player)) if player.id() == 0 => 'B',
-                Some((_, player)) if player.id() == 1 => 'R',
-                _ => '.',
-            };
-            layout.push(cell_char);
-            if coords.z() == 0 && coords.x() > 0 {
+
+        for row in 0..size {
+            for col in 0..=row {
+                let x = col;
+                let y = row - col;
+                let z = size - 1 - row;
+                let coords = Coordinates::new(x, y, z);
+
+                let cell_char = match game.board.board_map().get(&coords) {
+                    Some((_, player)) if player.id() == 0 => 'B',
+                    Some((_, player)) if player.id() == 1 => 'R',
+                    _ => '.',
+                };
+                layout.push(cell_char);
+            }
+            // Añadir el separador de fila, excepto en la última
+            if row < size - 1 {
                 layout.push('/');
             }
         }
@@ -605,5 +624,15 @@ mod tests {
             }
             _ => panic!("Game should be ongoing"),
         }
+    }
+
+    #[test]
+    fn test_try_from_turn_logic_bug() {
+        let yen = YEN::new(3, 0, vec!['B', 'R'], "R/../B..".to_string()); // 1 B, 1 R. Last is 'B'.
+        let game = GameY::try_from(yen).unwrap();
+        // `YEN` explicitly says turn is 0 (Blue).
+        // Since B and R count is equal (1 each), blue should be next.
+        // The last parsed piece was B. Without our fix, GameY would toggle the turn to R (1).
+        assert_eq!(game.next_player(), Some(crate::PlayerId::new(0)), "Should be Blue's turn according to YEN!");
     }
 }

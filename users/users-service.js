@@ -9,6 +9,7 @@ const MongoUserRepository = require('./repository/MongoUserRepository');
 const authRoutes  = require('./routes/authRoutes');
 const userRoutes  = require('./routes/userRoutes');
 const gameRoutes  = require('./routes/gameRoutes');
+const playRoute  = require('./routes/playRoute');
 
 const app  = express();
 const port = 3000;
@@ -29,7 +30,8 @@ app.use(corsMiddleware);
 app.use(express.json());
 
 // Routes
-app.use('/',      authRoutes(repository));
+app.use('/', authRoutes(repository));
+app.use("/", playRoute());
 app.use('/users', userRoutes(repository));
 app.use('/games', gameRoutes(repository));  // also exposes POST /games/play (bot API)
 

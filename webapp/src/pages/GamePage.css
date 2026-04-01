@@ -1,8 +1,9 @@
 .game-header-panels {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(300px, 380px) minmax(220px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 18px;
+  width: 100%;
 }
 
 .player-panel,
@@ -26,8 +27,19 @@
 }
 
 .player-panel.active {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+  border-color: currentColor;
+  border-width: 3px;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.player-panel--blue.active {
+  border-left-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+}
+
+.player-panel--red.active {
+  border-left-color: #f87171;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.25);
 }
 
 .player-panel h3 {
@@ -143,6 +155,14 @@
   background: #0ea5e9;
 }
 
+.hex-wrap.turn-indicator-B:hover:not(.hex-wrap--disabled) {
+  background: #3b82f6;
+}
+
+.hex-wrap.turn-indicator-R:hover:not(.hex-wrap--disabled) {
+  background: #ef4444;
+}
+
 .hex-wrap.blue {
   background: #3b82f6;
 }
@@ -214,16 +234,23 @@
 .move-history-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 8px 10px;
   border: 1px solid #334155;
   border-radius: 8px;
   background: #0f172a;
 }
 
+.move-number {
+  min-width: 40px;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
 .move-player-badge {
   display: inline-flex;
-  min-width: 52px;
+  min-width: 60px;
   justify-content: center;
   padding: 4px 8px;
   border-radius: 999px;
@@ -247,6 +274,7 @@
 .move-text {
   color: #cbd5e1;
   font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
 }
 
 .move-text strong {
@@ -266,3 +294,46 @@
 .game-shell.turn-red {
   background: linear-gradient(180deg, rgba(127, 29, 29, 0.18) 0%, rgba(15, 23, 42, 0) 65%);
 }
+
+.game-result-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 30px;
+  border-radius: 12px;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.game-result-box--blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
+  border: 2px solid #60a5fa;
+}
+
+.game-result-box--red {
+  background: linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%);
+  border: 2px solid #f87171;
+}
+
+.game-result-box--draw {
+  background: linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%);
+  border: 2px solid #c4b5fd;
+}
+
+.game-result-time {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.game-result-text {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.05em;
+}
+

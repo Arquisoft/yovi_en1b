@@ -127,7 +127,7 @@ export function NewGamePage() {
               id="boardSize"
               type="range"
               min="3"
-              max="30"
+              max="15"
               value={boardSize}
               onChange={(e) => setBoardSize(Number(e.target.value))}
               disabled={loading}
@@ -135,7 +135,7 @@ export function NewGamePage() {
             />
             <div className="size-info">
               <span>Smaller (3)</span>
-              <span>Larger (30)</span>
+              <span>Larger (15)</span>
             </div>
           </div>
         </fieldset>

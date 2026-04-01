@@ -26,7 +26,7 @@ pub mod version;
 use axum::response::IntoResponse;
 use axum::http::Method;
 use std::sync::Arc;
-use tower_http::cors::{CorsLayer, AllowOrigin};
+use tower_http::cors::CorsLayer;
 pub use choose::MoveResponse;
 pub use error::ErrorResponse;
 pub use version::*;
@@ -87,7 +87,9 @@ pub fn create_router(state: AppState) -> axum::Router {
 ///
 /// The default state includes the `RandomBot` which selects moves randomly.
 pub fn create_default_state() -> AppState {
-    let bots = YBotRegistry::new().with_bot(Arc::new(RandomBot));
+    let bots = YBotRegistry::new()
+        .with_bot(Arc::new(RandomBot))
+        .with_bot(Arc::new(crate::DefensiveBot));
     AppState::new(bots)
 }
 
