@@ -487,34 +487,101 @@ describe('GET /games/:id/play', () => {
     })
 })
 
+// ─── Public play endpoint ─────────────────────────────────────────────────────
 
+describe('POST /play', () => {
+    it('returns bot move without auth or game id', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ yen_state: null, strategy: 'random', board_size: 7 })
+
+        expect(res.status).toBe(200)
+        expect(res.body).toHaveProperty('coordinates')
+        expect(res.body).toHaveProperty('yen_state')
+    })
+
+    it('returns 400 if board_size is missing', async () => {
+        const res = await request(app)
+            .post('/play')
+            .send({ strategy: 'random' })
+
+        expect(res.status).toBe(400)
+    })
+
+    it('returns 503 when Gamey is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(503)
+    })
+
+    it('returns 502 when Gamey returns an error', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(502)
+    })
+
+    it('does not require authentication', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(200)
+    })
+})
 
 // ─── Game options ─────────────────────────────────────────────────────────────
 
 describe('GET /games/options', () => {
-    it('returns strategies, difficulty levels and variants', async () => {
+    it('returns strategies and variants', async () => {
         const res = await request(app).get('/games/options')
 
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body.strategies)).toBe(true)
-        expect(Array.isArray(res.body.difficulty_levels)).toBe(true)
         expect(Array.isArray(res.body.variants)).toBe(true)
+        expect(res.body).not.toHaveProperty('difficulty_levels')
     })
 
-    it('returns the expected strategies', async () => {
+    it('returns strategies as objects with name and difficulty', async () => {
         const res = await request(app).get('/games/options')
 
-        expect(res.body.strategies).toContain('Random')
-        expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
+        res.body.strategies.forEach(s => {
+            expect(s).toHaveProperty('name')
+            expect(s).toHaveProperty('difficulty')
+        })
     })
 
-    it('returns the expected difficulty levels', async () => {
+    it('returns the expected strategies with their difficulties', async () => {
         const res = await request(app).get('/games/options')
 
-        expect(res.body.difficulty_levels).toContain('Easy 😄')
-        expect(res.body.difficulty_levels).toContain('Medium 😐')
-        expect(res.body.difficulty_levels).toContain('Hard 😈')
+        const names = res.body.strategies.map(s => s.name)
+        expect(names).toContain('Random')
+        expect(names).toContain('AI')
+        expect(names).toContain('Dijkstra')
+
+        const random = res.body.strategies.find(s => s.name === 'Random')
+        const ai = res.body.strategies.find(s => s.name === 'AI')
+        const dijkstra = res.body.strategies.find(s => s.name === 'Dijkstra')
+        expect(random.difficulty).toBe('Easy 😄')
+        expect(ai.difficulty).toBe('Medium 😐')
+        expect(dijkstra.difficulty).toBe('Hard 😈')
     })
 
     it('returns the expected variants', async () => {
@@ -662,8 +729,8 @@ describe('PUT /games/:id/finish', () => {
         expect(res.body.total_games).toBeGreaterThanOrEqual(1)
         expect(res.body.total_wins).toBeGreaterThanOrEqual(1)
         expect(typeof res.body.total_losses).toBe('number')
-        expect(res.body.vs_bot.medium.wins).toBeGreaterThanOrEqual(1)
-        expect(typeof res.body.vs_bot.medium.losses).toBe('number')
+        expect(res.body.vs_bot.random.wins).toBeGreaterThanOrEqual(1)
+        expect(typeof res.body.vs_bot.random.losses).toBe('number')
     })
 
     it('does NOT update stats when result is DRAW (user quit)', async () => {

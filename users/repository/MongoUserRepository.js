@@ -2,6 +2,13 @@ const UserRepository = require('./UserRepository');
 const User = require('../models/user');
 const Game = require('../models/game');
 
+// Strategy -> difficulty mapping (same as gameRoutes)
+const STRATEGY_DIFFICULTY = {
+  random:   'easy',
+  dijkstra: 'medium',
+  ai:       'hard'
+};
+
 class MongoUserRepository extends UserRepository {
 
   async findByUsername(username) {
@@ -39,7 +46,7 @@ class MongoUserRepository extends UserRepository {
     return await Game.findByIdAndUpdate(id, data, { new: true });
   }
 
-  async updateStats(userId, { result, type, difficulty }) {
+  async updateStats(userId, { result, type, strategy }) {
     const update = { $inc: { 'statistics.total_games': 1 } };
     const winIncr  = result === 'WIN'  ? 1 : 0;
     const lossIncr = result === 'LOSS' ? 1 : 0;
@@ -51,9 +58,9 @@ class MongoUserRepository extends UserRepository {
       update.$inc['statistics.vs_player.wins']   = winIncr;
       update.$inc['statistics.vs_player.losses'] = lossIncr;
     } else {
-      const diffKey = difficulty.toLowerCase();
-      update.$inc[`statistics.vs_bot.${diffKey}.wins`]   = winIncr;
-      update.$inc[`statistics.vs_bot.${diffKey}.losses`] = lossIncr;
+      const stratKey = strategy?.toLowerCase() || 'random';
+      update.$inc[`statistics.vs_bot.${stratKey}.wins`]   = winIncr;
+      update.$inc[`statistics.vs_bot.${stratKey}.losses`] = lossIncr;
     }
 
     return await User.findByIdAndUpdate(userId, update, { new: true });

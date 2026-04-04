@@ -93,19 +93,27 @@ components:
         vs_bot:
           $ref: '#/components/schemas/VsBotStats'
 
+    StrategyOption:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Random"
+        difficulty:
+          type: string
+          example: "Easy 😄"
+
     GameOptions:
       type: object
       properties:
         strategies:
           type: array
           items:
-            type: string
-          example: ['Random', 'AI (coming soon)', 'Dijkstra (soming soon)']
-        difficulty_levels:
-          type: array
-          items:
-            type: string
-          example: ['Easy 😄', 'Medium 😐', 'Hard 😈']
+            $ref: '#/components/schemas/StrategyOption'
+          example:
+            - { name: "Random", difficulty: "Easy 😄" }
+            - { name: "AI", difficulty: "Medium 😐" }
+            - { name: "Dijkstra", difficulty: "Hard 😈" }
         variants:
           type: array
           items:
@@ -389,6 +397,58 @@ paths:
         '500':
           description: Internal server error
 
+  /play:
+    post:
+      summary: Public bot play — no auth or game id required
+      description: >
+        Open source endpoint for external users. Send a board position and strategy directly
+        to get the bot's next move. No authentication or internal game id needed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [board_size]
+              properties:
+                yen_state:
+                  type: string
+                  nullable: true
+                  description: Current board in YEN notation. Send null for the first move.
+                  example: "B/.B/RB./B..R"
+                strategy:
+                  type: string
+                  enum: [random, dijkstra, ai]
+                  default: random
+                  example: "random"
+                board_size:
+                  type: integer
+                  example: 7
+      responses:
+        '200':
+          description: Bot move returned from Gamey
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coordinates:
+                    $ref: '#/components/schemas/Coordinates'
+                  yen_state:
+                    type: string
+                    example: "R/.B/RB./B..R"
+                  winner:
+                    type: string
+                    enum: [B, R]
+                    nullable: true
+                    example: null
+        '400':
+          description: board_size is required
+        '502':
+          description: Gamey service returned an error
+        '503':
+          description: Gamey service unreachable
+
   /games:
     post:
       summary: Create a new game
@@ -417,12 +477,10 @@ paths:
                   example: "Tobias"
                 strategy:
                   type: string
+                  enum: [random, dijkstra, ai]
                   default: random
+                  description: "Difficulty is derived automatically: random=easy, dijkstra=medium, ai=hard"
                   example: "random"
-                difficulty_level:
-                  type: string
-                  default: medium
-                  example: "medium"
       responses:
         '201':
           description: Game created
