@@ -3,6 +3,7 @@ import { getUserProfile } from '../api/usersApi';
 import { Panel } from '../components/ui/Panel';
 import { useAuth } from '../hooks/useAuth';
 import type { UserProfile } from '../types/users';
+import { formatGameLabel } from '../utils/gameLabels';
 import './ProfilePage.css';
 
 function formatDate(value: string): string {
@@ -78,42 +79,61 @@ export function ProfilePage() {
       return null;
     }
 
-    const totalGames = profile.statistics.total_games;
-    const totalWins = profile.statistics.total_wins;
-    const totalLosses = profile.statistics.total_losses;
-    const totalDraws = profile.statistics.total_draws;
+    const stats = profile.statistics;
+    const totalGames = stats.total_games;
+    const totalWins = stats.total_wins;
+    const totalLosses = stats.total_losses;
+    const totalDraws = stats.total_draws;
 
-    const categories = [
-      {
-        label: 'Vs player',
-        wins: profile.statistics.vs_player.wins,
-        losses: profile.statistics.vs_player.losses,
-        draws: profile.statistics.vs_player.draws
-      },
-      {
-        label: 'Vs bot - easy',
-        wins: profile.statistics.vs_bot.easy.wins,
-        losses: profile.statistics.vs_bot.easy.losses,
-        draws: profile.statistics.vs_bot.easy.draws
-      },
-      {
-        label: 'Vs bot - medium',
-        wins: profile.statistics.vs_bot.medium.wins,
-        losses: profile.statistics.vs_bot.medium.losses,
-        draws: profile.statistics.vs_bot.medium.draws
-      },
-      {
-        label: 'Vs bot - hard',
-        wins: profile.statistics.vs_bot.hard.wins,
-        losses: profile.statistics.vs_bot.hard.losses,
-        draws: profile.statistics.vs_bot.hard.draws
-      }
-    ].map((category) => {
-      const games = category.wins + category.losses + category.draws;
-      const winRate = percent(category.wins, games);
-      const lossRate = percent(category.losses, games);
-      const drawRate = percent(category.draws, games);
-      return { ...category, games, winRate, lossRate, drawRate, tone: getWinRateTone(winRate) };
+    const playerCategoryBase = {
+      label: 'Vs player',
+      wins: stats.vs_player.wins,
+      losses: stats.vs_player.losses,
+      draws: stats.vs_player.draws
+    };
+
+    const playerGames = playerCategoryBase.wins + playerCategoryBase.losses + playerCategoryBase.draws;
+    const playerCategory = {
+      ...playerCategoryBase,
+      games: playerGames,
+      winRate: percent(playerCategoryBase.wins, playerGames),
+      lossRate: percent(playerCategoryBase.losses, playerGames),
+      drawRate: percent(playerCategoryBase.draws, playerGames),
+      tone: getWinRateTone(percent(playerCategoryBase.wins, playerGames))
+    };
+
+    const botCategories: Array<{
+      label: string;
+      difficulty: string;
+      wins: number;
+      losses: number;
+      draws: number;
+      games: number;
+      winRate: number;
+      lossRate: number;
+      drawRate: number;
+      tone: 'profile-kpi--rate-low' | 'profile-kpi--rate-mid' | 'profile-kpi--rate-high';
+    }> = stats.vs_bot.map((item) => {
+      const wins = item.wins;
+      const losses = item.losses;
+      const draws = item.draws;
+      const games = wins + losses + draws;
+      const winRate = percent(wins, games);
+      const lossRate = percent(losses, games);
+      const drawRate = percent(draws, games);
+
+      return {
+        label: formatGameLabel(item.name),
+        difficulty: formatGameLabel(item.difficulty),
+        wins,
+        losses,
+        draws,
+        games,
+        winRate,
+        lossRate,
+        drawRate,
+        tone: getWinRateTone(winRate)
+      };
     });
 
     return {
@@ -123,8 +143,8 @@ export function ProfilePage() {
       totalDraws,
       completedGames: totalWins + totalLosses + totalDraws,
       overallWinRate: percent(totalWins, totalGames),
-      playerCategory: categories[0],
-      botCategories: categories.slice(1)
+      playerCategory,
+      botCategories
     };
   }, [profile]);
 
@@ -150,8 +170,8 @@ export function ProfilePage() {
           <section className="profile-kpis">
             <article className="profile-kpi"><span>Total games</span><strong>{derived.totalGames}</strong></article>
             <article className="profile-kpi profile-kpi--wins"><span>Total wins</span><strong>{derived.totalWins}</strong></article>
-            <article className="profile-kpi profile-kpi--losses"><span>Total losses</span><strong>{derived.totalLosses}</strong></article>
             <article className="profile-kpi profile-kpi--draws"><span>Total draws</span><strong>{derived.totalDraws}</strong></article>
+            <article className="profile-kpi profile-kpi--losses"><span>Total losses</span><strong>{derived.totalLosses}</strong></article>
             <article className={`profile-kpi ${getWinRateTone(derived.overallWinRate)}`}><span>Win rate</span><strong>{derived.overallWinRate}%</strong></article>
           </section>
 
@@ -204,11 +224,12 @@ export function ProfilePage() {
                 <p className="profile-category-label">Vs bot</p>
                 <div className="profile-category-grid">
                   {derived.botCategories.map((category) => (
-                    <article className="profile-category-card" key={category.label}>
+                    <article className="profile-category-card" key={`${category.label}-${category.difficulty}`}>
                       <div className="profile-category-head">
                         <h4>{category.label}</h4>
                         <span>{category.games} games</span>
                       </div>
+                      <p className="profile-category-subtitle">Difficulty: {category.difficulty}</p>
                       <div className="profile-meter" role="img" aria-label={`${category.label} win rate ${category.winRate} percent`}>
                         <div className={`profile-meter__wins ${category.tone}`} style={{ width: `${category.winRate}%` }} />
                         <div className="profile-meter__draws" style={{ width: `${category.drawRate}%` }} />
@@ -228,4 +249,3 @@ export function ProfilePage() {
     </Panel>
   );
 }
-

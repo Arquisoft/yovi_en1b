@@ -52,16 +52,16 @@ describe('NewGamePage — rendering', () => {
     expect(screen.getByText('Rules')).toBeInTheDocument();
   });
 
-  test('AI Strategy section is visible in default BOT mode', async () => {
+  test('Bot Strategy section is visible in default BOT mode', async () => {
     renderNewGamePage();
-    expect(screen.getByText('AI Strategy')).toBeInTheDocument();
+    expect(screen.getByText('Bot Strategy')).toBeInTheDocument();
     expect(await screen.findByText('Medium')).toBeInTheDocument();
   });
 
-  test('AI Strategy section is hidden when Play vs Player is selected', async () => {
+  test('Bot Strategy section is hidden when Play vs Player is selected', async () => {
     renderNewGamePage();
     await userEvent.click(screen.getByLabelText(/play vs player/i));
-    expect(screen.queryByText('AI Strategy')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bot Strategy')).not.toBeInTheDocument();
   });
 
   test('Opponent Name input appears only in Player mode', async () => {

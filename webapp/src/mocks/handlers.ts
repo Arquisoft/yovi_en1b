@@ -189,6 +189,7 @@ function emptyWinLoss(): WinLossStats {
 
 function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
+  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
 
   const stats: UserStatistics = {
     total_games: userGames.length,
@@ -196,25 +197,13 @@ function getUserStatistics(userId: string): UserStatistics {
     total_losses: 0,
     total_draws: 0,
     vs_player: emptyWinLoss(),
-    vs_bot: {
-      easy: emptyWinLoss(),
-      medium: emptyWinLoss(),
-      hard: emptyWinLoss()
-    }
+    vs_bot: []
   };
 
   for (const game of userGames) {
-    if (game.result === 'WIN') {
-      stats.total_wins += 1;
-    }
-
-    if (game.result === 'LOSS') {
-      stats.total_losses += 1;
-    }
-
-    if (game.result === 'DRAW') {
-      stats.total_draws += 1;
-    }
+    if (game.result === 'WIN') stats.total_wins += 1;
+    if (game.result === 'LOSS') stats.total_losses += 1;
+    if (game.result === 'DRAW') stats.total_draws += 1;
 
     if (game.game_type === 'PLAYER') {
       if (game.result === 'WIN') stats.vs_player.wins += 1;
@@ -223,12 +212,22 @@ function getUserStatistics(userId: string): UserStatistics {
       continue;
     }
 
-    const bucket = stats.vs_bot[game.difficulty_level];
-    if (game.result === 'WIN') bucket.wins += 1;
-    if (game.result === 'LOSS') bucket.losses += 1;
-    if (game.result === 'DRAW') bucket.draws += 1;
+    const bucketKey = `${game.strategy}:${game.difficulty_level}`;
+    const existing = botBuckets.get(bucketKey) ?? {
+      name: game.strategy,
+      difficulty: game.difficulty_level,
+      wins: 0,
+      losses: 0,
+      draws: 0
+    };
+
+    if (game.result === 'WIN') existing.wins += 1;
+    if (game.result === 'LOSS') existing.losses += 1;
+    if (game.result === 'DRAW') existing.draws += 1;
+    botBuckets.set(bucketKey, existing);
   }
 
+  stats.vs_bot = [...botBuckets.values()];
   return stats;
 }
 
@@ -276,7 +275,7 @@ export const handlers = [
     return HttpResponse.json({ message: `User ${username} created`, userId } as RegisterResponse, { status: 201 });
   }),
 
-  http.get('*/users/:id', ({ params, request }) => {
+  http.get('*/user/:id', ({ params, request }) => {
     const tokenUserId = extractUserId(request);
     if (!tokenUserId) {
       return HttpResponse.json({ error: 'No token provided' }, { status: 401 });
@@ -317,9 +316,9 @@ export const handlers = [
       .filter((game) => game.player_id === requestedUserId)
       .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
       .map((game) => {
-        const rest = { ...game };
-        delete rest.moves;
-        return rest;
+        const copy: Partial<GameRecord> = { ...game };
+        delete copy.moves;
+        return copy;
       });
 
     return HttpResponse.json(history);

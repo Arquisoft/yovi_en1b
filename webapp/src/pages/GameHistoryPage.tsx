@@ -34,7 +34,7 @@ function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'draw' | 'pending' 
 
 function getEnemyLabel(game: GameHistoryItem, username: string | null): string {
   if (game.game_type === 'BOT') {
-    return 'AI';
+    return 'Bot';
   }
 
   const enemy = game.name_of_enemy?.trim();

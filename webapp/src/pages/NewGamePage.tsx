@@ -61,7 +61,7 @@ export function NewGamePage() {
     }
 
     if (gameType === 'BOT' && !selectedStrategy) {
-      setError('Please choose an AI strategy');
+      setError('Please choose a bot strategy');
       return;
     }
 
@@ -106,11 +106,11 @@ export function NewGamePage() {
                 checked={gameType === 'BOT'}
                 onChange={(e) => setGameType(e.target.value as GameType)}
                 disabled={loading}
-                aria-label="Play vs AI"
+                aria-label="Play vs Bot"
               />
               <span className="radio-text">
-                <strong>Play vs AI</strong>
-                <small>Challenge the computer</small>
+                <strong>Play vs Bot</strong>
+                <small>Challenge the Bot</small>
               </span>
             </label>
 
@@ -171,7 +171,7 @@ export function NewGamePage() {
 
         {gameType === 'BOT' && (
           <fieldset className="form-section">
-            <legend>AI Strategy</legend>
+            <legend>Bot Strategy</legend>
             {loadingOptions ? (
               <p className="strategy-loading">Loading available strategies...</p>
             ) : (

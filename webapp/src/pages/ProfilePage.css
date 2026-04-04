@@ -324,6 +324,12 @@
   border-top: 1px solid #334155;
 }
 
+.profile-category-subtitle {
+  margin: -0.2rem 0 0.5rem;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
 @media (min-width: 840px) {
   .profile-block {
     grid-column: span 6;

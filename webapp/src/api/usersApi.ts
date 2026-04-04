@@ -3,7 +3,7 @@ import type { GameHistoryItem } from '../types/games';
 import type { UserProfile } from '../types/users';
 
 export async function getUserProfile(userId: string): Promise<UserProfile> {
-  return requestJson<UserProfile>(`/users/${encodeURIComponent(userId)}`);
+  return requestJson<UserProfile>(`/user/${encodeURIComponent(userId)}`);
 }
 
 export async function getUserHistory(userId: string): Promise<GameHistoryItem[]> {

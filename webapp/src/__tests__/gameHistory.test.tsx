@@ -92,7 +92,7 @@ describe('GameHistoryPage', () => {
     renderHistoryPage();
 
     expect(await screen.findByLabelText('Played games history')).toBeInTheDocument();
-    expect(screen.getByText('AI')).toBeInTheDocument();
+    expect(screen.getByText('bot')).toBeInTheDocument();
     expect(screen.getByText('Marek')).toBeInTheDocument();
     expect(screen.getByText('Easy')).toBeInTheDocument();
     expect(screen.getByText('Random')).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe('GameHistoryPage', () => {
 
     renderHistoryPage();
 
-    const openButton = await screen.findByRole('button', { name: /open ai game/i });
+    const openButton = await screen.findByRole('button', { name: /open bot game/i });
     await userEvent.click(openButton);
     expect(await screen.findByText('Game details')).toBeInTheDocument();
   });

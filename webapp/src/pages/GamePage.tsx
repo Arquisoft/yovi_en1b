@@ -62,7 +62,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
   }
 
   if (botThinking) {
-    return 'AI is thinking...';
+    return 'Bot is thinking...';
   }
 
   const playerName = game.current_turn === 'B' ? 'Blue' : 'Red';
@@ -71,7 +71,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
 
 function getEnemyTitle(game: GameRecord): string {
   if (game.game_type === 'BOT') {
-    return 'AI';
+    return 'Bot';
   }
 
   return game.name_of_enemy ?? 'Player 2 (Red)';

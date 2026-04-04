@@ -4,10 +4,12 @@ export type WinLossStats = {
   draws: number;
 };
 
-export type VsBotStats = {
-  easy: WinLossStats;
-  medium: WinLossStats;
-  hard: WinLossStats;
+export type BotStatsItem = {
+  name: string;
+  difficulty: string;
+  wins: number;
+  losses: number;
+  draws: number;
 };
 
 export type UserStatistics = {
@@ -16,7 +18,7 @@ export type UserStatistics = {
   total_losses: number;
   total_draws: number;
   vs_player: WinLossStats;
-  vs_bot: VsBotStats;
+  vs_bot: BotStatsItem[];
 };
 
 export type UserProfile = {

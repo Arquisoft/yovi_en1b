@@ -19,12 +19,12 @@ describe('usersApi', () => {
     requestJsonMock.mockReset();
   });
 
-  it('getUserProfile uses /users/{id} endpoint', async () => {
+  it('getUserProfile uses /user/{id} endpoint', async () => {
     requestJsonMock.mockResolvedValueOnce({ _id: USERS_API_TEST_DATA.userId });
 
     await getUserProfile(USERS_API_TEST_DATA.userId);
 
-    expect(requestJsonMock).toHaveBeenCalledWith(`/users/${USERS_API_TEST_DATA.userId}`);
+    expect(requestJsonMock).toHaveBeenCalledWith(`/user/${USERS_API_TEST_DATA.userId}`);
   });
 
   it('getUserHistory uses /users/{id}/history endpoint', async () => {
