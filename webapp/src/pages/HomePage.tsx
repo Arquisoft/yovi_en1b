@@ -9,7 +9,7 @@ export function HomePage() {
         <div className="home-logo-glow" aria-hidden="true" />
         <img src={logo} alt="YOVI logo" className="home-logo" />
         <h1>Welcome to YOVI</h1>
-        <p>Ready to play? Create a new game or check your history.</p>
+        <p>Ready to play? Create a new game, check your history, or view the leaderboard.</p>
       </header>
 
       <div className="home-actions-shell">
@@ -22,9 +22,9 @@ export function HomePage() {
             <span className="action-icon">📊</span>
             <span>Game History</span>
           </Link>
-          <Link to="/profile" className="home-action">
-            <span className="action-icon">👤</span>
-            <span>View Statistics</span>
+          <Link to="/leaderboard" className="home-action">
+            <span className="action-icon">🏆</span>
+            <span>Leaderboard</span>
           </Link>
         </div>
       </div>

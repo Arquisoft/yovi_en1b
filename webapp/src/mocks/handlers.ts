@@ -12,6 +12,20 @@ const mockGames = new Map<string, GameRecord>(
 );
 let gameCounter = 1;
 
+const DEFAULT_STRATEGY_OPTIONS = [
+  { name: 'random', difficulty: 'easy' },
+  { name: 'ai', difficulty: 'medium' },
+  { name: 'dijkstra', difficulty: 'hard' }
+] as const;
+
+function formatLabel(value: string): string {
+  if (value.toLowerCase() === 'ai') {
+    return 'AI';
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
 function coordinateKey(c: Coordinates): string {
   return `${c.x}:${c.y}:${c.z}`;
 }
@@ -191,6 +205,16 @@ function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
   const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
 
+  for (const option of DEFAULT_STRATEGY_OPTIONS) {
+    botBuckets.set(`${option.name}:${option.difficulty}`, {
+      name: option.name,
+      difficulty: option.difficulty,
+      wins: 0,
+      losses: 0,
+      draws: 0
+    });
+  }
+
   const stats: UserStatistics = {
     total_games: userGames.length,
     total_wins: 0,
@@ -348,11 +372,10 @@ export const handlers = [
 
   http.get('*/games/options', () =>
     HttpResponse.json({
-      strategies: [
-        { name: 'Random', difficulty: 'Easy' },
-        { name: 'AI', difficulty: 'Medium' },
-        { name: 'Dijkstra', difficulty: 'Hard' }
-      ],
+      strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
+        name: formatLabel(item.name),
+        difficulty: formatLabel(item.difficulty)
+      })),
       variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
     })
   ),

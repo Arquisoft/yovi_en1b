@@ -86,4 +86,32 @@ describe('ProfilePage', () => {
 
     expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
   });
+
+  test('keeps the normal layout when no games were played', async () => {
+    server.use(
+      http.get('*/user/:id', ({ params }) =>
+        HttpResponse.json({
+          _id: params.id,
+          username: PROFILE_TEST_DATA.username,
+          created_at: '2026-03-17T10:00:00.000Z',
+          statistics: {
+            total_games: 0,
+            total_wins: 0,
+            total_losses: 0,
+            total_draws: 0,
+            vs_player: { wins: 0, losses: 0, draws: 0 },
+            vs_bot: []
+          }
+        })
+      )
+    );
+
+    renderProfilePage();
+
+    expect(await screen.findByRole('heading', { name: PROFILE_TEST_DATA.username })).toBeInTheDocument();
+    expect(screen.getByText('Total games')).toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
+    expect(screen.getByText('Category performance')).toBeInTheDocument();
+    expect(screen.getByText(/no finished games yet/i)).toBeInTheDocument();
+  });
 });

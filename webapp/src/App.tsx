@@ -8,6 +8,7 @@ import { NewGamePage } from './pages/NewGamePage';
 import { GamePage } from './pages/GamePage';
 import { GameHistoryPage } from './pages/GameHistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { useAuth } from './hooks/useAuth';
 import './App.css';
 
@@ -28,6 +29,7 @@ function App() {
               <Route path="/games/:id" element={<GamePage />} />
               <Route path="/games/history" element={<GameHistoryPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

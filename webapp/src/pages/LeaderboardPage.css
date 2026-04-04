@@ -1,0 +1,48 @@
+.leaderboard-card {
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 20px;
+  background: linear-gradient(145deg, #111827 0%, #0f172a 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.leaderboard-card h2 {
+  margin: 0;
+  color: #f8fafc;
+}
+
+.leaderboard-card p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.leaderboard-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.leaderboard-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #0284c7;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: #f8fafc;
+  background: linear-gradient(130deg, #0369a1, #0284c7);
+  font-weight: 700;
+}
+
+.leaderboard-link:hover {
+  filter: brightness(1.08);
+}
+
+.leaderboard-link--secondary {
+  border-color: #475569;
+  background: #1e293b;
+  color: #e2e8f0;
+}
