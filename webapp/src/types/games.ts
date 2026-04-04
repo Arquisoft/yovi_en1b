@@ -34,6 +34,8 @@ export type GameRecord = {
   moves: Move[];
 };
 
+export type GameHistoryItem = Omit<GameRecord, 'moves'>;
+
 export type CreateGamePayload = {
   board_size: number;
   game_type: GameType;

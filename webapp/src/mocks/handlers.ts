@@ -367,6 +367,28 @@ export const handlers = [
     return HttpResponse.json(profile);
   }),
 
+  http.get('*/users/:id/history', ({ params, request }) => {
+    const tokenUserId = extractUserId(request);
+    if (!tokenUserId) {
+      return HttpResponse.json({ error: 'No token provided' }, { status: 401 });
+    }
+
+    const requestedUserId = String(params.id);
+    if (requestedUserId !== tokenUserId) {
+      return HttpResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const history = [...mockGames.values()]
+      .filter((game) => game.player_id === requestedUserId)
+      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
+      .map((game) => {
+        const { moves: _moves, ...rest } = game;
+        return rest;
+      });
+
+    return HttpResponse.json(history);
+  }),
+
   http.post('*/games', async ({ request }) => {
     const userId = extractUserId(request);
     if (!userId) {
