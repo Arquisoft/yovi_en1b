@@ -8,10 +8,12 @@ import { AuthProvider } from '../features/auth/AuthProvider';
 import { GameHistoryPage } from '../pages/GameHistoryPage';
 import { server } from '../mocks/server';
 import { http, HttpResponse } from 'msw';
+import { DEFAULT_MOCK_USER } from '../mocks/mockFixtures';
 
 faker.seed(20260404);
 const HISTORY_TEST_DATA = {
-  userId: 'user',
+  userId: DEFAULT_MOCK_USER.userId,
+  username: DEFAULT_MOCK_USER.username,
   authToken: faker.string.alphanumeric(24),
   gameIdA: faker.string.alphanumeric(10),
   gameIdB: faker.string.alphanumeric(10)
@@ -19,7 +21,7 @@ const HISTORY_TEST_DATA = {
 
 function setSession() {
   localStorage.setItem('auth_token', HISTORY_TEST_DATA.authToken);
-  localStorage.setItem('auth_username', 'user');
+  localStorage.setItem('auth_username', HISTORY_TEST_DATA.username);
   localStorage.setItem('auth_user_id', HISTORY_TEST_DATA.userId);
 }
 
@@ -92,8 +94,8 @@ describe('GameHistoryPage', () => {
     expect(await screen.findByLabelText('Played games history')).toBeInTheDocument();
     expect(screen.getByText('AI')).toBeInTheDocument();
     expect(screen.getByText('Marek')).toBeInTheDocument();
-    expect(screen.getByText('easy')).toBeInTheDocument();
-    expect(screen.getByText('random')).toBeInTheDocument();
+    expect(screen.getByText('Easy')).toBeInTheDocument();
+    expect(screen.getByText('Random')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.queryByText('hard')).not.toBeInTheDocument();

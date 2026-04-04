@@ -72,10 +72,17 @@
   background: linear-gradient(120deg, #5e3237, #8a4b52);
 }
 
+.profile-kpi--draws {
+  border-color: #705ca6;
+  background: linear-gradient(120deg, #4a3f74, #705ca6);
+}
+
 .profile-kpi.profile-kpi--wins span,
 .profile-kpi.profile-kpi--wins strong,
 .profile-kpi.profile-kpi--losses span,
-.profile-kpi.profile-kpi--losses strong {
+.profile-kpi.profile-kpi--losses strong,
+.profile-kpi.profile-kpi--draws span,
+.profile-kpi.profile-kpi--draws strong {
   color: #f8fafc;
 }
 
@@ -130,7 +137,8 @@
 }
 
 .profile-dual-bar__wins,
-.profile-dual-bar__losses {
+.profile-dual-bar__losses,
+.profile-dual-bar__draws {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,6 +156,10 @@
   background: linear-gradient(120deg, #8e4f56, #b66a72);
 }
 
+.profile-dual-bar__draws {
+  background: linear-gradient(120deg, #6f5aa3, #8d76c4);
+}
+
 .profile-meter {
   width: 100%;
   border-radius: 999px;
@@ -158,7 +170,8 @@
 }
 
 .profile-meter__wins,
-.profile-meter__losses {
+.profile-meter__losses,
+.profile-meter__draws {
   min-height: 0.9rem;
 }
 
@@ -168,6 +181,10 @@
 
 .profile-meter__losses {
   background: linear-gradient(120deg, #8e4f56, #b66a72);
+}
+
+.profile-meter__draws {
+  background: linear-gradient(120deg, #7c62bd, #a08dde);
 }
 
 .profile-meter__wins.profile-kpi--rate-low {

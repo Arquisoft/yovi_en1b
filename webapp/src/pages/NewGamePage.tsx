@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createGame, getGameOptions } from '../api/gamesApi';
 import { Panel } from '../components/ui/Panel';
 import type { CreateGamePayload, GameType, StrategyOption } from '../types/games';
+import { formatGameLabel } from '../utils/gameLabels';
 import './NewGamePage.css';
 
 export function NewGamePage() {
@@ -187,8 +188,8 @@ export function NewGamePage() {
                       aria-label={strategy.name}
                     />
                     <span className="radio-text radio-text-inline">
-                      <strong>{strategy.name}</strong>
-                      <span className="difficulty-tag">{strategy.difficulty}</span>
+                      <strong>{formatGameLabel(strategy.name)}</strong>
+                      <span className="difficulty-tag">{formatGameLabel(strategy.difficulty)}</span>
                     </span>
                   </label>
                 ))}

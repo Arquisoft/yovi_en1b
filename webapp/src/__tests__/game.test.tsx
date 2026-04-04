@@ -276,8 +276,8 @@ describe('GamePage — bot metadata', () => {
 
     await screen.findByLabelText('game board');
     expect(screen.getByLabelText('Bot settings')).toBeInTheDocument();
-    expect(screen.getByText('Difficulty: hard')).toBeInTheDocument();
-    expect(screen.getByText('Strategy: dijkstra')).toBeInTheDocument();
+    expect(screen.getByText('Difficulty: Hard')).toBeInTheDocument();
+    expect(screen.getByText('Strategy: Dijkstra')).toBeInTheDocument();
   });
 
   test('does not show bot metadata tags for PLAYER games', async () => {

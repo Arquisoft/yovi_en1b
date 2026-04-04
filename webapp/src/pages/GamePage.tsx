@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { finishGame, getGame, playBotTurn, submitMove, undoMove } from '../api/gamesApi';
 import type { Coordinates, GameRecord, Move } from '../types/games';
 import { Panel } from '../components/ui/Panel';
+import { formatGameLabel } from '../utils/gameLabels';
 import './GamePage.css';
 
 const HEX_SIZE = 60;
@@ -442,8 +443,8 @@ export function GamePage() {
             <p>Moves: {redMoves}</p>
             {game.game_type === 'BOT' && (
               <div className="bot-meta-tags" aria-label="Bot settings">
-                <span className="difficulty-tag">Difficulty: {game.difficulty_level}</span>
-                <span className="difficulty-tag">Strategy: {game.strategy}</span>
+                <span className="difficulty-tag">Difficulty: {formatGameLabel(game.difficulty_level)}</span>
+                <span className="difficulty-tag">Strategy: {formatGameLabel(game.strategy)}</span>
               </div>
             )}
           </article>

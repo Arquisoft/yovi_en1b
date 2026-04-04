@@ -5,6 +5,7 @@ import { getUserHistory } from '../api/usersApi';
 import { Panel } from '../components/ui/Panel';
 import { useAuth } from '../hooks/useAuth';
 import type { GameHistoryItem } from '../types/games';
+import { formatGameLabel } from '../utils/gameLabels';
 import './GameHistoryPage.css';
 
 function formatDate(value: string): string {
@@ -161,8 +162,8 @@ export function GameHistoryPage() {
                       <div><dt>Duration</dt><dd>{formatDuration(game.duration_seconds)}</dd></div>
                       {game.game_type === 'BOT' && (
                         <>
-                          <div><dt>Difficulty</dt><dd>{game.difficulty_level}</dd></div>
-                          <div><dt>Strategy</dt><dd>{game.strategy}</dd></div>
+                          <div><dt>Difficulty</dt><dd>{formatGameLabel(game.difficulty_level)}</dd></div>
+                          <div><dt>Strategy</dt><dd>{formatGameLabel(game.strategy)}</dd></div>
                         </>
                       )}
                     </dl>
