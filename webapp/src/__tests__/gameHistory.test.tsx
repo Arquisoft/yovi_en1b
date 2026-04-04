@@ -92,7 +92,7 @@ describe('GameHistoryPage', () => {
     renderHistoryPage();
 
     expect(await screen.findByLabelText('Played games history')).toBeInTheDocument();
-    expect(screen.getByText('bot')).toBeInTheDocument();
+    expect(screen.getByText('Bot')).toBeInTheDocument();
     expect(screen.getByText('Marek')).toBeInTheDocument();
     expect(screen.getByText('Easy')).toBeInTheDocument();
     expect(screen.getByText('Random')).toBeInTheDocument();
