@@ -389,6 +389,17 @@ export const handlers = [
     return HttpResponse.json(game, { status: 201 });
   }),
 
+  http.get('*/games/options', () =>
+    HttpResponse.json({
+      strategies: [
+        { name: 'Random', difficulty: 'Easy' },
+        { name: 'AI', difficulty: 'Medium' },
+        { name: 'Dijkstra', difficulty: 'Hard' }
+      ],
+      variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+    })
+  ),
+
   http.get('*/games/:id', ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {

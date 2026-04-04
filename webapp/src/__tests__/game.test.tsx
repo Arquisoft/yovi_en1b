@@ -257,3 +257,35 @@ describe('GamePage — finish', () => {
   });
 });
 
+// ─── bot metadata ──────────────────────────────────────────────────────────────
+
+describe('GamePage — bot metadata', () => {
+  test('shows strategy and difficulty tags for BOT games', async () => {
+    const botGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      name_of_enemy: null,
+      current_turn: 'B',
+      difficulty_level: 'hard',
+      strategy: 'dijkstra'
+    };
+
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(botGame)));
+
+    renderGamePage();
+
+    await screen.findByLabelText('game board');
+    expect(screen.getByLabelText('Bot settings')).toBeInTheDocument();
+    expect(screen.getByText('Difficulty: hard')).toBeInTheDocument();
+    expect(screen.getByText('Strategy: dijkstra')).toBeInTheDocument();
+  });
+
+  test('does not show bot metadata tags for PLAYER games', async () => {
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
+
+    renderGamePage();
+
+    await screen.findByLabelText('game board');
+    expect(screen.queryByLabelText('Bot settings')).not.toBeInTheDocument();
+  });
+});

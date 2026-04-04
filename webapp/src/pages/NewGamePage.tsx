@@ -1,33 +1,54 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createGame } from '../api/gamesApi';
+import { createGame, getGameOptions } from '../api/gamesApi';
 import { Panel } from '../components/ui/Panel';
-import type { CreateGamePayload, DifficultyLevel, GameType, Strategy } from '../types/games';
+import type { CreateGamePayload, GameType, StrategyOption } from '../types/games';
 import './NewGamePage.css';
-
-/**
- * Helper to determine bot strategy based on difficulty.
- * Ready for expansion with difficulty-specific strategies.
- * Future: allow user to select strategy directly.
- */
-function getStrategyForDifficulty(difficulty: DifficultyLevel): Strategy {
-  const strategyMap: Record<DifficultyLevel, Strategy> = {
-    easy: 'random',
-    medium: 'balanced',
-    hard: 'aggressive'
-  };
-  return strategyMap[difficulty];
-}
 
 export function NewGamePage() {
   const navigate = useNavigate();
   const [gameType, setGameType] = useState<GameType>('BOT');
   const [boardSize, setBoardSize] = useState(5);
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>('medium');
   const [opponentName, setOpponentName] = useState('');
+  const [strategies, setStrategies] = useState<StrategyOption[]>([]);
+  const [selectedStrategyName, setSelectedStrategyName] = useState('');
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opponentNameError = error === 'Please enter opponent name';
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadOptions() {
+      try {
+        const options = await getGameOptions();
+        if (!mounted) return;
+
+        setStrategies(options.strategies ?? []);
+        if (options.strategies?.length) {
+          setSelectedStrategyName(options.strategies[0].name);
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : 'Failed to load game options');
+      } finally {
+        if (mounted) {
+          setLoadingOptions(false);
+        }
+      }
+    }
+
+    loadOptions();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const selectedStrategy = useMemo(
+    () => strategies.find((strategy) => strategy.name === selectedStrategyName),
+    [strategies, selectedStrategyName]
+  );
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +59,11 @@ export function NewGamePage() {
       return;
     }
 
+    if (gameType === 'BOT' && !selectedStrategy) {
+      setError('Please choose an AI strategy');
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -45,13 +71,15 @@ export function NewGamePage() {
       const payload: CreateGamePayload = {
         board_size: boardSize,
         game_type: gameType,
-        difficulty_level: difficulty,
-        strategy: getStrategyForDifficulty(difficulty),
         rule_set: 'normal'
       };
 
       if (gameType === 'PLAYER') {
         payload.name_of_enemy = trimmedOpponentName;
+      }
+
+      if (gameType === 'BOT' && selectedStrategy) {
+        payload.strategy = selectedStrategy.name;
       }
 
       const game = await createGame(payload);
@@ -66,7 +94,6 @@ export function NewGamePage() {
   return (
     <Panel title="New Game" subtitle="Configure your game and start playing">
       <form onSubmit={handleCreateGame} className="new-game-form">
-        {/* Opponent Selection */}
         <fieldset className="form-section">
           <legend>Opponent</legend>
           <div className="form-group">
@@ -78,6 +105,7 @@ export function NewGamePage() {
                 checked={gameType === 'BOT'}
                 onChange={(e) => setGameType(e.target.value as GameType)}
                 disabled={loading}
+                aria-label="Play vs AI"
               />
               <span className="radio-text">
                 <strong>Play vs AI</strong>
@@ -93,6 +121,7 @@ export function NewGamePage() {
                 checked={gameType === 'PLAYER'}
                 onChange={(e) => setGameType(e.target.value as GameType)}
                 disabled={loading}
+                aria-label="Play vs Player"
               />
               <span className="radio-text">
                 <strong>Play vs Player</strong>
@@ -118,7 +147,6 @@ export function NewGamePage() {
           )}
         </fieldset>
 
-        {/* Board Size */}
         <fieldset className="form-section">
           <legend>Board Size</legend>
           <div className="form-field">
@@ -140,60 +168,35 @@ export function NewGamePage() {
           </div>
         </fieldset>
 
-        {/* AI Difficulty */}
         {gameType === 'BOT' && (
           <fieldset className="form-section">
-            <legend>AI Difficulty</legend>
-            <div className="form-group">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="difficulty"
-                  value="easy"
-                  checked={difficulty === 'easy'}
-                  onChange={(e) => setDifficulty(e.target.value as DifficultyLevel)}
-                  disabled={loading}
-                />
-                <span className="radio-text">
-                  <strong>Easy</strong>
-                  <small>Random moves</small>
-                </span>
-              </label>
-
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="difficulty"
-                  value="medium"
-                  checked={difficulty === 'medium'}
-                  onChange={(e) => setDifficulty(e.target.value as DifficultyLevel)}
-                  disabled={loading}
-                />
-                <span className="radio-text">
-                  <strong>Medium</strong>
-                  <small>Balanced strategy</small>
-                </span>
-              </label>
-
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="difficulty"
-                  value="hard"
-                  checked={difficulty === 'hard'}
-                  onChange={(e) => setDifficulty(e.target.value as DifficultyLevel)}
-                  disabled={loading}
-                />
-                <span className="radio-text">
-                  <strong>Hard</strong>
-                  <small>Challenging AI</small>
-                </span>
-              </label>
-            </div>
+            <legend>AI Strategy</legend>
+            {loadingOptions ? (
+              <p className="strategy-loading">Loading available strategies...</p>
+            ) : (
+              <div className="form-group">
+                {strategies.map((strategy) => (
+                  <label className="radio-label" key={strategy.name}>
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value={strategy.name}
+                      checked={selectedStrategyName === strategy.name}
+                      onChange={(e) => setSelectedStrategyName(e.target.value)}
+                      disabled={loading}
+                      aria-label={strategy.name}
+                    />
+                    <span className="radio-text radio-text-inline">
+                      <strong>{strategy.name}</strong>
+                      <span className="difficulty-tag">{strategy.difficulty}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </fieldset>
         )}
 
-        {/* Rules - Ready for future expansion (extended, custom) */}
         <fieldset className="form-section">
           <legend>Rules</legend>
           <div className="form-group">
@@ -204,19 +207,22 @@ export function NewGamePage() {
                 value="normal"
                 defaultChecked
                 disabled={loading}
+                aria-label="Standard Rules"
               />
               <span className="radio-text">
                 <strong>Standard Rules</strong>
                 <small>Connect three sides of the triangle</small>
               </span>
             </label>
-            {/* Additional rule sets (extended, custom) to be added here */}
           </div>
         </fieldset>
 
-        {/* Actions */}
         <div className="form-actions">
-          <button type="submit" disabled={loading} className="btn-primary">
+          <button
+            type="submit"
+            disabled={loading || (gameType === 'BOT' && (loadingOptions || strategies.length === 0))}
+            className="btn-primary"
+          >
             {loading ? 'Creating game...' : 'Start Game'}
           </button>
         </div>

@@ -440,7 +440,12 @@ export function GamePage() {
           <article className={redPanelClass}>
             <h3>{enemyTitle}</h3>
             <p>Moves: {redMoves}</p>
-            {game.game_type === 'BOT' && <p>{game.difficulty_level} / {game.strategy}</p>}
+            {game.game_type === 'BOT' && (
+              <div className="bot-meta-tags" aria-label="Bot settings">
+                <span className="difficulty-tag">Difficulty: {game.difficulty_level}</span>
+                <span className="difficulty-tag">Strategy: {game.strategy}</span>
+              </div>
+            )}
           </article>
         </header>
 
