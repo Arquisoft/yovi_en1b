@@ -1,6 +1,6 @@
 const UserRepository = require('./UserRepository');
-const User = require('../models/User');
-const Game = require('../models/Game');
+const User = require('../models/user');
+const Game = require('../models/game');
 
 // Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
