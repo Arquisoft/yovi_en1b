@@ -5,5 +5,5 @@ Feature: Route guards
     Given I am not signed in
     When I navigate directly to "/profile"
     Then I should be on the entry page
-    And I should see "Welcome to Game Y"
+    And I should see "Welcome to YOVI"
 
