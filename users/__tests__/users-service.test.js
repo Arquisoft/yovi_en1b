@@ -131,6 +131,43 @@ describe('GET /exists/:username', () => {
     })
 })
 
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+describe('GET /leaderboard', () => {
+    it('returns leaderboard without auth', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+
+    it('returns at most 10 players', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(200)
+        expect(res.body.length).toBeLessThanOrEqual(10)
+    })
+
+    it('returns players with username and statistics', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        if (res.body.length > 0) {
+            expect(res.body[0]).toHaveProperty('username')
+            expect(res.body[0]).toHaveProperty('statistics')
+        }
+    })
+
+    it('returns players ordered by total_wins descending', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        for (let i = 0; i < res.body.length - 1; i++) {
+            expect(res.body[i].statistics.total_wins).toBeGreaterThanOrEqual(
+                res.body[i + 1].statistics.total_wins
+            )
+        }
+    })
+})
+
 // ─── User profile ─────────────────────────────────────────────────────────────
 
 describe('GET /users/:id', () => {
@@ -177,6 +214,7 @@ describe('GET /users/:id/stats', () => {
         expect(res.body.total_games).toBe(0)
         expect(res.body.total_wins).toBe(0)
         expect(res.body.total_losses).toBe(0)
+        expect(res.body.total_draws).toBe(0)
         expect(res.body).toHaveProperty('vs_player')
         expect(res.body).toHaveProperty('vs_bot')
     })
@@ -775,7 +813,7 @@ describe('PUT /games/:id/finish', () => {
             .get(`/users/${userId}/stats`)
             .set('Authorization', `Bearer ${token}`)).body
 
-        expect(statsAfter.total_games).toBe(statsBefore.total_games)
+        // DRAW must not affect wins or losses
         expect(statsAfter.total_wins).toBe(statsBefore.total_wins)
         expect(statsAfter.total_losses).toBe(statsBefore.total_losses)
     })
