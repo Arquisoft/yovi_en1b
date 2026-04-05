@@ -131,6 +131,43 @@ describe('GET /exists/:username', () => {
     })
 })
 
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+describe('GET /leaderboard', () => {
+    it('returns leaderboard without auth', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+
+    it('returns at most 10 players', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(200)
+        expect(res.body.length).toBeLessThanOrEqual(10)
+    })
+
+    it('returns players with username and statistics', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        if (res.body.length > 0) {
+            expect(res.body[0]).toHaveProperty('username')
+            expect(res.body[0]).toHaveProperty('statistics')
+        }
+    })
+
+    it('returns players ordered by total_wins descending', async () => {
+        const res = await request(app).get('/leaderboard')
+
+        for (let i = 0; i < res.body.length - 1; i++) {
+            expect(res.body[i].statistics.total_wins).toBeGreaterThanOrEqual(
+                res.body[i + 1].statistics.total_wins
+            )
+        }
+    })
+})
+
 // ─── User profile ─────────────────────────────────────────────────────────────
 
 describe('GET /users/:id', () => {
@@ -177,6 +214,7 @@ describe('GET /users/:id/stats', () => {
         expect(res.body.total_games).toBe(0)
         expect(res.body.total_wins).toBe(0)
         expect(res.body.total_losses).toBe(0)
+        expect(res.body.total_draws).toBe(0)
         expect(res.body).toHaveProperty('vs_player')
         expect(res.body).toHaveProperty('vs_bot')
     })
@@ -313,13 +351,19 @@ describe('POST /games/:id/move', () => {
         expect(res.body.status).toBe('IN_PROGRESS')
     })
 
-    it('auto-finishes game with WIN when Gamey returns winner B', async () => {
+    it('auto-finishes game with WIN when player B makes the winning move', async () => {
         // Create a fresh game for this test
         const createRes = await request(app)
             .post('/games')
             .send({ board_size: 5 })
             .set('Authorization', `Bearer ${token}`)
         const winGameId = createRes.body._id
+
+        // Ensure it's B's turn
+        if (createRes.body.current_turn === 'R') {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ yen_state: '...', winner: null }) }))
+            await request(app).post(`/games/${winGameId}/move`).send({ coordinates: { x: 0, y: 0, z: 0 } }).set('Authorization', `Bearer ${token}`)
+        }
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
@@ -336,12 +380,18 @@ describe('POST /games/:id/move', () => {
         expect(res.body.result).toBe('WIN')
     })
 
-    it('auto-finishes game with LOSS when Gamey returns winner R', async () => {
+    it('auto-finishes game with LOSS when player R makes the winning move', async () => {
         const createRes = await request(app)
             .post('/games')
             .send({ board_size: 5 })
             .set('Authorization', `Bearer ${token}`)
         const lossGameId = createRes.body._id
+
+        // Ensure it's R's turn
+        if (createRes.body.current_turn === 'B') {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ yen_state: '...', winner: null }) }))
+            await request(app).post(`/games/${lossGameId}/move`).send({ coordinates: { x: 0, y: 0, z: 0 } }).set('Authorization', `Bearer ${token}`)
+        }
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
@@ -431,7 +481,15 @@ describe('GET /games/:id/play', () => {
             .set('Authorization', `Bearer ${token}`)
         const botWinGameId = createRes.body._id
 
-        // First add a move so yen_state is available
+        // Ensure the bot plays as R. So we need the human to play as B!
+        // If it comes out as R first, we do a dummy move so the bot is B? No, the Bot MUST play as R.
+        // So the second move (bot's move) must be on turn R. This means human move must be on turn B.
+        if (createRes.body.current_turn === 'R') {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ yen_state: '...', winner: null }) }))
+            await request(app).post(`/games/${botWinGameId}/move`).send({ coordinates: { x: 0, y: 0, z: 0 } }).set('Authorization', `Bearer ${token}`)
+        }
+
+        // First add a move so yen_state is available (Human plays on B)
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ yen_state: 'B/.B/RB./B..R', winner: null })
@@ -441,6 +499,7 @@ describe('GET /games/:id/play', () => {
             .send({ coordinates: { x: 0, y: 0, z: 4 } })
             .set('Authorization', `Bearer ${token}`)
 
+        // Bot plays on R
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ coordinates: { x: 2, y: 1, z: 0 }, yen_state: 'R/.B/RB./B..R', winner: 'R' })
@@ -487,34 +546,101 @@ describe('GET /games/:id/play', () => {
     })
 })
 
+// ─── Public play endpoint ─────────────────────────────────────────────────────
 
+describe('POST /play', () => {
+    it('returns bot move without auth or game id', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ yen_state: null, strategy: 'random', board_size: 7 })
+
+        expect(res.status).toBe(200)
+        expect(res.body).toHaveProperty('coordinates')
+        expect(res.body).toHaveProperty('yen_state')
+    })
+
+    it('returns 400 if board_size is missing', async () => {
+        const res = await request(app)
+            .post('/play')
+            .send({ strategy: 'random' })
+
+        expect(res.status).toBe(400)
+    })
+
+    it('returns 503 when Gamey is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(503)
+    })
+
+    it('returns 502 when Gamey returns an error', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(502)
+    })
+
+    it('does not require authentication', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ board_size: 7 })
+
+        expect(res.status).toBe(200)
+    })
+})
 
 // ─── Game options ─────────────────────────────────────────────────────────────
 
 describe('GET /games/options', () => {
-    it('returns strategies, difficulty levels and variants', async () => {
+    it('returns strategies and variants', async () => {
         const res = await request(app).get('/games/options')
 
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body.strategies)).toBe(true)
-        expect(Array.isArray(res.body.difficulty_levels)).toBe(true)
         expect(Array.isArray(res.body.variants)).toBe(true)
+        expect(res.body).not.toHaveProperty('difficulty_levels')
     })
 
-    it('returns the expected strategies', async () => {
+    it('returns strategies as objects with name and difficulty', async () => {
         const res = await request(app).get('/games/options')
 
-        expect(res.body.strategies).toContain('Random')
-        expect(res.body.strategies).toContain('AI (coming soon)')
-        expect(res.body.strategies).toContain('Dijkstra (coming soon)')
+        res.body.strategies.forEach(s => {
+            expect(s).toHaveProperty('name')
+            expect(s).toHaveProperty('difficulty')
+        })
     })
 
-    it('returns the expected difficulty levels', async () => {
+    it('returns the expected strategies with their difficulties', async () => {
         const res = await request(app).get('/games/options')
 
-        expect(res.body.difficulty_levels).toContain('Easy 😄')
-        expect(res.body.difficulty_levels).toContain('Medium 😐')
-        expect(res.body.difficulty_levels).toContain('Hard 😈')
+        const names = res.body.strategies.map(s => s.name)
+        expect(names).toContain('Random')
+        expect(names).toContain('AI')
+        expect(names).toContain('Dijkstra')
+
+        const random = res.body.strategies.find(s => s.name === 'Random')
+        const ai = res.body.strategies.find(s => s.name === 'AI')
+        const dijkstra = res.body.strategies.find(s => s.name === 'Dijkstra')
+        expect(random.difficulty).toBe('Easy 😄')
+        expect(ai.difficulty).toBe('Medium 😐')
+        expect(dijkstra.difficulty).toBe('Hard 😈')
     })
 
     it('returns the expected variants', async () => {
@@ -662,8 +788,8 @@ describe('PUT /games/:id/finish', () => {
         expect(res.body.total_games).toBeGreaterThanOrEqual(1)
         expect(res.body.total_wins).toBeGreaterThanOrEqual(1)
         expect(typeof res.body.total_losses).toBe('number')
-        expect(res.body.vs_bot.medium.wins).toBeGreaterThanOrEqual(1)
-        expect(typeof res.body.vs_bot.medium.losses).toBe('number')
+        expect(res.body.vs_bot.random.wins).toBeGreaterThanOrEqual(1)
+        expect(typeof res.body.vs_bot.random.losses).toBe('number')
     })
 
     it('does NOT update stats when result is DRAW (user quit)', async () => {
@@ -687,7 +813,7 @@ describe('PUT /games/:id/finish', () => {
             .get(`/users/${userId}/stats`)
             .set('Authorization', `Bearer ${token}`)).body
 
-        expect(statsAfter.total_games).toBe(statsBefore.total_games)
+        // DRAW must not affect wins or losses
         expect(statsAfter.total_wins).toBe(statsBefore.total_wins)
         expect(statsAfter.total_losses).toBe(statsBefore.total_losses)
     })

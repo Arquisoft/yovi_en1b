@@ -4,11 +4,18 @@ const authMiddleware = require('../middleware/auth');
 
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
+// Strategy -> difficulty mapping
+const STRATEGY_DIFFICULTY = {
+    random: 'easy',
+    dijkstra: 'medium',
+    ai: 'hard'
+};
+
 // Helper: auto-finish a game if Gamey reports a winner
 async function autoFinishIfWinner(game, winner, repository) {
     if (!winner) return;
-    // winner is 'B' or 'R' - the logged-in player is always 'B'
-    const result = winner === 'B' ? 'WIN' : 'LOSS';
+    const winningPlayer = game.moves.at(-1)?.player;
+    const result = winningPlayer === 'B' ? 'WIN' : 'LOSS';
     await repository.updateGame(game._id, {
         status: 'FINISHED',
         result,
@@ -18,7 +25,7 @@ async function autoFinishIfWinner(game, winner, repository) {
     await repository.updateStats(game.player_id, {
         result,
         type: game.game_type,
-        difficulty: game.difficulty_level
+        strategy: game.strategy
     });
 }
 
@@ -42,18 +49,25 @@ async function computeYenState(yen_state_prev, coordinates) {
 module.exports = function gameRoutes(repository) {
     const router = express.Router();
 
-    // Get available game options (strategies, difficulty levels, game variants)
+    // Get available game options — public, no auth needed
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
-            strategies: ['Random', 'AI (coming soon)', 'Dijkstra (coming soon)'],
-            difficulty_levels: ['Easy 😄', 'Medium 😐', 'Hard 😈'],
-            variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+            strategies: [
+                { name: 'Random', difficulty: 'Easy 😄' },
+                { name: 'AI', difficulty: 'Medium 😐' },
+                { name: 'Dijkstra', difficulty: 'Hard 😈' }
+            ],
+            variants: [
+                'Classic Y',
+                'Master Y (coming soon)',
+                'Pie Rule (coming soon)'
+            ]
         });
     });
 
     // Create a new game
     router.post('/', authMiddleware, async function createGame(req, res) {
-        const { board_size, strategy, difficulty_level, game_type, name_of_enemy } = req.body || {};
+        const { board_size, strategy, game_type, name_of_enemy } = req.body || {};
 
         if (!board_size) return res.status(400).json({ error: 'board_size is required' });
 
@@ -62,16 +76,16 @@ module.exports = function gameRoutes(repository) {
         }
 
         try {
-            //It needs to be random.
             const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
+            const resolvedStrategy = strategy || 'random';
 
             const game = await repository.createGame({
                 player_id: req.user.userId,
                 game_type: game_type || 'BOT',
                 name_of_enemy: name_of_enemy || null,
                 board_size,
-                strategy: strategy || 'random',
-                difficulty_level: difficulty_level || 'medium',
+                strategy: resolvedStrategy,
+                difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
                 current_turn
             });
             res.status(201).json(game);
@@ -91,7 +105,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Submit a player move - only needs coordinates, Gamey computes new yen_state and checks winner
+    // Submit a player move
     router.post('/:id/move', authMiddleware, async function submitMove(req, res) {
         const { coordinates } = req.body || {};
 
@@ -133,7 +147,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Request bot move - Gamey computes bot move, checks winner, saves it automatically
+    // Request bot move for an existing game
     router.get('/:id/play', authMiddleware, async function botPlay(req, res) {
         let game;
         try {
@@ -152,7 +166,12 @@ module.exports = function gameRoutes(repository) {
             gameyResponse = await fetch(`${GAMEY_URL}/play`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ yen_state, strategy: game.strategy, difficulty_level: game.difficulty_level, board_size: game.board_size })
+                body: JSON.stringify({
+                    yen_state,
+                    strategy: game.strategy,
+                    difficulty_level: game.difficulty_level,
+                    board_size: game.board_size
+                })
             });
         } catch {
             return res.status(503).json({ error: 'Gamey service unreachable' });
@@ -181,7 +200,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Finish a game (manual - DRAW when user quits)
+    // Finish a game manually (DRAW when user quits)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state, duration_seconds } = req.body || {};
 
@@ -203,7 +222,7 @@ module.exports = function gameRoutes(repository) {
                 await repository.updateStats(game.player_id, {
                     result,
                     type: game.game_type,
-                    difficulty: game.difficulty_level
+                    strategy: game.strategy
                 });
             }
 
@@ -225,7 +244,7 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Undo last move - only allowed in PLAYER vs PLAYER games
+    // Undo last move — only allowed in PLAYER vs PLAYER games
     router.post('/:id/undo', authMiddleware, async function undoMove(req, res) {
         try {
             const game = await repository.findGameById(req.params.id);
@@ -234,7 +253,7 @@ module.exports = function gameRoutes(repository) {
             if (game.game_type !== 'PLAYER') return res.status(400).json({ error: 'Undo is only allowed in player vs player games' });
             if (game.moves.length === 0) return res.status(400).json({ error: 'No moves to undo' });
 
-            game.moves.pop(); //erases last move
+            game.moves.pop();
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
 
