@@ -32,8 +32,8 @@ app.use(express.json());
 
 // Routes
 app.use('/', authRoutes(repository));
-app.use("/", playRoute());
-app.use("/", leaderBoardRoute(repository));
+app.use("/play", playRoute());
+app.use("/leaderboard", leaderBoardRoute(repository));
 app.use('/users', userRoutes(repository));
 app.use('/games', gameRoutes(repository));  // also exposes POST /games/play (bot API)
 
