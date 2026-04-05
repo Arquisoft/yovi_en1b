@@ -8,11 +8,13 @@
 //! - [`RandomBot`] - A simple bot that makes random valid moves
 
 pub mod defensive;
+pub mod hard;
 pub mod random;
 pub mod ybot;
 pub mod ybot_registry;
 
 pub use defensive::DefensiveBot;
+pub use hard::HardBot;
 pub use random::RandomBot;
 pub use ybot::YBot;
 pub use ybot_registry::YBotRegistry;

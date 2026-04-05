@@ -89,7 +89,8 @@ pub fn create_router(state: AppState) -> axum::Router {
 pub fn create_default_state() -> AppState {
     let bots = YBotRegistry::new()
         .with_bot(Arc::new(RandomBot))
-        .with_bot(Arc::new(crate::DefensiveBot));
+        .with_bot(Arc::new(crate::DefensiveBot))
+        .with_bot(Arc::new(crate::HardBot::default()));
     AppState::new(bots)
 }
 
