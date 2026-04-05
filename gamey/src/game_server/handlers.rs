@@ -613,7 +613,7 @@ mod tests {
     #[tokio::test]
     async fn test_play_success_with_defensive_strategy() {
         let req = axum::Json(PlayRequest {
-            yen_state: Some("R/..".to_string()), // Size 2, R at top corner (1,0,0)
+            yen_state: Some("R/..".to_string()), // Size 2, R at top corner (0,0,1)
             strategy: Some("defensive".to_string()),
             difficulty_level: Some("medium".to_string()),
             board_size: 2,
@@ -622,10 +622,10 @@ mod tests {
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         
-        // Size 2 board, R at top corner (1,0,0). Neighbors are (0,1,0) and (0,0,1).
+        // Size 2 board, R at top corner (0,0,1). Neighbors are (1,0,0) and (0,1,0).
         // The bot (B) should have picked one of these.
         let chosen_coords = res_json.coordinates;
-        let r_coords = Coordinates::new(1, 0, 0);
+        let r_coords = Coordinates::new(0, 0, 1);
         let neighbors = r_coords.neighbors(2);
         assert!(neighbors.contains(&chosen_coords), "Defensive bot should pick a neighbor of R's move");
     }
