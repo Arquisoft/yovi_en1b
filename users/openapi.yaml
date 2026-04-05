@@ -55,6 +55,9 @@ components:
         losses:
           type: integer
           example: 1
+        draws:
+          type: integer
+          example: 0
 
     VsBotDifficultyStats:
       type: object
@@ -65,15 +68,19 @@ components:
         losses:
           type: integer
           example: 1
+        draws:
+          type: integer
+          example: 0
 
     VsBotStats:
       type: object
+      description: Stats per strategy — random (easy), dijkstra (medium), ai (hard)
       properties:
-        easy:
+        random:
           $ref: '#/components/schemas/VsBotDifficultyStats'
-        medium:
+        dijkstra:
           $ref: '#/components/schemas/VsBotDifficultyStats'
-        hard:
+        ai:
           $ref: '#/components/schemas/VsBotDifficultyStats'
 
     Statistics:
@@ -88,6 +95,9 @@ components:
         total_losses:
           type: integer
           example: 4
+        total_draws:
+          type: integer
+          example: 1
         vs_player:
           $ref: '#/components/schemas/VsPlayerStats'
         vs_bot:
@@ -299,6 +309,31 @@ paths:
           description: Internal server error
 
   # Users
+
+  /leaderboard:
+    get:
+      summary: Get leaderboard
+      description: Returns the top 10 players ranked by total wins. Public endpoint, no authentication required.
+      responses:
+        '200':
+          description: List of top players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                      example: "64b1f2e3c4d5e6f7a8b9c0d2"
+                    username:
+                      type: string
+                      example: "nacho"
+                    statistics:
+                      $ref: '#/components/schemas/Statistics'
+        '500':
+          description: Internal server error
 
   /users/{id}:
     get:
