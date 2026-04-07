@@ -4,28 +4,14 @@ const authMiddleware = require('../middleware/auth');
 module.exports = function userRoutes(repository) {
     const router = express.Router();
 
-    // Get user profile
-    router.get('/:id', authMiddleware, async function getUserProfile(req, res) {
-        try {
-            const user = await repository.findById(req.params.id);
-            if (!user) return res.status(404).json({ error: 'User not found' });
-
-            const response = user.toObject();
-            delete response.password_hash;
-            res.json(response);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    });
-
     const BOT_DIFFICULTY = {
         random:   'Easy 😄',
         ai:       'Medium 😐',
         dijkstra: 'Hard 😈'
     };
 
-    //Get user statistics
-    router.get('/:id/stats', authMiddleware, async function getUserStats(req, res) {
+    //Get user profile statistics
+    router.get('/:id', authMiddleware, async function getUserStats(req, res) {
         try {
             const user = await repository.findById(req.params.id);
             if (!user) return res.status(404).json({ error: 'User not found' });

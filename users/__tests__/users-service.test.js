@@ -192,14 +192,19 @@ describe('GET /leaderboard', () => {
 // ─── User profile ─────────────────────────────────────────────────────────────
 
 describe('GET /users/:id', () => {
-    it('returns user profile without password_hash', async () => {
+    it('returns user stats with expected fields', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body.username).toBe('Pablo')
         expect(res.body).not.toHaveProperty('password_hash')
+        expect(res.body).not.toHaveProperty('username')
+        expect(typeof res.body.total_games).toBe('number')
+        expect(typeof res.body.total_wins).toBe('number')
+        expect(typeof res.body.total_losses).toBe('number')
+        expect(typeof res.body.total_draws).toBe('number')
+        expect(Array.isArray(res.body.vs_bots)).toBe(true)
     })
 
     it('returns 401 without token', async () => {
