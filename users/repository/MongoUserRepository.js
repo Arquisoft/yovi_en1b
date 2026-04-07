@@ -2,12 +2,7 @@ const UserRepository = require('./UserRepository');
 const User = require('../models/user');
 const Game = require('../models/game');
 
-// Strategy -> difficulty mapping
-const STRATEGY_DIFFICULTY = {
-  random:   'easy',
-  dijkstra: 'medium',
-  ai:       'hard'
-};
+const LEADERBOARD_SIZE = 10;
 
 class MongoUserRepository extends UserRepository {
 
@@ -72,10 +67,44 @@ class MongoUserRepository extends UserRepository {
   }
 
   async getLeaderboard() {
-    return await User.find({}, 'username statistics')
-        .sort({ 'statistics.total_wins': -1 })
-        .limit(10)
-        .lean();
+    const [overall, random, ai, dijkstra] = await Promise.all([
+      User.find()
+          .sort({ 'statistics.total_wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.total_wins statistics.total_games')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.random.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.random')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.ai.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.ai')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.dijkstra.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.dijkstra')
+          .lean(),
+    ]);
+
+    return {
+      overall: overall.map(u => ({
+        username:    u.username,
+        total_wins:  u.statistics.total_wins,
+        total_games: u.statistics.total_games
+      })),
+      vs_bots: {
+        random:   random.map(u =>   ({ username: u.username, wins: u.statistics.vs_bot.random.wins   })),
+        ai:       ai.map(u =>       ({ username: u.username, wins: u.statistics.vs_bot.ai.wins       })),
+        dijkstra: dijkstra.map(u => ({ username: u.username, wins: u.statistics.vs_bot.dijkstra.wins }))
+      }
+    };
   }
 }
 

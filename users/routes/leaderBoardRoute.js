@@ -3,7 +3,7 @@ const express = require('express');
 module.exports = function leaderBoardRoute(repository) {
     const router = express.Router();
 
-    // Get leaderboard — public, no auth needed
+    // Get leaderboard - public, no auth needed
     router.get('/leaderboard', async function getLeaderboard(req, res) {
         try {
             const leaderboard = await repository.getLeaderboard();

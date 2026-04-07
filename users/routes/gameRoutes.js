@@ -19,7 +19,7 @@ async function autoFinishIfWinner(game, winner, repository) {
         status: 'FINISHED',
         result,
         yen_final_state: game.moves.at(-1)?.yen_state ?? null,
-        duration_seconds: 0
+        duration_seconds: game.duration_seconds //ERROR (was 0, solved?)
     });
     await repository.updateStats(game.player_id, {
         result,
@@ -57,9 +57,9 @@ module.exports = function gameRoutes(repository) {
                 { name: 'Dijkstra', difficulty: 'Hard 😈'   }
             ],
             variants: [
-                'Classic Y',
-                'Master Y (coming soon)',
-                'Pie Rule (coming soon)'
+                { name: 'Classic Y'              },
+                { name: 'Master Y (coming soon)' },
+                { name: 'Pie Rule (coming soon)' }
             ]
         });
     });
