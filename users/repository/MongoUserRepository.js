@@ -2,6 +2,8 @@ const UserRepository = require('./UserRepository');
 const User = require('../models/user');
 const Game = require('../models/game');
 
+const LEADERBOARD_SIZE = 10;
+
 class MongoUserRepository extends UserRepository {
 
   async findByUsername(username) {
@@ -39,24 +41,70 @@ class MongoUserRepository extends UserRepository {
     return await Game.findByIdAndUpdate(id, data, { new: true });
   }
 
-  async updateStats(userId, { result, type, difficulty }) {
+  async updateStats(userId, { result, type, strategy }) {
     const update = { $inc: { 'statistics.total_games': 1 } };
+
     const winIncr  = result === 'WIN'  ? 1 : 0;
     const lossIncr = result === 'LOSS' ? 1 : 0;
+    const drawIncr = result === 'DRAW' ? 1 : 0;
 
     update.$inc['statistics.total_wins']   = winIncr;
     update.$inc['statistics.total_losses'] = lossIncr;
+    update.$inc['statistics.total_draws']  = drawIncr;
 
     if (type === 'PLAYER') {
       update.$inc['statistics.vs_player.wins']   = winIncr;
       update.$inc['statistics.vs_player.losses'] = lossIncr;
+      update.$inc['statistics.vs_player.draws']  = drawIncr;
     } else {
-      const diffKey = difficulty.toLowerCase();
-      update.$inc[`statistics.vs_bot.${diffKey}.wins`]   = winIncr;
-      update.$inc[`statistics.vs_bot.${diffKey}.losses`] = lossIncr;
+      const stratKey = strategy?.toLowerCase() || 'random';
+      update.$inc[`statistics.vs_bot.${stratKey}.wins`]   = winIncr;
+      update.$inc[`statistics.vs_bot.${stratKey}.losses`] = lossIncr;
+      update.$inc[`statistics.vs_bot.${stratKey}.draws`]  = drawIncr;
     }
 
     return await User.findByIdAndUpdate(userId, update, { new: true });
+  }
+
+  async getLeaderboard() {
+    const [overall, random, ai, dijkstra] = await Promise.all([
+      User.find()
+          .sort({ 'statistics.total_wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.total_wins statistics.total_games')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.random.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.random')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.ai.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.ai')
+          .lean(),
+
+      User.find()
+          .sort({ 'statistics.vs_bot.dijkstra.wins': -1 })
+          .limit(LEADERBOARD_SIZE)
+          .select('username statistics.vs_bot.dijkstra')
+          .lean(),
+    ]);
+
+    return {
+      overall: overall.map(u => ({
+        username:    u.username,
+        total_wins:  u.statistics.total_wins,
+        total_games: u.statistics.total_games
+      })),
+      vs_bots: {
+        random:   random.map(u =>   ({ username: u.username, wins: u.statistics.vs_bot.random.wins   })),
+        ai:       ai.map(u =>       ({ username: u.username, wins: u.statistics.vs_bot.ai.wins       })),
+        dijkstra: dijkstra.map(u => ({ username: u.username, wins: u.statistics.vs_bot.dijkstra.wins }))
+      }
+    };
   }
 }
 

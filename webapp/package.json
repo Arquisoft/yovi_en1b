@@ -15,9 +15,9 @@
     "test:watch": "vitest --watch",
     "test:e2e:run": "cucumber-js --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
     "test:e2e:dry-run": "cucumber-js --dry-run --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
-    "test:e2e": "start-server-and-test start:all http://localhost:5173 test:e2e:run",
+    "test:e2e": "concurrently -k -s first \"npm run start:all\" \"wait-on http://localhost:5173 && npm run test:e2e:run\"",
     "test:e2e:install-browsers": "npx playwright install",
-    "start:all": "concurrently \"npm run dev\" \"npm --prefix ../users start\"",
+    "start:all": "concurrently \"npm run dev\" \"npm --prefix ../users start\" \"cargo run --manifest-path ../gamey/Cargo.toml\"",
     "msw:init": "msw init public --save"
   },
   "dependencies": {
@@ -51,7 +51,8 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vitest": "^4.0.16",
-    "vitest-sonar-reporter": "^3.0.0"
+    "vitest-sonar-reporter": "^3.0.0",
+    "wait-on": "^9.0.4"
   },
   "msw": {
     "workerDirectory": [
