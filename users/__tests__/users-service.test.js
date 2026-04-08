@@ -3,6 +3,7 @@ import request from 'supertest'
 import mongoose from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import app from '../users-service.js'
+import User from '../models/user.js'
 
 let mongoServer;
 let token;
@@ -213,7 +214,6 @@ describe('GET /leaderboard', () => {
     })
 
     it('returns 500 when the repository throws', async () => {
-        const User = (await import('../models/user.js')).default
         vi.spyOn(User, 'find').mockRejectedValueOnce(new Error('DB failure'))
 
         const res = await request(app).get('/leaderboard')
@@ -289,7 +289,6 @@ describe('GET /users/:id', () => {
     })
 
     it('returns 500 when repository throws', async () => {
-        const User = (await import('../models/user.js')).default
         vi.spyOn(User, 'findById').mockRejectedValueOnce(new Error('DB failure'))
 
         const res = await request(app)
