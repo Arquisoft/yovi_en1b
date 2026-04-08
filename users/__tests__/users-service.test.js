@@ -1066,39 +1066,119 @@ describe('GET /users/:id games array', () => {
     })
 })
 
-// ─── MongoUserRepository unit: getLeaderboard ?? 0 fallback ──────────────────
+// ─── MongoUserRepository direct unit tests ───────────────────────────────────
 
-describe('MongoUserRepository.getLeaderboard - ?? 0 fallback for missing vs_bot stats', () => {
-    it('returns wins: 0 for a user returned by the bot query who has no vs_bot data', async () => {
-        const MongoUserRepository = (await import('../repository/MongoUserRepository.js')).default
-        const User = mongoose.model('User')
+describe('MongoUserRepository direct unit tests', () => {
+    let repo
+    let User
+    let Game
 
-        // Insert a user whose statistics.vs_bot sub-document is missing entirely,
-        // but give them a high total_wins so they appear in the sorted query results.
-        await User.create({
-            username: 'PartialStatsUser',
+    beforeAll(async () => {
+        const { default: MongoUserRepository } = await import('../repository/MongoUserRepository.js')
+        repo = new MongoUserRepository()
+        User = mongoose.model('User')
+        Game = mongoose.model('Game')
+    })
+
+    // ── findById ──────────────────────────────────────────────────────────────
+
+    it('findById returns user without password_hash', async () => {
+        const created = await User.create({ username: 'RepoTestUser', password_hash: 'secret' })
+        const found = await repo.findById(created._id)
+        expect(found).not.toBeNull()
+        expect(found.username).toBe('RepoTestUser')
+        expect(found.password_hash).toBeUndefined()
+    })
+
+    // ── create ────────────────────────────────────────────────────────────────
+
+    it('create saves a new user and returns it', async () => {
+        const saved = await repo.create({ username: 'RepoCreatedUser', password_hash: 'hash' })
+        expect(saved._id).toBeDefined()
+        expect(saved.username).toBe('RepoCreatedUser')
+    })
+
+    // ── createGame / findGameById / updateGame ────────────────────────────────
+
+    it('createGame saves a game and findGameById retrieves it', async () => {
+        const user = await User.create({ username: 'GameRepoUser', password_hash: 'x' })
+        const game = await repo.createGame({
+            player_id:    user._id,
+            board_size:   7,
+            game_type:    'BOT',
+            strategy:     'random',
+            current_turn: 'B',
+            status:       'IN_PROGRESS',
+        })
+        expect(game._id).toBeDefined()
+
+        const found = await repo.findGameById(game._id)
+        expect(found).not.toBeNull()
+        expect(String(found._id)).toBe(String(game._id))
+    })
+
+    it('updateGame updates and returns the new document', async () => {
+        const user = await User.create({ username: 'UpdateGameUser', password_hash: 'x' })
+        const game = await repo.createGame({
+            player_id:    user._id,
+            board_size:   7,
+            game_type:    'BOT',
+            strategy:     'random',
+            current_turn: 'B',
+            status:       'IN_PROGRESS',
+        })
+
+        const updated = await repo.updateGame(game._id, { $set: { status: 'FINISHED', result: 'WIN' } })
+        expect(updated.status).toBe('FINISHED')
+        expect(updated.result).toBe('WIN')
+    })
+
+    // ── updateStats: draws branch (covers vs_bot draws + findByIdAndUpdate) ──
+
+    it('updateStats increments draws for a BOT game (covers drawIncr and findByIdAndUpdate)', async () => {
+        const user = await User.create({ username: 'DrawStatsUser', password_hash: 'x' })
+        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'dijkstra' })
+
+        const updated = await repo.findById(user._id)
+        expect(updated.statistics.total_draws).toBe(1)
+        expect(updated.statistics.vs_bot.dijkstra.draws).toBe(1)
+        // wins and losses stay 0
+        expect(updated.statistics.total_wins).toBe(0)
+        expect(updated.statistics.total_losses).toBe(0)
+    })
+
+    // ── getLeaderboard ?? 0 fallback: user appears in ALL three bot queries ──
+
+    it('getLeaderboard returns wins: 0 for users with no vs_bot data in every bot category', async () => {
+        // Give this user high bot wins in each category so they appear in the
+        // sorted-by-wins queries, but then wipe vs_bot via a raw update so
+        // lean() returns undefined — forcing all three ?? 0 branches to execute.
+        const user = await User.create({
+            username: 'NoBotDataUser',
             password_hash: 'x',
             statistics: {
-                total_games: 5,
-                total_wins: 99,  // high enough to appear in top-10
+                total_games:  3,
+                total_wins:   50,
                 total_losses: 0,
-                total_draws: 0,
-                // vs_bot intentionally omitted → undefined in lean() result
+                total_draws:  0,
+                vs_bot: {
+                    random:   { wins: 50, losses: 0, draws: 0 },
+                    ai:       { wins: 50, losses: 0, draws: 0 },
+                    dijkstra: { wins: 50, losses: 0, draws: 0 },
+                }
             }
         })
 
-        const repo = new MongoUserRepository()
+        // Unset vs_bot so lean() returns it as undefined
+        await User.updateOne({ _id: user._id }, { $unset: { 'statistics.vs_bot': '' } })
+
         const leaderboard = await repo.getLeaderboard()
 
-        // Each entry in vs_bots must have wins as a number, never undefined
         for (const botKey of ['random', 'ai', 'dijkstra']) {
-            leaderboard.vs_bots[botKey].forEach(entry => {
-                expect(typeof entry.wins).toBe('number')
-                // Specifically the ?? 0 path: PartialStatsUser has no vs_bot data
-                if (entry.username === 'PartialStatsUser') {
-                    expect(entry.wins).toBe(0)
-                }
-            })
+            const entry = leaderboard.vs_bots[botKey].find(e => e.username === 'NoBotDataUser')
+            expect(entry).toBeDefined()           // user appears in results
+            expect(entry.wins).toBe(0)            // ?? 0 fallback was hit
+            expect(typeof entry.wins).toBe('number')
         }
     })
 })
