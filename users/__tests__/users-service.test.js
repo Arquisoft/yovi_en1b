@@ -930,6 +930,55 @@ describe('PUT /games/:id/finish', () => {
 
         expect(res.status).toBe(400)
     })
+
+    it('updates vs_player stats when finishing a PLAYER game with WIN', async () => {
+        const statsBefore = (await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)).body.statistics
+
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+        const playerGameId = createRes.body._id
+
+        await request(app)
+            .put(`/games/${playerGameId}/finish`)
+            .send({ result: 'WIN' })
+            .set('Authorization', `Bearer ${token}`)
+
+        const statsAfter = (await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)).body.statistics
+
+        // Covers the `if (type === 'PLAYER')` branch in updateStats
+        expect(statsAfter.vs_player.wins).toBe(statsBefore.vs_player.wins + 1)
+        expect(statsAfter.total_wins).toBe(statsBefore.total_wins + 1)
+        expect(statsAfter.total_games).toBe(statsBefore.total_games + 1)
+    })
+
+    it('updates vs_player stats when finishing a PLAYER game with LOSS', async () => {
+        const statsBefore = (await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)).body.statistics
+
+        const createRes = await request(app)
+            .post('/games')
+            .send({ board_size: 7, game_type: 'PLAYER', name_of_enemy: 'Tobias' })
+            .set('Authorization', `Bearer ${token}`)
+
+        await request(app)
+            .put(`/games/${createRes.body._id}/finish`)
+            .send({ result: 'LOSS' })
+            .set('Authorization', `Bearer ${token}`)
+
+        const statsAfter = (await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)).body.statistics
+
+        expect(statsAfter.vs_player.losses).toBe(statsBefore.vs_player.losses + 1)
+        expect(statsAfter.total_losses).toBe(statsBefore.total_losses + 1)
+    })
 })
 
 // ─── Replay ───────────────────────────────────────────────────────────────────
@@ -1014,5 +1063,42 @@ describe('GET /users/:id games array', () => {
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body.games)).toBe(true)
         expect(res.body.games.length).toBe(0)
+    })
+})
+
+// ─── MongoUserRepository unit: getLeaderboard ?? 0 fallback ──────────────────
+
+describe('MongoUserRepository.getLeaderboard - ?? 0 fallback for missing vs_bot stats', () => {
+    it('returns wins: 0 for a user returned by the bot query who has no vs_bot data', async () => {
+        const MongoUserRepository = (await import('../repository/MongoUserRepository.js')).default
+        const User = mongoose.model('User')
+
+        // Insert a user whose statistics.vs_bot sub-document is missing entirely,
+        // but give them a high total_wins so they appear in the sorted query results.
+        await User.create({
+            username: 'PartialStatsUser',
+            password_hash: 'x',
+            statistics: {
+                total_games: 5,
+                total_wins: 99,  // high enough to appear in top-10
+                total_losses: 0,
+                total_draws: 0,
+                // vs_bot intentionally omitted → undefined in lean() result
+            }
+        })
+
+        const repo = new MongoUserRepository()
+        const leaderboard = await repo.getLeaderboard()
+
+        // Each entry in vs_bots must have wins as a number, never undefined
+        for (const botKey of ['random', 'ai', 'dijkstra']) {
+            leaderboard.vs_bots[botKey].forEach(entry => {
+                expect(typeof entry.wins).toBe('number')
+                // Specifically the ?? 0 path: PartialStatsUser has no vs_bot data
+                if (entry.username === 'PartialStatsUser') {
+                    expect(entry.wins).toBe(0)
+                }
+            })
+        }
     })
 })
