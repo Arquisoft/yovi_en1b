@@ -59,9 +59,16 @@ components:
           type: integer
           example: 0
 
-    VsBotDifficultyStats:
+    BotStat:
       type: object
+      description: Stats for a single bot strategy, normalized with name and difficulty
       properties:
+        name:
+          type: string
+          example: "random"
+        difficulty:
+          type: string
+          example: "Easy 😄"
         wins:
           type: integer
           example: 3
@@ -71,17 +78,6 @@ components:
         draws:
           type: integer
           example: 0
-
-    VsBotStats:
-      type: object
-      description: Stats per strategy — random (easy), dijkstra (medium), ai (hard)
-      properties:
-        random:
-          $ref: '#/components/schemas/VsBotDifficultyStats'
-        dijkstra:
-          $ref: '#/components/schemas/VsBotDifficultyStats'
-        ai:
-          $ref: '#/components/schemas/VsBotDifficultyStats'
 
     Statistics:
       type: object
@@ -100,8 +96,14 @@ components:
           example: 1
         vs_player:
           $ref: '#/components/schemas/VsPlayerStats'
-        vs_bot:
-          $ref: '#/components/schemas/VsBotStats'
+        vs_bots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BotStat'
+          example:
+            - { name: "random",   difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
+            - { name: "ai",       difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
+            - { name: "dijkstra", difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
 
     StrategyOption:
       type: object
@@ -113,6 +115,13 @@ components:
           type: string
           example: "Easy 😄"
 
+    VariantOption:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Classic Y"
+
     GameOptions:
       type: object
       properties:
@@ -121,14 +130,65 @@ components:
           items:
             $ref: '#/components/schemas/StrategyOption'
           example:
-            - { name: "Random", difficulty: "Easy 😄" }
-            - { name: "AI", difficulty: "Medium 😐" }
-            - { name: "Dijkstra", difficulty: "Hard 😈" }
+            - { name: "Random",   difficulty: "Easy 😄"   }
+            - { name: "AI",       difficulty: "Medium 😐" }
+            - { name: "Dijkstra", difficulty: "Hard 😈"   }
         variants:
           type: array
           items:
-            type: string
-          example: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+            $ref: '#/components/schemas/VariantOption'
+          example:
+            - { name: 'Classic Y' }
+            - { name: 'Master Y (coming soon)' }
+            - { name: 'Pie Rule (coming soon)' }
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        username:
+          type: string
+          example: "nacho"
+        total_wins:
+          type: integer
+          example: 42
+        total_games:
+          type: integer
+          example: 50
+
+    BotLeaderboardEntry:
+      type: object
+      properties:
+        username:
+          type: string
+          example: "nacho"
+        wins:
+          type: integer
+          example: 15
+
+    Leaderboard:
+      type: object
+      properties:
+        overall:
+          type: array
+          description: Top 10 players by total wins
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        vs_bots:
+          type: object
+          description: Top 10 players per bot strategy
+          properties:
+            random:
+              type: array
+              items:
+                $ref: '#/components/schemas/BotLeaderboardEntry'
+            ai:
+              type: array
+              items:
+                $ref: '#/components/schemas/BotLeaderboardEntry'
+            dijkstra:
+              type: array
+              items:
+                $ref: '#/components/schemas/BotLeaderboardEntry'
 
     Game:
       type: object
@@ -153,9 +213,6 @@ components:
         strategy:
           type: string
           example: "random"
-        difficulty_level:
-          type: string
-          example: "medium"
         current_turn:
           type: string
           enum: [B, R]
@@ -313,25 +370,14 @@ paths:
   /leaderboard:
     get:
       summary: Get leaderboard
-      description: Returns the top 10 players ranked by total wins. Public endpoint, no authentication required.
+      description: Returns top 10 players overall and per bot strategy. Public endpoint, no authentication required.
       responses:
         '200':
-          description: List of top players
+          description: Leaderboard with overall ranking and per-bot rankings
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    _id:
-                      type: string
-                      example: "64b1f2e3c4d5e6f7a8b9c0d2"
-                    username:
-                      type: string
-                      example: "nacho"
-                    statistics:
-                      $ref: '#/components/schemas/Statistics'
+                $ref: '#/components/schemas/Leaderboard'
         '500':
           description: Internal server error
 
@@ -355,33 +401,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-        '401':
-          description: No token provided or invalid token
-        '404':
-          description: User not found
-        '500':
-          description: Internal server error
-
-  /users/{id}/stats:
-    get:
-      summary: Get user statistics
-      description: Returns detailed statistics including vs_player and vs_bot breakdowns. Requires authentication.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          example: "64b1f2e3c4d5e6f7a8b9c0d2"
-      responses:
-        '200':
-          description: User statistics
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Statistics'
         '401':
           description: No token provided or invalid token
         '404':
@@ -421,7 +440,7 @@ paths:
   /games/options:
     get:
       summary: Get available game options
-      description: Returns the available strategies, difficulty levels and game variants. Public endpoint, no authentication required.
+      description: Returns the available strategies and game variants. Public endpoint, no authentication required.
       responses:
         '200':
           description: Available game options
@@ -514,7 +533,7 @@ paths:
                   type: string
                   enum: [random, dijkstra, ai]
                   default: random
-                  description: "Difficulty is derived automatically: random=easy, dijkstra=medium, ai=hard"
+                  description: "Difficulty is derived automatically: random=Easy 😄, dijkstra=Hard 😈, ai=Medium 😐"
                   example: "random"
       responses:
         '201':
@@ -608,11 +627,10 @@ paths:
     get:
       summary: Request bot move
       description: >
-        Reads the yen_state from the last saved move in DB, and forwards it along with strategy,
-        difficulty_level and board_size to Gamey. Gamey returns the bot's chosen coordinates,
-        yen_state, and winner. The bot move is saved automatically. If Gamey returns a winner
-        the game is automatically finished and statistics updated.
-        Returns the full updated game state. Requires authentication.
+        Reads the yen_state from the last saved move in DB, and forwards it along with strategy
+        and board_size to Gamey. Gamey returns the bot's chosen coordinates, yen_state, and winner.
+        The bot move is saved automatically. If Gamey returns a winner the game is automatically
+        finished and statistics updated. Returns the full updated game state. Requires authentication.
       security:
         - bearerAuth: []
       parameters:

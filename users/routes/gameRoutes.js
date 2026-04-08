@@ -20,7 +20,7 @@ async function autoFinishIfWinner(game, winner, repository) {
         status: 'FINISHED',
         result,
         yen_final_state: game.moves.at(-1)?.yen_state ?? null,
-        duration_seconds: 0
+        duration_seconds: Math.floor((Date.now() - new Date(game.created_at).getTime()) / 1000)
     });
     await repository.updateStats(game.player_id, {
         result,
@@ -58,9 +58,9 @@ module.exports = function gameRoutes(repository) {
                 { name: 'Dijkstra', difficulty: 'Hard 😈' }
             ],
             variants: [
-                'Classic Y',
-                'Master Y (coming soon)',
-                'Pie Rule (coming soon)'
+                { name: 'Classic Y'              },
+                { name: 'Master Y (coming soon)' },
+                { name: 'Pie Rule (coming soon)' }
             ]
         });
     });
@@ -202,7 +202,7 @@ module.exports = function gameRoutes(repository) {
 
     // Finish a game manually (DRAW when user quits)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
-        const { result, yen_final_state, duration_seconds } = req.body || {};
+        const { result, yen_final_state } = req.body || {};
 
         if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or DRAW)' });
 
@@ -211,11 +211,12 @@ module.exports = function gameRoutes(repository) {
             if (!game) return res.status(404).json({ error: 'Game not found' });
             if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
+            const duration_seconds = Math.floor((Date.now() - new Date(game.created_at).getTime()) / 1000);
             const updatedGame = await repository.updateGame(req.params.id, {
                 status: 'FINISHED',
                 result,
                 yen_final_state,
-                duration_seconds: duration_seconds || 0
+                duration_seconds
             });
 
             if (result !== 'DRAW') {
