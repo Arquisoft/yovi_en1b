@@ -187,24 +187,62 @@ describe('GET /leaderboard', () => {
             }
         }
     })
+
+    it('does not crash when a user has no bot games (vs_bot undefined fix)', async () => {
+        // Register a fresh user who has never played a bot game
+        await request(app)
+            .post('/createuser')
+            .send({ username: 'BotlessUser', password: 'password123' })
+
+        // Leaderboard must still return 200 without throwing
+        // "Cannot read properties of undefined (reading 'vs_bot')"
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body.overall)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.dijkstra)).toBe(true)
+
+        // wins field must always be a number, never undefined
+        for (const botKey of ['random', 'ai', 'dijkstra']) {
+            res.body.vs_bots[botKey].forEach(entry => {
+                expect(typeof entry.wins).toBe('number')
+            })
+        }
+    })
 })
 
 // ─── User profile ─────────────────────────────────────────────────────────────
 
 describe('GET /users/:id', () => {
-    it('returns user stats with expected fields', async () => {
+    it('returns full user object with _id, username, created_at, statistics and games', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
+
+        // Top-level user fields
+        expect(res.body).toHaveProperty('_id')
+        expect(res.body).toHaveProperty('username')
+        expect(res.body).toHaveProperty('created_at')
         expect(res.body).not.toHaveProperty('password_hash')
-        expect(res.body).not.toHaveProperty('username')
-        expect(typeof res.body.total_games).toBe('number')
-        expect(typeof res.body.total_wins).toBe('number')
-        expect(typeof res.body.total_losses).toBe('number')
-        expect(typeof res.body.total_draws).toBe('number')
-        expect(Array.isArray(res.body.vs_bots)).toBe(true)
+
+        // Games array included
+        expect(Array.isArray(res.body.games)).toBe(true)
+
+        // Stats are nested under statistics, NOT at root level
+        expect(res.body).not.toHaveProperty('total_games')
+        expect(res.body).not.toHaveProperty('total_wins')
+        expect(res.body).toHaveProperty('statistics')
+
+        const { statistics } = res.body
+        expect(typeof statistics.total_games).toBe('number')
+        expect(typeof statistics.total_wins).toBe('number')
+        expect(typeof statistics.total_losses).toBe('number')
+        expect(typeof statistics.total_draws).toBe('number')
+        expect(Array.isArray(statistics.vs_bots)).toBe(true)
     })
 
     it('returns 401 without token', async () => {
@@ -784,13 +822,15 @@ describe('PUT /games/:id/finish', () => {
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body.total_games).toBeGreaterThanOrEqual(1)
-        expect(res.body.total_wins).toBeGreaterThanOrEqual(1)
-        expect(typeof res.body.total_losses).toBe('number')
 
-        // vs_bots is now a normalized array
-        expect(Array.isArray(res.body.vs_bots)).toBe(true)
-        const random = res.body.vs_bots.find(b => b.name === 'random')
+        const { statistics } = res.body
+        expect(statistics.total_games).toBeGreaterThanOrEqual(1)
+        expect(statistics.total_wins).toBeGreaterThanOrEqual(1)
+        expect(typeof statistics.total_losses).toBe('number')
+
+        // vs_bots is now a normalized array under statistics
+        expect(Array.isArray(statistics.vs_bots)).toBe(true)
+        const random = statistics.vs_bots.find(b => b.name === 'random')
         expect(random).toBeDefined()
         expect(random.difficulty).toBe('Easy 😄')
         expect(random.wins).toBeGreaterThanOrEqual(1)
@@ -807,7 +847,7 @@ describe('PUT /games/:id/finish', () => {
         const BOT_DIFFICULTY = { random: 'Easy 😄', ai: 'Medium 😐', dijkstra: 'Hard 😈' }
 
         for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
-            const entry = res.body.vs_bots.find(b => b.name === name)
+            const entry = res.body.statistics.vs_bots.find(b => b.name === name)
             expect(entry).toBeDefined()
             expect(entry.difficulty).toBe(difficulty)
             expect(typeof entry.wins).toBe('number')
@@ -819,7 +859,7 @@ describe('PUT /games/:id/finish', () => {
     it('does NOT update stats when result is DRAW (user quit)', async () => {
         const statsBefore = (await request(app)
             .get(`/users/${userId}`)
-            .set('Authorization', `Bearer ${token}`)).body
+            .set('Authorization', `Bearer ${token}`)).body.statistics
 
         const createRes = await request(app)
             .post('/games')
@@ -832,7 +872,7 @@ describe('PUT /games/:id/finish', () => {
 
         const statsAfter = (await request(app)
             .get(`/users/${userId}`)
-            .set('Authorization', `Bearer ${token}`)).body
+            .set('Authorization', `Bearer ${token}`)).body.statistics
 
         expect(statsAfter.total_wins).toBe(statsBefore.total_wins)
         expect(statsAfter.total_losses).toBe(statsBefore.total_losses)
@@ -895,5 +935,49 @@ describe('GET /users/:id/history (after games)', () => {
         res.body.forEach(game => {
             expect(game).not.toHaveProperty('moves')
         })
+    })
+})
+
+// ─── GET /users/:id includes games ───────────────────────────────────────────
+
+describe('GET /users/:id games array', () => {
+    it('includes a games array in the user profile after games are played', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body.games)).toBe(true)
+        expect(res.body.games.length).toBeGreaterThan(0)
+    })
+
+    it('games in the profile do not expose move arrays (select -moves)', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        res.body.games.forEach(game => {
+            expect(game).not.toHaveProperty('moves')
+        })
+    })
+
+    it('games array is empty for a brand new user', async () => {
+        // Register and log in a fresh user
+        await request(app)
+            .post('/createuser')
+            .send({ username: 'FreshUser', password: 'password123' })
+        const loginRes = await request(app)
+            .post('/login')
+            .send({ username: 'FreshUser', password: 'password123' })
+        const freshToken = loginRes.body.token
+        const freshId    = loginRes.body.userId
+
+        const res = await request(app)
+            .get(`/users/${freshId}`)
+            .set('Authorization', `Bearer ${freshToken}`)
+
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body.games)).toBe(true)
+        expect(res.body.games.length).toBe(0)
     })
 })
