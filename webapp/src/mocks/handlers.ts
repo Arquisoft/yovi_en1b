@@ -205,8 +205,9 @@ function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
   const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
 
+  // Initialize all strategies
   for (const option of DEFAULT_STRATEGY_OPTIONS) {
-    botBuckets.set(`${option.name}:${option.difficulty}`, {
+    botBuckets.set(option.name, {
       name: option.name,
       difficulty: option.difficulty,
       wins: 0,
@@ -221,7 +222,7 @@ function getUserStatistics(userId: string): UserStatistics {
     total_losses: 0,
     total_draws: 0,
     vs_player: emptyWinLoss(),
-    vs_bot: []
+    vs_bots: []
   };
 
   for (const game of userGames) {
@@ -236,22 +237,15 @@ function getUserStatistics(userId: string): UserStatistics {
       continue;
     }
 
-    const bucketKey = `${game.strategy}:${game.difficulty_level}`;
-    const existing = botBuckets.get(bucketKey) ?? {
-      name: game.strategy,
-      difficulty: game.difficulty_level,
-      wins: 0,
-      losses: 0,
-      draws: 0
-    };
-
-    if (game.result === 'WIN') existing.wins += 1;
-    if (game.result === 'LOSS') existing.losses += 1;
-    if (game.result === 'DRAW') existing.draws += 1;
-    botBuckets.set(bucketKey, existing);
+    const existing = botBuckets.get(game.strategy);
+    if (existing) {
+      if (game.result === 'WIN') existing.wins += 1;
+      if (game.result === 'LOSS') existing.losses += 1;
+      if (game.result === 'DRAW') existing.draws += 1;
+    }
   }
 
-  stats.vs_bot = [...botBuckets.values()];
+  stats.vs_bots = Array.from(botBuckets.values());
   return stats;
 }
 
@@ -299,7 +293,7 @@ export const handlers = [
     return HttpResponse.json({ message: `User ${username} created`, userId } as RegisterResponse, { status: 201 });
   }),
 
-  http.get('*/user/:id', ({ params, request }) => {
+  http.get('*/users/:id', ({ params, request }) => {
     const tokenUserId = extractUserId(request);
     if (!tokenUserId) {
       return HttpResponse.json({ error: 'No token provided' }, { status: 401 });

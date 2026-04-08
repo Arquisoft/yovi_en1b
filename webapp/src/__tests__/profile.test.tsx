@@ -33,9 +33,9 @@ function renderProfilePage() {
 }
 
 describe('ProfilePage', () => {
-  test('renders user statistics from /user/{id}', async () => {
+  test('renders user statistics from /users/{id}', async () => {
     server.use(
-      http.get('*/user/:id', ({ params }) =>
+      http.get('*/users/:id', ({ params }) =>
         HttpResponse.json({
           _id: params.id,
           username: PROFILE_TEST_DATA.username,
@@ -46,10 +46,11 @@ describe('ProfilePage', () => {
             total_losses: 3,
             total_draws: 2,
             vs_player: { wins: 2, losses: 1, draws: 1 },
-            vs_bot: [
+            vs_bots: [
               { name: 'random', difficulty: 'easy', wins: 1, losses: 0, draws: 0 },
               { name: 'ai', difficulty: 'medium', wins: 1, losses: 1, draws: 1 },
-              { name: 'dijkstra', difficulty: 'hard', wins: 1, losses: 1, draws: 0 }
+              { name: 'dijkstra', difficulty: 'hard', wins: 1, losses: 1, draws: 0 },
+              { name: 'minimax', difficulty: 'hard', wins: 0, losses: 1, draws: 0 }
             ]
           }
         })
@@ -70,14 +71,14 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('img', { name: /vs player win rate/i })).toBeInTheDocument();
     expect(screen.getByText('4 games')).toBeInTheDocument();
     expect(screen.getByText('Random')).toBeInTheDocument();
-    expect(screen.getByText('Difficulty: Easy')).toBeInTheDocument();
+    expect(screen.getByText('Minimax')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /overall result split/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /ai win rate/i })).toBeInTheDocument();
   });
 
   test('shows backend error message', async () => {
     server.use(
-      http.get('*/user/:id', () =>
+      http.get('*/users/:id', () =>
         HttpResponse.json({ error: 'User not found' }, { status: 404 })
       )
     );
@@ -89,7 +90,7 @@ describe('ProfilePage', () => {
 
   test('keeps the normal layout when no games were played', async () => {
     server.use(
-      http.get('*/user/:id', ({ params }) =>
+      http.get('*/users/:id', ({ params }) =>
         HttpResponse.json({
           _id: params.id,
           username: PROFILE_TEST_DATA.username,
@@ -100,7 +101,11 @@ describe('ProfilePage', () => {
             total_losses: 0,
             total_draws: 0,
             vs_player: { wins: 0, losses: 0, draws: 0 },
-            vs_bot: []
+            vs_bots: [
+              { name: 'random', difficulty: 'easy', wins: 0, losses: 0, draws: 0 },
+              { name: 'ai', difficulty: 'medium', wins: 0, losses: 0, draws: 0 },
+              { name: 'dijkstra', difficulty: 'hard', wins: 0, losses: 0, draws: 0 }
+            ]
           }
         })
       )

@@ -28,6 +28,7 @@ function getWinRateTone(winRate: number): 'profile-kpi--rate-low' | 'profile-kpi
   return 'profile-kpi--rate-low';
 }
 
+
 export function ProfilePage() {
   const { userId } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -113,7 +114,7 @@ export function ProfilePage() {
       lossRate: number;
       drawRate: number;
       tone: 'profile-kpi--rate-low' | 'profile-kpi--rate-mid' | 'profile-kpi--rate-high';
-    }> = stats.vs_bot.map((item) => {
+    }> = stats.vs_bots.map((item) => {
       const wins = item.wins;
       const losses = item.losses;
       const draws = item.draws;
@@ -124,7 +125,7 @@ export function ProfilePage() {
 
       return {
         label: formatGameLabel(item.name),
-        difficulty: formatGameLabel(item.difficulty),
+        difficulty: item.difficulty,
         wins,
         losses,
         draws,
@@ -224,12 +225,12 @@ export function ProfilePage() {
                 <p className="profile-category-label">Vs bot</p>
                 <div className="profile-category-grid">
                   {derived.botCategories.map((category) => (
-                    <article className="profile-category-card" key={`${category.label}-${category.difficulty}`}>
+                    <article className="profile-category-card" key={category.label}>
                       <div className="profile-category-head">
                         <h4>{category.label}</h4>
+                        <span className="profile-difficulty-tag">{category.difficulty}</span>
                         <span>{category.games} games</span>
                       </div>
-                      <p className="profile-category-subtitle">Difficulty: {category.difficulty}</p>
                       <div className="profile-meter" role="img" aria-label={`${category.label} win rate ${category.winRate} percent`}>
                         <div className={`profile-meter__wins ${category.tone}`} style={{ width: `${category.winRate}%` }} />
                         <div className="profile-meter__draws" style={{ width: `${category.drawRate}%` }} />
