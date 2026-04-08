@@ -211,6 +211,16 @@ describe('GET /leaderboard', () => {
             })
         }
     })
+
+    it('returns 500 when the repository throws', async () => {
+        const User = (await import('../models/user.js')).default
+        vi.spyOn(User, 'find').mockRejectedValueOnce(new Error('DB failure'))
+
+        const res = await request(app).get('/leaderboard')
+
+        expect(res.status).toBe(500)
+        expect(res.body).toHaveProperty('error')
+    })
 })
 
 // ─── User profile ─────────────────────────────────────────────────────────────
@@ -263,6 +273,31 @@ describe('GET /users/:id', () => {
             .get(`/users/${fakeId}`)
             .set('Authorization', `Bearer ${token}`)
         expect(res.status).toBe(404)
+    })
+
+    it('includes vs_player stats with wins, losses and draws', async () => {
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        const { vs_player } = res.body.statistics
+        expect(vs_player).toBeDefined()
+        expect(typeof vs_player.wins).toBe('number')
+        expect(typeof vs_player.losses).toBe('number')
+        expect(typeof vs_player.draws).toBe('number')
+    })
+
+    it('returns 500 when repository throws', async () => {
+        const User = (await import('../models/user.js')).default
+        vi.spyOn(User, 'findById').mockRejectedValueOnce(new Error('DB failure'))
+
+        const res = await request(app)
+            .get(`/users/${userId}`)
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(500)
+        expect(res.body).toHaveProperty('error')
     })
 })
 
