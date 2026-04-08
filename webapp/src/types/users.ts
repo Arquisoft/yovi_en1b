@@ -27,3 +27,20 @@ export type UserProfile = {
   created_at: string;
   statistics: UserStatistics;
 };
+
+export type LeaderboardEntry = {
+  username: string;
+  total_wins: number;
+  total_games: number;
+};
+
+export type BotLeaderboardEntry = {
+  username: string;
+  wins: number;
+};
+
+export type Leaderboard = {
+  overall: LeaderboardEntry[];
+  vs_bots: Record<string, BotLeaderboardEntry[]>;
+};
+

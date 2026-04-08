@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
 import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
-import type { UserProfile, UserStatistics, WinLossStats } from '../types/users';
+import type { UserProfile, UserStatistics, WinLossStats, Leaderboard, BotLeaderboardEntry } from '../types/users';
 import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
 
 const mockUsers = new Map<string, { password: string; userId: string }>([
@@ -249,10 +249,64 @@ function getUserStatistics(userId: string): UserStatistics {
   return stats;
 }
 
+function buildLeaderboard(): Leaderboard {
+  const userStats = new Map<
+    string,
+    { total_wins: number; total_games: number; botWins: Map<string, number> }
+  >();
+
+  // Aggregate stats for all users
+  for (const [, user] of mockUsers) {
+    const stats = getUserStatistics(user.userId);
+    userStats.set(user.userId, {
+      total_wins: stats.total_wins,
+      total_games: stats.total_games,
+      botWins: new Map(stats.vs_bots.map((bot) => [bot.name, bot.wins]))
+    });
+  }
+
+  // Build overall leaderboard (top 10 by total wins)
+  const overall = Array.from(mockUsers.entries())
+    .map(([username, user]) => {
+      const stats = userStats.get(user.userId);
+      return {
+        username,
+        total_wins: stats?.total_wins ?? 0,
+        total_games: stats?.total_games ?? 0
+      };
+    })
+    .sort((a, b) => b.total_wins - a.total_wins)
+    .slice(0, 10);
+
+  // Build per-bot leaderboards (top 10 per strategy)
+  const vs_bots: Record<string, BotLeaderboardEntry[]> = {};
+
+  for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.name)) {
+    vs_bots[strategy] = Array.from(mockUsers.entries())
+      .map(([username, user]) => {
+        const stats = userStats.get(user.userId);
+        return {
+          username,
+          wins: stats?.botWins.get(strategy) ?? 0
+        };
+      })
+      .filter((entry) => entry.wins > 0)
+      .sort((a, b) => b.wins - a.wins)
+      .slice(0, 10);
+  }
+
+  return { overall, vs_bots };
+}
+
 export const handlers = [
   http.get('*/exists/:username', ({ params }) => {
     const exists = mockUsers.has(params.username as string);
     return HttpResponse.json({ exists } as ExistsResponse);
+  }),
+
+  http.get('*/leaderboard', () => {
+    const leaderboard = buildLeaderboard();
+    return HttpResponse.json(leaderboard);
   }),
 
   http.post('*/login', async ({ request }) => {
