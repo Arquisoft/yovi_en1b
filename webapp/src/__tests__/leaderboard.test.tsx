@@ -317,7 +317,6 @@ describe('LeaderboardPage', () => {
       );
 
       await waitFor(() => {
-        const players = screen.getAllByText(/player/i);
         // First player should have highest wins
         expect(screen.getByText('champion_player')).toBeInTheDocument();
       });
@@ -371,7 +370,6 @@ describe('LeaderboardPage', () => {
     });
 
     test('active tab has visual indication', async () => {
-      const user = userEvent.setup();
       render(
         <MemoryRouter>
           <LeaderboardPage />
