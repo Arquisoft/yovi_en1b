@@ -25,7 +25,6 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 0;
   border-bottom: 2px solid #334155;
   background: linear-gradient(90deg, rgba(15, 23, 42, 0.5) 0%, rgba(30, 41, 59, 0.3) 100%);
   border-radius: 12px 12px 0 0;
