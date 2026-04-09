@@ -66,6 +66,12 @@ class MongoUserRepository extends UserRepository {
     return await User.findByIdAndUpdate(userId, update, { new: true });
   }
 
+  /**
+   * Note for future Nacho: .lean() se utiliza para optimizar las consultas
+   * a MongoDB al decirle a Mongoose que devuelva objetos JavaScript planos (POJOs)
+   *
+   * @returns {Promise<{overall: *, vs_bots: {random: *, ai: *, dijkstra: *}}>}
+   */
   async getLeaderboard() {
     const [overall, random, ai, dijkstra] = await Promise.all([
       User.find()
@@ -100,9 +106,9 @@ class MongoUserRepository extends UserRepository {
         total_games: u.statistics.total_games
       })),
       vs_bots: {
-        random:   random.map(u =>   ({ username: u.username, wins: u.statistics.vs_bot.random.wins   })),
-        ai:       ai.map(u =>       ({ username: u.username, wins: u.statistics.vs_bot.ai.wins       })),
-        dijkstra: dijkstra.map(u => ({ username: u.username, wins: u.statistics.vs_bot.dijkstra.wins }))
+        random:   random.map(u =>   ({ username: u.username, wins: u.statistics?.vs_bot?.random?.wins   ?? 0 })),
+        ai:       ai.map(u =>       ({ username: u.username, wins: u.statistics?.vs_bot?.ai?.wins       ?? 0 })),
+        dijkstra: dijkstra.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.dijkstra?.wins ?? 0 }))
       }
     };
   }
