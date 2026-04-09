@@ -193,11 +193,11 @@ pub async fn play(
         return Err(Json(ErrorResponse::error("Game is already finished", None, None)));
     }
 
-    let difficulty = req.difficulty_level.as_deref().unwrap_or("easy");
+    let strategy = req.strategy.as_deref().unwrap_or("random");
 
-    let bot: Box<dyn YBot> = match difficulty {
+    let bot: Box<dyn YBot> = match strategy {
         "hard" => Box::new(HardBot::default()),
-        "medium" => Box::new(DefensiveBot),
+        "defensive" => Box::new(DefensiveBot),
         _ => Box::new(RandomBot),
     };
 
@@ -612,7 +612,7 @@ mod tests {
         let req = axum::Json(PlayRequest {
             yen_state: Some("R/..".to_string()), // Size 2, R at top corner (0,0,1)
             strategy: Some("defensive".to_string()),
-            difficulty_level: Some("medium".to_string()),
+            difficulty_level: None,
             board_size: 2,
         });
         let res = play(req).await;
@@ -628,11 +628,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_play_success_with_hard_difficulty() {
+    async fn test_play_success_with_hard_strategy() {
         let req = axum::Json(PlayRequest {
             yen_state: Some("./..".to_string()),
-            strategy: None,
-            difficulty_level: Some("hard".to_string()),
+            strategy: Some("hard".to_string()),
+            difficulty_level: None,
             board_size: 2,
         });
         let res = play(req).await;
