@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { finishGame, getGame, playBotTurn, submitMove, undoMove } from '../api/gamesApi';
 import type { Coordinates, GameRecord, Move } from '../types/games';
 import { Panel } from '../components/ui/Panel';
+import { formatGameLabel } from '../utils/gameLabels';
 import './GamePage.css';
 
 const HEX_SIZE = 60;
@@ -61,7 +62,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
   }
 
   if (botThinking) {
-    return 'AI is thinking...';
+    return 'Bot is thinking...';
   }
 
   const playerName = game.current_turn === 'B' ? 'Blue' : 'Red';
@@ -70,7 +71,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
 
 function getEnemyTitle(game: GameRecord): string {
   if (game.game_type === 'BOT') {
-    return 'AI';
+    return 'Bot';
   }
 
   return game.name_of_enemy ?? 'Player 2 (Red)';
@@ -440,7 +441,12 @@ export function GamePage() {
           <article className={redPanelClass}>
             <h3>{enemyTitle}</h3>
             <p>Moves: {redMoves}</p>
-            {game.game_type === 'BOT' && <p>{game.difficulty_level} / {game.strategy}</p>}
+            {game.game_type === 'BOT' && (
+              <div className="bot-meta-tags" aria-label="Bot settings">
+                <span className="difficulty-tag">Difficulty: {formatGameLabel(game.difficulty_level)}</span>
+                <span className="difficulty-tag">Strategy: {formatGameLabel(game.strategy)}</span>
+              </div>
+            )}
           </article>
         </header>
 
