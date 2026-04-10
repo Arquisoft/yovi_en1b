@@ -13,25 +13,34 @@ module.exports = function userRoutes(repository) {
     //Get user profile statistics
     router.get('/:id', authMiddleware, async function getUserStats(req, res) {
         try {
-            const user = await repository.findById(req.params.id);
+            const [user, games] = await Promise.all([
+                repository.findById(req.params.id),
+                repository.findGamesByPlayer(req.params.id)
+            ]);
             if (!user) return res.status(404).json({ error: 'User not found' });
 
-            const { statistics } = user;
+            const { _id, username, created_at, statistics } = user;
             const vs_bot = statistics.vs_bot.toObject();
 
             res.json({
-                total_games:  statistics.total_games,
-                total_wins:   statistics.total_wins,
-                total_losses: statistics.total_losses,
-                total_draws:  statistics.total_draws,
-                vs_player:    statistics.vs_player,
-                vs_bots: Object.entries(vs_bot).map(([name, stats]) => ({
-                    name,
-                    difficulty: BOT_DIFFICULTY[name] ?? 'Unknown',
-                    wins:       stats.wins,
-                    losses:     stats.losses,
-                    draws:      stats.draws
-                }))
+                _id,
+                username,
+                created_at,
+                statistics: {
+                    total_games:  statistics.total_games,
+                    total_wins:   statistics.total_wins,
+                    total_losses: statistics.total_losses,
+                    total_draws:  statistics.total_draws,
+                    vs_player:    statistics.vs_player,
+                    vs_bots: Object.entries(vs_bot).map(([name, stats]) => ({
+                        name,
+                        difficulty: BOT_DIFFICULTY[name] ?? 'Unknown',
+                        wins:       stats.wins,
+                        losses:     stats.losses,
+                        draws:      stats.draws
+                    }))
+                },
+                games
             });
         } catch (err) {
             res.status(500).json({ error: err.message });
