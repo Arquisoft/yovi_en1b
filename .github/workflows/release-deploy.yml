@@ -48,9 +48,13 @@ jobs:
           cargo test
 
   e2e:
-    name: Run E2E tests
+    name: Run E2E tests (${{ matrix.browser }})
     runs-on: ubuntu-latest
     needs: [test-node, test-rust]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
     # Lanzamos MongoDB para que los tests de registro/login funcionen
     services:
       mongodb:
@@ -83,6 +87,8 @@ jobs:
         env:
           # Le decimos al backend de los tests que use el MongoDB que acabamos de levantar
           MONGODB_URI: mongodb://localhost:27017/test_db
+          GAMEY_URL: http://localhost:4000
+          BROWSER: ${{ matrix.browser }}
         run: |
           cd webapp
           npm run test:e2e

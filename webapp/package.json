@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "VITE_USE_MSW=true vite",
+    "dev:mock": "cross-env VITE_USE_MSW=true vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -15,9 +15,9 @@
     "test:watch": "vitest --watch",
     "test:e2e:run": "cucumber-js --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
     "test:e2e:dry-run": "cucumber-js --dry-run --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
-    "test:e2e": "concurrently -k -s first \"npm run start:all\" \"wait-on http://localhost:5173 && npm run test:e2e:run\"",
+    "test:e2e": "cross-env APP_URL=http://localhost npm run test:e2e:run",
     "test:e2e:install-browsers": "npx playwright install",
-    "start:all": "concurrently \"npm run dev\" \"npm --prefix ../users start\" \"cargo run --manifest-path ../gamey/Cargo.toml\"",
+    "start:all": "concurrently \"npm run dev\" \"cross-env GAMEY_URL=http://localhost:4000 npm --prefix ../users start\" \"cargo run --manifest-path ../gamey/Cargo.toml -- --mode server --port 4000\"",
     "msw:init": "msw init public --save"
   },
   "dependencies": {
@@ -38,6 +38,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.16",
     "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

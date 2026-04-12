@@ -1,14 +1,13 @@
 import { Given, When, Then } from '@cucumber/cucumber'
 import assert from 'assert'
 
-const APP_URL = 'http://localhost:5173'
+const APP_URL = process.env.APP_URL || 'http://localhost'
 
 function getUsernameInput(page) {
   return page.getByLabel('Username', { exact: true })
 }
 
 function getPasswordInput(page) {
-  // Exact label avoids matching "Confirm Password" in strict mode.
   return page.getByLabel('Password', { exact: true })
 }
 
@@ -31,9 +30,7 @@ Given('the app is open on the entry page', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
   await page.goto(APP_URL)
-  await assert.doesNotReject(async () => {
-    await page.getByRole('heading', { name: 'Welcome to YOVI' }).waitFor({ timeout: 10_000 })
-  })
+  await page.getByRole('heading', { name: 'Welcome to YOVI' }).waitFor({ timeout: 10_000 })
 })
 
 Given('I am not signed in', async function () {
@@ -158,15 +155,6 @@ Then('I should see auth error {string}', async function (message) {
   await error.waitFor({ timeout: 10_000 })
   const text = (await error.textContent()) ?? ''
   const normalized = text.replace(/^\s*⚠️\s*/u, '').trim()
-
-  // Current username-Enter path may submit form and return backend validation.
-  if (message === 'Username is required') {
-    assert.ok(
-      normalized.includes('Username is required') || normalized.includes('Username and password required'),
-      `Expected username validation error, got '${normalized}'`
-    )
-    return
-  }
 
   assert.ok(
     normalized.includes(message),
