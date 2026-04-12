@@ -482,7 +482,8 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_scenario_1_user_registration_and_login">6.1. Scenario 1: User Registration and Login</a></li>
 <li><a href="#_scenario_2_player_vs_player_game">6.2. Scenario 2: Player vs Player Game</a></li>
 <li><a href="#_scenario_3_player_vs_bot_game">6.3. Scenario 3: Player vs Bot Game</a></li>
-<li><a href="#_scenario_4_game_replay">6.4. Scenario 4: Game Replay</a></li>
+<li><a href="#_scenario_4_win_detection">6.4. Scenario 4: Win Detection</a></li>
+<li><a href="#_scenario_5_game_replay">6.5. Scenario 5: Game Replay</a></li>
 </ul>
 </li>
 <li><a href="#section-deployment-view">7. Deployment View</a>
@@ -1305,7 +1306,7 @@ Refer to details in the following sections.</p>
 <h3 id="_scenario_2_player_vs_player_game">6.2. Scenario 2: Player vs Player Game</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/pvp-sequence.png" alt="pvp sequence" width="889" height="975">
+<img src="./images/pvp-sequence.png" alt="pvp sequence" width="1008" height="1103">
 </div>
 </div>
 <div class="paragraph">
@@ -1320,10 +1321,13 @@ Refer to details in the following sections.</p>
 <p>Player field in each move is inferred from <code>current_turn</code> — frontend does not send it</p>
 </li>
 <li>
-<p><code>yen_state</code> per move is computed by Gamey&#8217;s <code>/compute</code> endpoint, not by the frontend or backend</p>
+<p><code>yen_state</code> per move is computed by Gamey&#8217;s <code>/compute</code> endpoint — neither the frontend nor the backend computes it</p>
 </li>
 <li>
-<p>DRAW result (user quit) does not update statistics</p>
+<p>Gamey returns a <code>winner</code> field (<code>B</code>, <code>R</code>, or <code>null</code>) after every move — the backend auto-finishes the game if a winner is detected</p>
+</li>
+<li>
+<p>WIN/LOSS statistics are updated automatically by the backend — frontend only calls <code>/finish</code> for DRAW (user quit)</p>
 </li>
 </ul>
 </div>
@@ -1333,7 +1337,7 @@ Refer to details in the following sections.</p>
 <h3 id="_scenario_3_player_vs_bot_game">6.3. Scenario 3: Player vs Bot Game</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/pve-sequence.png" alt="pve sequence" width="937" height="1083">
+<img src="./images/pve-sequence.png" alt="pve sequence" width="927" height="1471">
 </div>
 </div>
 <div class="paragraph">
@@ -1345,23 +1349,60 @@ Refer to details in the following sections.</p>
 <p>The backend acts as a proxy between the frontend and Gamey — the frontend never calls Gamey directly</p>
 </li>
 <li>
-<p><code>POST /compute</code> — Gamey receives <code>{ yen_state_prev, coordinates }</code> and returns the new <code>{ yen_state }</code> after applying the move</p>
+<p><code>POST /compute</code> — Gamey receives <code>{ yen_state_prev, coordinates }</code> and returns <code>{ yen_state, winner }</code> after applying the move</p>
 </li>
 <li>
-<p><code>POST /play</code> — Gamey receives <code>{ yen_state, strategy, difficulty_level, board_size }</code> and returns the bot&#8217;s <code>{ coordinates, yen_state }</code></p>
+<p><code>POST /play</code> — Gamey receives <code>{ yen_state, strategy, difficulty_level, board_size }</code> and returns <code>{ coordinates, yen_state, winner }</code></p>
 </li>
 <li>
-<p>Bot move is saved automatically in the DB by the Users Service — frontend does not need to call <code>POST /games/:id/move</code> for the bot</p>
+<p>Both <code>/compute</code> and <code>/play</code> return a <code>winner</code> field (<code>B</code>, <code>R</code>, or <code>null</code>) — the backend checks it after every move and auto-finishes the game if needed</p>
 </li>
 <li>
-<p>If it is the first move, <code>yen_state_prev</code> / <code>yen_state</code> is sent as <code>null</code> and Gamey generates the initial board state from <code>board_size</code></p>
+<p>Bot move is saved automatically by the Users Service — frontend only calls <code>GET /games/:id/play</code> and receives the full updated game state</p>
+</li>
+<li>
+<p>Difficulty level is derived automatically from strategy: <code>random</code> → easy, <code>dijkstra</code> → medium, <code>ai</code> → hard</p>
+</li>
+<li>
+<p>If it is the first move, <code>yen_state</code> is sent as <code>null</code> and Gamey generates the initial board state from <code>board_size</code></p>
 </li>
 </ul>
 </div>
 <hr>
 </div>
 <div class="sect2">
-<h3 id="_scenario_4_game_replay">6.4. Scenario 4: Game Replay</h3>
+<h3 id="_scenario_4_win_detection">6.4. Scenario 4: Win Detection</h3>
+<div class="imageblock">
+<div class="content">
+<img src="./images/win-detection-sequence.png" alt="win detection sequence" width="542" height="571">
+</div>
+</div>
+<div class="paragraph">
+<p><strong>Notable aspects:</strong></p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Win detection is fully handled by Gamey — the Users Service only reacts to the <code>winner</code> field</p>
+</li>
+<li>
+<p>The win condition is a connected path of a player&#8217;s cells touching all three sides of the triangular board</p>
+</li>
+<li>
+<p>The Users Service calls <code>autoFinishIfWinner</code> after every move (both player and bot) — if <code>winner</code> is not null, it updates the game and statistics atomically</p>
+</li>
+<li>
+<p><code>winner: "B"</code> means the human player won → result is <code>WIN</code>; <code>winner: "R"</code> means the bot won → result is <code>LOSS</code></p>
+</li>
+<li>
+<p>Duration is calculated automatically from <code>game.created_at</code> when auto-finishing — no need for the frontend to send it</p>
+</li>
+</ul>
+</div>
+<hr>
+</div>
+<div class="sect2">
+<h3 id="_scenario_5_game_replay">6.5. Scenario 5: Game Replay</h3>
 <div class="imageblock">
 <div class="content">
 <img src="./images/replay-sequence.png" alt="replay sequence" width="844" height="547">
