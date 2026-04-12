@@ -1,7 +1,7 @@
 import { Given, When, Then } from '@cucumber/cucumber'
 import assert from 'assert'
 
-const APP_URL = process.env.APP_URL || 'http://localhost'
+const APP_URL = process.env.APP_URL || 'http://localhost:5173'
 
 function getUsernameInput(page) {
   return page.getByLabel('Username', { exact: true })
