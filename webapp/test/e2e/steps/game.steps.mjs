@@ -67,7 +67,9 @@ When('I play the first available hex', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  const firstHex = page.getByRole('button', { name: /^Hex \(/ }).first()
+  await page.locator('.hex-wrap:not([disabled])').first().waitFor({ timeout: 30_000 })
+
+  const firstHex = page.getByRole('button', { name: /^Hex \(/ }).and(page.locator(':not([disabled])')).first()
   await firstHex.waitFor({ timeout: 10_000 })
 
   const before = (await firstHex.getAttribute('aria-label')) ?? ''
