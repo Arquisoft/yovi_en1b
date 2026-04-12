@@ -15,7 +15,7 @@
     "test:watch": "vitest --watch",
     "test:e2e:run": "cucumber-js --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
     "test:e2e:dry-run": "cucumber-js --dry-run --import test/e2e/support/setup.mjs --import test/e2e/steps/**/*.mjs test/e2e/features --format progress",
-    "test:e2e": "concurrently -k -s first \"npm run start:e2e\" \"wait-on http://localhost:5173 && npm run test:e2e:run\"",
+    "test:e2e": "concurrently -k -s first \"npm run start:e2e\" \"wait-on http://localhost:5173 tcp:localhost:4000 tcp:localhost:3000 && npm run test:e2e:run\"",
     "test:e2e:install-browsers": "npx playwright install",
     "start:all": "concurrently \"npm run dev\" \"cross-env GAMEY_URL=http://localhost:4000 npm --prefix ../users start\" \"cargo run --manifest-path ../gamey/Cargo.toml -- --mode server --port 4000\"",
     "start:e2e": "concurrently \"npm run dev\" \"cross-env GAMEY_URL=http://localhost:4000 npm --prefix ../users start\" \"cargo run --manifest-path ../gamey/Cargo.toml -- --mode server --port 4000\"",
