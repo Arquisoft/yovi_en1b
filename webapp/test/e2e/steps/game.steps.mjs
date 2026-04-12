@@ -11,7 +11,8 @@ When('I open the new game page', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  await page.goto(`${APP_URL}/games/new`)
+  // Navigate via UI for better stability
+  await page.getByRole('link', { name: 'Create New Game' }).click()
   await page.getByRole('heading', { name: 'New Game' }).waitFor({ timeout: 10_000 })
 })
 
