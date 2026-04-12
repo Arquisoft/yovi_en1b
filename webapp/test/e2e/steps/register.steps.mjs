@@ -132,7 +132,7 @@ Then('I should be on the home page', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  await page.getByRole('heading', { name: 'Welcome to YOVI' }).waitFor({ timeout: 10_000 })
+  await page.getByRole('link', { name: 'Create New Game' }).waitFor({ timeout: 10_000 })
   assert.strictEqual(page.url().endsWith('/'), true, `Expected to be on '/', got '${page.url()}'`)
 })
 
@@ -140,7 +140,7 @@ Then('I should be on the entry page', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  await page.getByRole('heading', { name: 'Welcome to YOVI' }).waitFor({ timeout: 10_000 })
+  await getUsernameInput(page).waitFor({ timeout: 10_000 })
   assert.strictEqual(page.url().includes('/profile'), false, `Expected redirect away from '/profile', got '${page.url()}'`)
 })
 
@@ -172,4 +172,37 @@ Then('I should see auth error {string}', async function (message) {
     normalized.includes(message),
     `Expected error to include '${message}', got '${normalized}'`
   )
+})
+
+Then('I should see a heading with text {string}', async function (text) {
+  const page = this.page
+  if (!page) throw new Error('Page not initialized')
+  await page.getByRole('heading', { name: text }).waitFor({ timeout: 10_000 })
+})
+
+Then('I should see my current username in the profile card', async function () {
+  const page = this.page
+  if (!page) throw new Error('Page not initialized')
+  if (!this.currentUsername) throw new Error('No current username set')
+  await page.getByRole('heading', { name: this.currentUsername }).waitFor({ timeout: 10_000 })
+})
+
+Then('I should see a subtitle {string}', async function (text) {
+  const page = this.page
+  if (!page) throw new Error('Page not initialized')
+  await page.getByText(text, { exact: false }).waitFor({ timeout: 10_000 })
+})
+
+Then('I should see a table with {string}, {string}, and {string}', async function (col1, col2, col3) {
+  const page = this.page
+  if (!page) throw new Error('Page not initialized')
+  await page.getByRole('columnheader', { name: col1 }).waitFor({ timeout: 10_000 })
+  await page.getByRole('columnheader', { name: col2 }).waitFor({ timeout: 10_000 })
+  await page.getByRole('columnheader', { name: col3 }).waitFor({ timeout: 10_000 })
+})
+
+When('I click the {string} button in the top bar', async function (name) {
+  const page = this.page
+  if (!page) throw new Error('Page not initialized')
+  await page.locator('.topbar-actions').getByRole('button', { name }).click()
 })
