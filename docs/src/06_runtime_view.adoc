@@ -96,6 +96,7 @@ FE --> Player: Show result screen
 * Starting turn (B or R) is randomly assigned using `crypto.randomInt` — cryptographically secure
 * Player field in each move is inferred from `current_turn` — frontend does not send it
 * `yen_state` per move is computed by Gamey's `/compute` endpoint, not by the frontend or backend
+* Gamey returns a `winner` field after every `/compute` call — see Scenario 4 for win detection details
 * DRAW result (user quit) does not update statistics
 
 ---
@@ -123,7 +124,7 @@ loop Until game ends
     FE -> USERS: POST /games/:id/move { coordinates }
     USERS -> DB: Get last yen_state
     USERS -> GAMEY: POST /compute\n{ yen_state_prev, coordinates }
-    GAMEY --> USERS: { yen_state }
+    GAMEY --> USERS: { yen_state, winner }
     USERS -> DB: Save player move
     USERS --> FE: 201 { updated game }
     FE --> Player: Render board
@@ -131,9 +132,9 @@ loop Until game ends
     FE -> USERS: GET /games/:id/play
     USERS -> DB: Get last yen_state
     USERS -> GAMEY: POST /play\n{ yen_state, strategy, difficulty_level, board_size }
-    GAMEY --> USERS: { coordinates, yen_state }
+    GAMEY --> USERS: { coordinates, yen_state, winner }
     USERS -> DB: Save bot move automatically
-    USERS --> FE: 201 { coordinates, yen_state }
+    USERS --> FE: 201 { updated game }
     FE --> Player: Render bot move
 end
 
@@ -148,14 +149,51 @@ FE --> Player: Show result screen
 *Notable aspects:*
 
 * The backend acts as a proxy between the frontend and Gamey — the frontend never calls Gamey directly
-* `POST /compute` — Gamey receives `{ yen_state_prev, coordinates }` and returns the new `{ yen_state }` after applying the move
-* `POST /play` — Gamey receives `{ yen_state, strategy, difficulty_level, board_size }` and returns the bot's `{ coordinates, yen_state }`
+* `POST /compute` — Gamey receives `{ yen_state_prev, coordinates }` and returns `{ yen_state, winner }`
+* `POST /play` — Gamey receives `{ yen_state, strategy, difficulty_level, board_size }` and returns `{ coordinates, yen_state, winner }`
+* Both endpoints return a `winner` field — see Scenario 4 for win detection details
 * Bot move is saved automatically in the DB by the Users Service — frontend does not need to call `POST /games/:id/move` for the bot
 * If it is the first move, `yen_state_prev` / `yen_state` is sent as `null` and Gamey generates the initial board state from `board_size`
 
 ---
 
-=== Scenario 4: Game Replay
+=== Scenario 4: Win Detection
+
+[plantuml,"win-detection-sequence",png]
+----
+@startuml
+participant "Users Service" as USERS
+participant "Gamey Logic" as GAMEY
+participant "MongoDB" as DB
+
+note over GAMEY: Win condition: a player's cells\nform a connected path touching\nall three sides of the triangle
+
+USERS -> GAMEY: POST /compute or POST /play
+GAMEY -> GAMEY: Apply move to board
+GAMEY -> GAMEY: Check if any player's cells\nconnect all three triangle sides
+
+alt Winner found
+    GAMEY --> USERS: { yen_state, winner: "B" or "R" }
+    USERS -> DB: Set status=FINISHED, result=WIN or LOSS
+    USERS -> DB: Update user statistics
+    DB --> USERS: Updated
+else No winner yet
+    GAMEY --> USERS: { yen_state, winner: null }
+    USERS --> USERS: Game continues
+end
+@enduml
+----
+
+*Notable aspects:*
+
+* Win detection is fully handled by Gamey — the Users Service only reacts to the `winner` field
+* The backend calls `autoFinishIfWinner` after every move (both player and bot) — if `winner` is not null, the game is finished and statistics updated automatically
+* `winner: "B"` → human player wins → result is `WIN`; `winner: "R"` → bot wins → result is `LOSS`
+* Duration is calculated automatically from `game.created_at` when auto-finishing
+
+---
+
+=== Scenario 5: Game Replay
 
 [plantuml,"replay-sequence",png]
 ----
