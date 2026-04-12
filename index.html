@@ -452,14 +452,25 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_stakeholders">1.3. Stakeholders</a></li>
 </ul>
 </li>
-<li><a href="#section-architecture-constraints">2. Architecture Constraints</a></li>
+<li><a href="#section-architecture-constraints">2. Architecture Constraints</a>
+<ul class="sectlevel2">
+<li><a href="#_technical_constraints">2.1. Technical Constraints</a></li>
+<li><a href="#_organizational_constraints">2.2. Organizational Constraints</a></li>
+<li><a href="#_conventions">2.3. Conventions</a></li>
+</ul>
+</li>
 <li><a href="#section-system-scope-and-context">3. Context and Scope</a>
 <ul class="sectlevel2">
 <li><a href="#_business_context">3.1. Business Context</a></li>
 <li><a href="#_technical_context">3.2. Technical Context</a></li>
 </ul>
 </li>
-<li><a href="#section-solution-strategy">4. Solution Strategy</a></li>
+<li><a href="#section-solution-strategy">4. Solution Strategy</a>
+<ul class="sectlevel2">
+<li><a href="#_technology_decisions">4.1. Technology decisions</a></li>
+<li><a href="#_quality_goals_2">4.2. Quality goals</a></li>
+</ul>
+</li>
 <li><a href="#section-building-block-view">5. Building Block View</a>
 <ul class="sectlevel2">
 <li><a href="#_whitebox_overall_system_level_1">5.1. Whitebox Overall System (Level 1)</a></li>
@@ -468,10 +479,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#section-runtime-view">6. Runtime View</a>
 <ul class="sectlevel2">
-<li><a href="#_player_makes_a_move">6.1. Player Makes a Move</a></li>
-<li><a href="#_game_initialization_matchmaking">6.2. Game Initialization (Matchmaking)</a></li>
-<li><a href="#_win_condition_detection">6.3. Win Condition Detection</a></li>
-<li><a href="#_player_reconnection_after_disconnect">6.4. Player Reconnection After Disconnect</a></li>
+<li><a href="#_scenario_1_user_registration_and_login">6.1. Scenario 1: User Registration and Login</a></li>
+<li><a href="#_scenario_2_player_vs_player_game">6.2. Scenario 2: Player vs Player Game</a></li>
+<li><a href="#_scenario_3_player_vs_bot_game">6.3. Scenario 3: Player vs Bot Game</a></li>
+<li><a href="#_scenario_4_game_replay">6.4. Scenario 4: Game Replay</a></li>
 </ul>
 </li>
 <li><a href="#section-deployment-view">7. Deployment View</a>
@@ -680,19 +691,49 @@ These include</p>
 <tr>
 <th class="tableblock halign-left valign-top">Role or Name</th>
 <th class="tableblock halign-left valign-top">Contact</th>
-<th class="tableblock halign-left valign-top">Expectations</th>
+<th class="tableblock halign-left valign-top">Job Definition</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Jose Emilio Labra Gayo</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 1</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Pablo Gonzalez</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 2</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Diego Martín Fernández</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 3</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Celia Melendi Lavandera</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 4</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">bilalyazicioglu</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GameY(Rust) Developer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UO300896</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Database Engineer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Th0be</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend Developer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nacho50900</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Backend Developer</p></td>
 </tr>
 </tbody>
 </table>
@@ -717,17 +758,146 @@ Constraints must always be dealt with; they may be negotiable, though.</p>
 <div class="paragraph">
 <div class="title">Form</div>
 <p>Simple tables of constraints with explanations.
-If needed you can subdivide them into
-technical constraints, organizational and political constraints and
-conventions (e.g. programming or versioning guidelines, documentation or naming conventions)</p>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-2/">Architecture Constraints</a> in the arc42 documentation.</p>
+If needed you can subdivide them into technical constraints, organizational and political constraints and conventions.</p>
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_technical_constraints">2.1. Technical Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint ID</th>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-01</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Mandatory Tech Stack</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Web application must use <strong>TypeScript</strong>; core game logic (move validation/generation) must be in <strong>Rust</strong>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Requirement defined by the ASW course to practice polyglot development and language interoperability.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-02</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Communication Protocol</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Subsystems must communicate via <strong>JSON messages</strong>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standardizes data exchange between the TypeScript frontend and the Rust backend service.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-03</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Game Representation (YEN)</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All game states and moves must be represented using the <strong>YEN notation</strong>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ensures consistency in how the Game Y board is serialized and stored across the system.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-04</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Architecture Decomposition</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">System must be split into at least two subsystems: <strong>Web Application</strong> and <strong>Rust-based web service</strong>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Encourages modularity and demonstrates the ability to integrate different architectural components.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-05</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>External API</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system must expose a documented API for third-party bots.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Facilitates extensibility and allows the game to be played by automated agents.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TC-06</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Public Deployment</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The application must be accessible via a public URL.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Demonstrates the ability to manage cloud deployment and production environments.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_organizational_constraints">2.2. Organizational Constraints</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint ID</th>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OC-01</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Version Control</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All source code and documentation must be hosted in the assigned <strong>GitHub repository</strong> (Arquisoft/yovi_en1b).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Enables collaborative development and allows instructors to track progress and contributions.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OC-02</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Automated CI/CD</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deployment and testing must be automated using CI/CD pipelines (e.g., GitHub Actions).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ensures software quality and rapid feedback loops throughout the development lifecycle.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OC-03</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Documentation Standards</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use of the <strong>arc42 template</strong> and <strong>ADRs</strong> (Architectural Decision Records) is mandatory.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provides a standardized structure for architectural documentation and history of key decisions.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_conventions">2.3. Conventions</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constraint ID</th>
+<th class="tableblock halign-left valign-top">Constraint</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">C-01</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Testing Requirements</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mandatory inclusion of Unit, Integration, E2E, and Load tests.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical for verifying system reliability and performance under stress.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">C-02</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>AI Strategy Options</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The AI must offer at least two different strategies or difficulty levels.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Enhances user experience and demonstrates implementation of different algorithmic approaches.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">C-03</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Language</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All documentation and code comments should be in <strong>English</strong>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard practice in software engineering.</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -812,6 +982,49 @@ conventions (e.g. programming or versioning guidelines, documentation or naming 
 <div class="sect1">
 <h2 id="section-solution-strategy">4. Solution Strategy</h2>
 <div class="sectionbody">
+<div class="paragraph">
+<p>The GameY project follows a layered structured divided into UI, game logic and backend user handling</p>
+</div>
+<div class="sect2">
+<h3 id="_technology_decisions">4.1. Technology decisions</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>The UI will be develop using React, due to one of the members already knowing it; Vite and TypeScript due to constraints</p>
+</li>
+<li>
+<p>The logic will consist of a Rust application due to constraints</p>
+</li>
+<li>
+<p>The users will be handle by a MongoDB database because we believe it is a very powerful database and would be great to know for our careers.</p>
+</li>
+<li>
+<p>Github will be used as the cloud platform to work due to constraints</p>
+</li>
+<li>
+<p>Docker will be used to deploy the application due to constraints</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quality_goals_2">4.2. Quality goals</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project</p>
+</li>
+<li>
+<p>Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it</p>
+</li>
+<li>
+<p>Security will be handled through strict user validation during the login</p>
+</li>
+<li>
+<p>Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing</p>
+</li>
+</ul>
+</div>
 <div class="sidebarblock arc42help">
 <div class="content">
 <div class="paragraph">
@@ -854,6 +1067,7 @@ Refer to details in the following sections.</p>
 </div>
 </div>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -1042,76 +1256,31 @@ Refer to details in the following sections.</p>
 <div class="sect1">
 <h2 id="section-runtime-view">6. Runtime View</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>The runtime view describes concrete behavior and interactions of the system’s building blocks in form of scenarios from the following areas:</p>
+<p>Here are the main runtime scenarios that demonstrate how YOVI&#8217;s components interact during gameplay.</p>
+</div>
+<div class="paragraph">
+<p>The system consists of three components:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>important use cases or features: how do building blocks execute them?</p>
+<p><strong>Frontend (FE)</strong> — React + Vite, runs on port 80</p>
 </li>
 <li>
-<p>interactions at critical external interfaces: how do building blocks cooperate with users and neighboring systems?</p>
+<p><strong>Users Service (USERS)</strong> — Node.js + Express + MongoDB, runs on port 3000</p>
 </li>
 <li>
-<p>operation and administration: launch, start-up, stop</p>
-</li>
-<li>
-<p>error and exception scenarios</p>
+<p><strong>Gamey Logic (GAMEY)</strong> — Rust game engine, runs on port 4000</p>
 </li>
 </ul>
 </div>
-<div class="paragraph">
-<p>Remark: The main criterion for the choice of possible scenarios (sequences, workflows) is their <strong>architectural relevance</strong>. It is <strong>not</strong> important to describe a large number of scenarios. You should rather document a representative selection.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>You should understand how (instances of) building blocks of your system perform their job and communicate at runtime.
-You will mainly capture scenarios in your documentation to communicate your architecture to stakeholders that are less willing or able to read and understand the static models (building block view, deployment view).</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>There are many notations for describing scenarios, e.g.</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>numbered list of steps (in natural language)</p>
-</li>
-<li>
-<p>activity diagrams or flow charts</p>
-</li>
-<li>
-<p>sequence diagrams</p>
-</li>
-<li>
-<p>BPMN or EPCs (event process chains)</p>
-</li>
-<li>
-<p>state machines</p>
-</li>
-<li>
-<p>&#8230;&#8203;</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-6/">Runtime View</a> in the arc42 documentation.</p>
-</div>
-</div>
-</div>
-<div class="paragraph">
-<p>Here are the main runtime scenarios that demonstrate how Game Y&#8217;s components interact during gameplay.</p>
-</div>
+<hr>
 <div class="sect2">
-<h3 id="_player_makes_a_move">6.1. Player Makes a Move</h3>
+<h3 id="_scenario_1_user_registration_and_login">6.1. Scenario 1: User Registration and Login</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/player-move-sequence.png" alt="player move sequence" width="1052" height="999">
+<img src="./images/auth-sequence.png" alt="auth sequence" width="634" height="738">
 </div>
 </div>
 <div class="paragraph">
@@ -1120,34 +1289,23 @@ You will mainly capture scenarios in your documentation to communicate your arch
 <div class="ulist">
 <ul>
 <li>
-<p>The frontend performs client-side validation to provide immediate feedback</p>
+<p>Passwords are never stored in plain text — bcrypt with salt rounds 10</p>
 </li>
 <li>
-<p>WebSocket ensures real-time communication between both players</p>
+<p>JWT token expires after 24 hours and must be sent as <code>Authorization: Bearer &lt;token&gt;</code> on all protected requests</p>
 </li>
 <li>
-<p>Game Logic validates all moves server-side to prevent cheating</p>
-</li>
-<li>
-<p>The triangular board consists of hexagonal cells arranged in a triangular shape</p>
-</li>
-<li>
-<p>Win condition checks if a player&#8217;s colored cells touch all three sides of the triangle</p>
-</li>
-<li>
-<p>Game state is persisted to MongoDB for game history and reconnection support</p>
-</li>
-<li>
-<p>Both players receive simultaneous updates through WebSocket broadcasting</p>
+<p>Username uniqueness is enforced at DB level (unique index)</p>
 </li>
 </ul>
 </div>
+<hr>
 </div>
 <div class="sect2">
-<h3 id="_game_initialization_matchmaking">6.2. Game Initialization (Matchmaking)</h3>
+<h3 id="_scenario_2_player_vs_player_game">6.2. Scenario 2: Player vs Player Game</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/game-init-sequence.png" alt="game init sequence" width="968" height="950">
+<img src="./images/pvp-sequence.png" alt="pvp sequence" width="889" height="975">
 </div>
 </div>
 <div class="paragraph">
@@ -1156,34 +1314,26 @@ You will mainly capture scenarios in your documentation to communicate your arch
 <div class="ulist">
 <ul>
 <li>
-<p>Matchmaking service maintains a queue of waiting players</p>
+<p>Starting turn (B or R) is randomly assigned using <code>crypto.randomInt</code> — cryptographically secure</p>
 </li>
 <li>
-<p>Players are matched on a first-come, first-served basis</p>
+<p>Player field in each move is inferred from <code>current_turn</code> — frontend does not send it</p>
 </li>
 <li>
-<p>Each player is randomly assigned a color to ensure fairness</p>
+<p><code>yen_state</code> per move is computed by Gamey&#8217;s <code>/compute</code> endpoint, not by the frontend or backend</p>
 </li>
 <li>
-<p>The triangular board is composed of hexagonal cells arranged in a triangular pattern</p>
-</li>
-<li>
-<p>Both players connect to the same WebSocket room for real-time updates</p>
-</li>
-<li>
-<p>Initial game state is persisted before players enter the game</p>
-</li>
-<li>
-<p>Players receive notification about whose turn it is (textual or visual)</p>
+<p>DRAW result (user quit) does not update statistics</p>
 </li>
 </ul>
 </div>
+<hr>
 </div>
 <div class="sect2">
-<h3 id="_win_condition_detection">6.3. Win Condition Detection</h3>
+<h3 id="_scenario_3_player_vs_bot_game">6.3. Scenario 3: Player vs Bot Game</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/win-detection-sequence.png" alt="win detection sequence" width="916" height="650">
+<img src="./images/pve-sequence.png" alt="pve sequence" width="937" height="1083">
 </div>
 </div>
 <div class="paragraph">
@@ -1192,28 +1342,29 @@ You will mainly capture scenarios in your documentation to communicate your arch
 <div class="ulist">
 <ul>
 <li>
-<p>Win condition checked after every move</p>
+<p>The backend acts as a proxy between the frontend and Gamey — the frontend never calls Gamey directly</p>
 </li>
 <li>
-<p>Player wins when a connected chain of their colored cells touches all three sides of the triangular board</p>
+<p><code>POST /compute</code> — Gamey receives <code>{ yen_state_prev, coordinates }</code> and returns the new <code>{ yen_state }</code> after applying the move</p>
 </li>
 <li>
-<p>Uses graph traversal (DFS/BFS) to detect connected components in the hexagonal grid</p>
+<p><code>POST /play</code> — Gamey receives <code>{ yen_state, strategy, difficulty_level, board_size }</code> and returns the bot&#8217;s <code>{ coordinates, yen_state }</code></p>
 </li>
 <li>
-<p>Hexagonal cells have up to 6 adjacent neighbors for connectivity checking</p>
+<p>Bot move is saved automatically in the DB by the Users Service — frontend does not need to call <code>POST /games/:id/move</code> for the bot</p>
 </li>
 <li>
-<p>Efficient algorithm analyzes only the moving player&#8217;s cells</p>
+<p>If it is the first move, <code>yen_state_prev</code> / <code>yen_state</code> is sent as <code>null</code> and Gamey generates the initial board state from <code>board_size</code></p>
 </li>
 </ul>
 </div>
+<hr>
 </div>
 <div class="sect2">
-<h3 id="_player_reconnection_after_disconnect">6.4. Player Reconnection After Disconnect</h3>
+<h3 id="_scenario_4_game_replay">6.4. Scenario 4: Game Replay</h3>
 <div class="imageblock">
 <div class="content">
-<img src="./images/player-reconnection-sequence.png" alt="player reconnection sequence" width="989" height="882">
+<img src="./images/replay-sequence.png" alt="replay sequence" width="844" height="547">
 </div>
 </div>
 <div class="paragraph">
@@ -1222,25 +1373,10 @@ You will mainly capture scenarios in your documentation to communicate your arch
 <div class="ulist">
 <ul>
 <li>
-<p>Game state persists in the database even if players disconnect</p>
+<p>Each move stores its resulting <code>yen_state</code>, so the frontend can reconstruct the board at any point in time</p>
 </li>
 <li>
-<p>Players can rejoin games in progress</p>
-</li>
-<li>
-<p>The system distinguishes between temporary disconnections and game abandonment</p>
-</li>
-<li>
-<p>After a timeout period (e.g., 1 minutes), the game may be forfeited</p>
-</li>
-<li>
-<p>WebSocket connection is re-established seamlessly</p>
-</li>
-<li>
-<p>The complete hexagonal board state is preserved and restored</p>
-</li>
-<li>
-<p>Opponent receives real-time notifications about connection status</p>
+<p>History endpoint excludes the moves array for a lighter response — full moves are fetched separately via <code>GET /games/:id/moves</code></p>
 </li>
 </ul>
 </div>
@@ -1322,33 +1458,40 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="./images/deployment-overview.png" alt="deployment overview" width="206" height="679">
+<img src="./images/deployment-overview.png" alt="deployment overview" width="424" height="962">
 </div>
 </div>
 <div class="dlist">
 <dl>
 <dt class="hdlist1">Motivation</dt>
 <dd>
-<p>Game Y uses Docker containers to separate frontend (React/Vite), backend (Rust game logic with WebSocket), and database (MongoDB). This ensures isolation, portability, and independent scaling of components. The containerized approach provides consistency across development and production environments.</p>
+<p>Game Y uses Docker Compose to orchestrate four independent containers: the <code>webapp</code> (React frontend), the <code>users</code> service (Node.js/Express user management API), the <code>gamey</code> service (Rust game engine), and a <code>mongodb</code> container for persistent storage. This separation ensures that each service can be developed, built, and scaled independently. MongoDB is the chosen database because its document-oriented model fits naturally with the variable structure of game states and move histories, and it integrates well with the Node.js ecosystem.</p>
 </dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>Only the <code>users</code> service connects to MongoDB. This is a deliberate architectural decision: <code>gamey</code> manages active game state in memory during a match (which is sufficient for its role as a pure game engine), and once a game ends the result is sent to the <code>users</code> service, which is responsible for all persistence — player accounts, statistics, and game history. This avoids two services competing to write to the same database and keeps data ownership clear.</p>
+</div>
+<div class="dlist">
+<dl>
 <dt class="hdlist1">Quality and/or Performance Features</dt>
 <dd>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Real-time gameplay:</strong> WebSocket enables low-latency bidirectional communication between players</p>
+<p><strong>Isolation:</strong> Each service runs in its own Docker container, preventing dependency conflicts and simplifying upgrades.</p>
 </li>
 <li>
-<p><strong>Isolation:</strong> Docker containers prevent component conflicts and ensure clean separation of concerns</p>
+<p><strong>Portability:</strong> <code>docker-compose up --build</code> reproduces the full environment on any machine with Docker installed.</p>
 </li>
 <li>
-<p><strong>Scalability:</strong> Each component can scale independently based on load requirements</p>
+<p><strong>Independent scaling:</strong> The <code>gamey</code> and <code>users</code> services can be scaled individually based on load without affecting the frontend.</p>
 </li>
 <li>
-<p><strong>Portability:</strong> The application runs consistently across different platforms and environments</p>
+<p><strong>Clear interface boundaries:</strong> Services communicate only via HTTP REST, making the contracts explicit and testable.</p>
 </li>
 <li>
-<p><strong>Development efficiency:</strong> Docker Compose orchestrates local development setup</p>
+<p><strong>Development efficiency:</strong> Docker Compose orchestrates the full local setup with a single command; no manual service wiring is required.</p>
 </li>
 </ul>
 </div>
@@ -1358,35 +1501,67 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
-<col style="width: 33.3333%;">
-<col style="width: 33.3333%;">
-<col style="width: 33.3334%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
+<col style="width: 20%;">
 </colgroup>
 <thead>
 <tr>
 <th class="tableblock halign-left valign-top">Building Block</th>
 <th class="tableblock halign-left valign-top">Container</th>
 <th class="tableblock halign-left valign-top">Technology</th>
+<th class="tableblock halign-left valign-top">Exposed Port</th>
+<th class="tableblock halign-left valign-top">Connects to</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">User Interface</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Webapp Container</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">React + TypeScript + Vite</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">80</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Users (3000), Gamey (4000)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Game Logic &amp; WebSocket</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Backend Container</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rust</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User Management &amp; Persistence</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Users Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Node.js + Express</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3000</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB (27017)</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Data Storage</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Database Container</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Game Logic &amp; Bot</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Gamey Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rust (Cargo)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4000</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">—</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Persistent Storage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB Container</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB 7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">27017 (internal)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">—</p></td>
 </tr>
 </tbody>
 </table>
+<div class="sect3">
+<h4 id="_container_descriptions">7.1.1. Container Descriptions</h4>
+<div class="paragraph">
+<p><strong>Webapp Container</strong> — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It talks to the <code>users</code> service for everything related to the player (registration, login, stats, history) and to the <code>gamey</code> service for all game actions (creating a game, submitting a move, querying board state).</p>
+</div>
+<div class="paragraph">
+<p><strong>Users Container</strong> — Manages player accounts, authentication, statistics, and game history. It is the only service that connects to MongoDB, acting as the single gateway for all persistent data. When a game finishes, the result is reported here so it can be stored and reflected in player stats.</p>
+</div>
+<div class="paragraph">
+<p><strong>Gamey Container</strong> — A pure game engine written in Rust. It handles game creation, move validation, win condition checking, and bot moves entirely in memory. It has no database connection; active game state lives in memory for the duration of a match. Once the game ends, the result is communicated back to the frontend, which then reports it to the <code>users</code> service.</p>
+</div>
+<div class="paragraph">
+<p><strong>MongoDB Container</strong> — Provides persistent NoSQL storage exclusively for the <code>users</code> service. It runs as a Docker container within the same Compose network, so it is not directly accessible from outside.</p>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_infrastructure_level_2">7.2. Infrastructure Level 2</h3>
@@ -1401,60 +1576,88 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 </div>
 </div>
 <div class="sect3">
-<h4 id="_backend_container">7.2.1. Backend Container</h4>
+<h4 id="_gamey_container">7.2.1. Gamey Container</h4>
 <div class="imageblock">
 <div class="content">
-<img src="./images/backend-detail.png" alt="backend detail" width="965" height="134">
+<img src="./images/gamey-detail.png" alt="gamey detail" width="336" height="400">
 </div>
 </div>
 <div class="paragraph">
-<p>The backend container runs the Rust application handling game logic, real-time WebSocket communication, and database operations. Key components include:</p>
+<p>The Gamey container runs the Rust application that implements the full game logic for Game Y. Its internal components are:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Game Engine:</strong> Validates moves and enforces game rules</p>
+<p><strong>Web Interface:</strong> Exposes HTTP endpoints on port 4000 that the React frontend calls to create games, submit moves, and query game state.</p>
 </li>
 <li>
-<p><strong>WebSocket Server:</strong> Maintains persistent connections with both players for real-time updates</p>
+<p><strong>Game Engine (core):</strong> Contains the core data model — coordinates, board state, player management, and action dispatch. This is the authoritative source for game rules. Win condition checking is performed internally within the engine after every move, using a graph traversal (DFS/BFS) over the hexagonal grid to detect whether a player&#8217;s connected chain touches all three sides of the triangular board (see section 6 for the runtime scenario).</p>
 </li>
 <li>
-<p><strong>Win Condition Checker:</strong> Detects when a connected chain of hexagonal cells touches all three sides</p>
+<p><strong>Bot Registry:</strong> Maintains a set of registered bot strategies. When a player chooses to play against the computer, the bot registry selects the appropriate bot and returns its move to the game engine.</p>
 </li>
 <li>
-<p><strong>Board Manager:</strong> Maintains the state of the hexagonal grid</p>
-</li>
-<li>
-<p><strong>MongoDB Driver:</strong> Handles all database operations with connection pooling</p>
+<p><strong>Notation Parser:</strong> Supports YEN (Yovi Extended Notation) and YGN (Yovi Game Notation) for encoding and decoding move sequences. This enables game export, replay, and interoperability.</p>
 </li>
 </ul>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_mongodb_container">7.2.2. MongoDB Container</h4>
+<h4 id="_users_container">7.2.2. Users Container</h4>
 <div class="imageblock">
 <div class="content">
-<img src="./images/mongodb-detail.png" alt="mongodb detail" width="538" height="155">
+<img src="./images/users-detail.png" alt="users detail" width="347" height="334">
 </div>
 </div>
 <div class="paragraph">
-<p>The MongoDB container stores all persistent data:</p>
+<p>The Users container is a lightweight Node.js/Express service. It exposes a REST endpoint (<code>POST /createuser</code>) that the React frontend calls during user registration. In the current implementation, user records are kept in-memory within the process; no external database is required. This service is designed to be replaced or extended with a persistent store in later development phases.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_webapp_container">7.2.3. Webapp Container</h4>
+<div class="paragraph">
+<p>The Webapp container serves the React single-page application compiled by Vite. It is served via a static file server on port 80. All game interactions are handled client-side in the browser, with REST calls made to the <code>users</code> service (port 3000) and the <code>gamey</code> service (port 4000). There is no server-side rendering; the container&#8217;s only role is to deliver the compiled JavaScript and assets to the browser.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_mongodb_container">7.2.4. MongoDB Container</h4>
+<div class="imageblock">
+<div class="content">
+<img src="./images/mongodb-detail.png" alt="mongodb detail" width="548" height="155">
+</div>
+</div>
+<div class="paragraph">
+<p>The MongoDB container is exclusively used by the <code>users</code> service. It holds two collections:</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>users collection:</strong> User accounts, authentication credentials, and player statistics</p>
+<p><strong>players:</strong> User accounts, hashed credentials, and per-player statistics (wins, losses, games played).</p>
 </li>
 <li>
-<p><strong>games collection:</strong> Active game sessions with current board state and turn information. The hexagonal board configuration is stored as an array of cell objects, indexed by gameId for quick retrieval</p>
-</li>
-<li>
-<p><strong>game_history collection:</strong> Archive of completed games including complete move logs for replay and analytics</p>
+<p><strong>game_history:</strong> Archived completed games including the full sequence of moves, the result, and the participants. This allows the frontend to display match history and enables future replay functionality.</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>The database uses indexes on frequently queried fields (email for users, gameId for games) to optimize performance.</p>
+<p><code>gamey</code> does not connect to MongoDB. Active game state is kept in memory within the Rust process for the duration of a match, which is sufficient for its role as a game engine. When a game concludes, the frontend reports the result to the <code>users</code> service, which writes it to <code>game_history</code>.</p>
+</div>
+<div class="paragraph">
+<p>The MongoDB port (27017) is only exposed internally within the Docker Compose network and is not reachable from outside the host machine.</p>
+</div>
+<div class="paragraph">
+<p>The docker-compose entry for this container is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-yaml" data-lang="yaml">mongodb:
+  image: mongo:7
+  volumes:
+    - mongo_data:/data/db</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The named volume <code>mongo_data</code> ensures that data persists across container restarts. Note that the port is intentionally not published to the host — only the <code>users</code> container needs to reach it, and it can do so through the internal Docker network.</p>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
@@ -1834,7 +2037,7 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-02-15 17:04:46 +0100
+Last updated 2026-04-05 16:22:47 +0200
 </div>
 </div>
 </body>
