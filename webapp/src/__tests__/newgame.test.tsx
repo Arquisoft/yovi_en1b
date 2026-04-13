@@ -39,10 +39,10 @@ function renderNewGamePage() {
 // ─── rendering ────────────────────────────────────────────────────────────────
 
 describe('NewGamePage — rendering', () => {
-  test('shows page heading and Start Game button', async () => {
+  test('shows page heading and Start Game button', () => {
     renderNewGamePage();
     expect(screen.getByRole('heading', { name: /new game/i })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /start game/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument();
   });
 
   test('shows Opponent, Board Size and Rules sections', () => {
@@ -52,16 +52,15 @@ describe('NewGamePage — rendering', () => {
     expect(screen.getByText('Rules')).toBeInTheDocument();
   });
 
-  test('Bot Strategy section is visible in default BOT mode', async () => {
+  test('AI Difficulty section is visible in default BOT mode', () => {
     renderNewGamePage();
-    expect(screen.getByText('Bot Strategy')).toBeInTheDocument();
-    expect(await screen.findByText('Medium')).toBeInTheDocument();
+    expect(screen.getByText('AI Difficulty')).toBeInTheDocument();
   });
 
-  test('Bot Strategy section is hidden when Play vs Player is selected', async () => {
+  test('AI Difficulty section is hidden when Play vs Player is selected', async () => {
     renderNewGamePage();
     await userEvent.click(screen.getByLabelText(/play vs player/i));
-    expect(screen.queryByText('Bot Strategy')).not.toBeInTheDocument();
+    expect(screen.queryByText('AI Difficulty')).not.toBeInTheDocument();
   });
 
   test('Opponent Name input appears only in Player mode', async () => {
@@ -95,7 +94,6 @@ describe('NewGamePage — validation', () => {
       )
     );
     renderNewGamePage();
-    await screen.findByLabelText(/random/i);
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
     await screen.findByText(/internal server error/i);
   });
@@ -126,8 +124,8 @@ describe('NewGamePage — game creation', () => {
       )
     );
     renderNewGamePage();
-    await screen.findByLabelText(/random/i);
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
+    // After navigation the form should no longer be in the document
     await screen.findByRole('button', { name: /start game|creating game/i });
   });
 

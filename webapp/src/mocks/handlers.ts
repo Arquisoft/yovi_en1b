@@ -1,8 +1,80 @@
 import { http, HttpResponse } from 'msw';
 import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
 import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
-import type { UserProfile, UserStatistics, WinLossStats, Leaderboard, BotLeaderboardEntry } from '../types/users';
-import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
+import type { UserProfile, UserStatistics, WinLossStats } from '../types/users';
+
+const DEFAULT_MOCK_USER = {
+  username: 'user',
+  password: 'user',
+  userId: 'user'
+} as const;
+
+const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
+  {
+    _id: 'seed-game-player-win',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'PLAYER',
+    name_of_enemy: 'Local Opponent',
+    board_size: 5,
+    strategy: 'random',
+    difficulty_level: 'medium',
+    rule_set: 'normal',
+    current_turn: 'R',
+    status: 'FINISHED',
+    result: 'WIN',
+    duration_seconds: 180,
+    created_at: '2026-03-16T10:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-easy-win',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'random',
+    difficulty_level: 'easy',
+    rule_set: 'normal',
+    current_turn: 'R',
+    status: 'FINISHED',
+    result: 'WIN',
+    duration_seconds: 120,
+    created_at: '2026-03-16T11:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-medium-loss',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'balanced',
+    difficulty_level: 'medium',
+    rule_set: 'normal',
+    current_turn: 'B',
+    status: 'FINISHED',
+    result: 'LOSS',
+    duration_seconds: 240,
+    created_at: '2026-03-16T12:00:00.000Z',
+    moves: []
+  },
+  {
+    _id: 'seed-game-bot-hard-loss',
+    player_id: DEFAULT_MOCK_USER.userId,
+    game_type: 'BOT',
+    name_of_enemy: null,
+    board_size: 5,
+    strategy: 'aggressive',
+    difficulty_level: 'hard',
+    rule_set: 'normal',
+    current_turn: 'B',
+    status: 'FINISHED',
+    result: 'LOSS',
+    duration_seconds: 300,
+    created_at: '2026-03-16T13:00:00.000Z',
+    moves: []
+  }
+];
 
 const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
@@ -11,20 +83,6 @@ const mockGames = new Map<string, GameRecord>(
   SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
 );
 let gameCounter = 1;
-
-const DEFAULT_STRATEGY_OPTIONS = [
-  { name: 'random', difficulty: 'easy' },
-  { name: 'ai', difficulty: 'medium' },
-  { name: 'dijkstra', difficulty: 'hard' }
-] as const;
-
-function formatLabel(value: string): string {
-  if (value.toLowerCase() === 'ai') {
-    return 'AI';
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
 
 function coordinateKey(c: Coordinates): string {
   return `${c.x}:${c.y}:${c.z}`;
@@ -198,115 +256,51 @@ function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R
 }
 
 function emptyWinLoss(): WinLossStats {
-  return { wins: 0, losses: 0, draws: 0 };
+  return { wins: 0, losses: 0 };
 }
 
 function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
-  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
-
-  // Initialize all strategies
-  for (const option of DEFAULT_STRATEGY_OPTIONS) {
-    botBuckets.set(option.name, {
-      name: option.name,
-      difficulty: option.difficulty,
-      wins: 0,
-      losses: 0,
-      draws: 0
-    });
-  }
 
   const stats: UserStatistics = {
     total_games: userGames.length,
     total_wins: 0,
     total_losses: 0,
-    total_draws: 0,
     vs_player: emptyWinLoss(),
-    vs_bots: []
+    vs_bot: {
+      easy: emptyWinLoss(),
+      medium: emptyWinLoss(),
+      hard: emptyWinLoss()
+    }
   };
 
   for (const game of userGames) {
-    if (game.result === 'WIN') stats.total_wins += 1;
-    if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'DRAW') stats.total_draws += 1;
+    if (game.result === 'WIN') {
+      stats.total_wins += 1;
+    }
+
+    if (game.result === 'LOSS') {
+      stats.total_losses += 1;
+    }
 
     if (game.game_type === 'PLAYER') {
       if (game.result === 'WIN') stats.vs_player.wins += 1;
       if (game.result === 'LOSS') stats.vs_player.losses += 1;
-      if (game.result === 'DRAW') stats.vs_player.draws += 1;
       continue;
     }
 
-    const existing = botBuckets.get(game.strategy);
-    if (existing) {
-      if (game.result === 'WIN') existing.wins += 1;
-      if (game.result === 'LOSS') existing.losses += 1;
-      if (game.result === 'DRAW') existing.draws += 1;
-    }
+    const bucket = stats.vs_bot[game.difficulty_level];
+    if (game.result === 'WIN') bucket.wins += 1;
+    if (game.result === 'LOSS') bucket.losses += 1;
   }
 
-  stats.vs_bots = Array.from(botBuckets.values());
   return stats;
-}
-
-function buildLeaderboard(): Leaderboard {
-  const userStats = new Map<
-    string,
-    { total_wins: number; total_games: number; botWins: Map<string, number> }
-  >();
-
-  // Aggregate stats for all users
-  for (const [, user] of mockUsers) {
-    const stats = getUserStatistics(user.userId);
-    userStats.set(user.userId, {
-      total_wins: stats.total_wins,
-      total_games: stats.total_games,
-      botWins: new Map(stats.vs_bots.map((bot) => [bot.name, bot.wins]))
-    });
-  }
-
-  // Build overall leaderboard (top 10 by total wins)
-  const overall = Array.from(mockUsers.entries())
-    .map(([username, user]) => {
-      const stats = userStats.get(user.userId);
-      return {
-        username,
-        total_wins: stats?.total_wins ?? 0,
-        total_games: stats?.total_games ?? 0
-      };
-    })
-    .sort((a, b) => b.total_wins - a.total_wins)
-    .slice(0, 10);
-
-  // Build per-bot leaderboards (top 10 per strategy)
-  const vs_bots: Record<string, BotLeaderboardEntry[]> = {};
-
-  for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.name)) {
-    vs_bots[strategy] = Array.from(mockUsers.entries())
-      .map(([username, user]) => {
-        const stats = userStats.get(user.userId);
-        return {
-          username,
-          wins: stats?.botWins.get(strategy) ?? 0
-        };
-      })
-      .filter((entry) => entry.wins > 0)
-      .sort((a, b) => b.wins - a.wins)
-      .slice(0, 10);
-  }
-
-  return { overall, vs_bots };
 }
 
 export const handlers = [
   http.get('*/exists/:username', ({ params }) => {
     const exists = mockUsers.has(params.username as string);
     return HttpResponse.json({ exists } as ExistsResponse);
-  }),
-
-  http.get('*/leaderboard', () => {
-    const leaderboard = buildLeaderboard();
-    return HttpResponse.json(leaderboard);
   }),
 
   http.post('*/login', async ({ request }) => {
@@ -366,34 +360,11 @@ export const handlers = [
     const profile: UserProfile = {
       _id: requestedUserId,
       username: usernameEntry[0],
-      created_at: DEFAULT_MOCK_USER.createdAt,
+      created_at: new Date().toISOString(),
       statistics: getUserStatistics(requestedUserId)
     };
 
     return HttpResponse.json(profile);
-  }),
-
-  http.get('*/users/:id/history', ({ params, request }) => {
-    const tokenUserId = extractUserId(request);
-    if (!tokenUserId) {
-      return HttpResponse.json({ error: 'No token provided' }, { status: 401 });
-    }
-
-    const requestedUserId = String(params.id);
-    if (requestedUserId !== tokenUserId) {
-      return HttpResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const history = [...mockGames.values()]
-      .filter((game) => game.player_id === requestedUserId)
-      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
-      .map((game) => {
-        const copy: Partial<GameRecord> = { ...game };
-        delete copy.moves;
-        return copy;
-      });
-
-    return HttpResponse.json(history);
   }),
 
   http.post('*/games', async ({ request }) => {
@@ -417,16 +388,6 @@ export const handlers = [
 
     return HttpResponse.json(game, { status: 201 });
   }),
-
-  http.get('*/games/options', () =>
-    HttpResponse.json({
-      strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
-        name: formatLabel(item.name),
-        difficulty: formatLabel(item.difficulty)
-      })),
-      variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
-    })
-  ),
 
   http.get('*/games/:id', ({ params, request }) => {
     const userId = extractUserId(request);

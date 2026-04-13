@@ -4,7 +4,6 @@ import {
   createGame,
   finishGame,
   getGame,
-  getGameOptions,
   getMoves,
   playBotTurn,
   submitMove,
@@ -46,14 +45,6 @@ describe('gamesApi', () => {
     await getGame(GAMES_API_TEST_DATA.gameId);
 
     expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}`);
-  });
-
-  it('getGameOptions calls the options endpoint', async () => {
-    requestJsonMock.mockResolvedValueOnce({ strategies: [], variants: [] });
-
-    await getGameOptions();
-
-    expect(requestJsonMock).toHaveBeenCalledWith('/games/options');
   });
 
   it('getMoves calls moves endpoint', async () => {

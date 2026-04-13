@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requestJson } from '../api/httpClient';
-import { getUserHistory, getUserProfile } from '../api/usersApi';
+import { getUserProfile } from '../api/usersApi';
 
 faker.seed(20260317);
 const USERS_API_TEST_DATA = {
@@ -26,12 +26,5 @@ describe('usersApi', () => {
 
     expect(requestJsonMock).toHaveBeenCalledWith(`/users/${USERS_API_TEST_DATA.userId}`);
   });
-
-  it('getUserHistory uses /users/{id}/history endpoint', async () => {
-    requestJsonMock.mockResolvedValueOnce([]);
-
-    await getUserHistory(USERS_API_TEST_DATA.userId);
-
-    expect(requestJsonMock).toHaveBeenCalledWith(`/users/${USERS_API_TEST_DATA.userId}/history`);
-  });
 });
+

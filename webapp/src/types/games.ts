@@ -4,6 +4,8 @@ export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 
 export type RuleSet = 'normal' | 'extended' | 'custom';
 
+export type Strategy = 'random' | 'balanced' | 'aggressive' | 'defensive';
+
 export type Coordinates = {
   x: number;
   y: number;
@@ -23,7 +25,7 @@ export type GameRecord = {
   game_type: GameType;
   name_of_enemy: string | null;
   board_size: number;
-  strategy: string;
+  strategy: Strategy;
   difficulty_level: DifficultyLevel;
   rule_set: RuleSet;
   current_turn: 'B' | 'R';
@@ -34,13 +36,11 @@ export type GameRecord = {
   moves: Move[];
 };
 
-export type GameHistoryItem = Omit<GameRecord, 'moves'>;
-
 export type CreateGamePayload = {
   board_size: number;
   game_type: GameType;
   name_of_enemy?: string;
-  strategy?: string;
+  strategy?: Strategy;
   difficulty_level?: DifficultyLevel;
   rule_set?: RuleSet;
 };
@@ -52,14 +52,4 @@ export type SubmitMovePayload = {
 export type FinishGamePayload = {
   result: 'WIN' | 'LOSS' | 'DRAW';
   duration_seconds?: number;
-};
-
-export type StrategyOption = {
-  name: string;
-  difficulty: string;
-};
-
-export type GameOptions = {
-  strategies: StrategyOption[];
-  variants: string[];
 };

@@ -3,7 +3,6 @@ import { getUserProfile } from '../api/usersApi';
 import { Panel } from '../components/ui/Panel';
 import { useAuth } from '../hooks/useAuth';
 import type { UserProfile } from '../types/users';
-import { formatGameLabel } from '../utils/gameLabels';
 import './ProfilePage.css';
 
 function formatDate(value: string): string {
@@ -27,7 +26,6 @@ function getWinRateTone(winRate: number): 'profile-kpi--rate-low' | 'profile-kpi
   if (winRate >= 40) return 'profile-kpi--rate-mid';
   return 'profile-kpi--rate-low';
 }
-
 
 export function ProfilePage() {
   const { userId } = useAuth();
@@ -80,72 +78,45 @@ export function ProfilePage() {
       return null;
     }
 
-    const stats = profile.statistics;
-    const totalGames = stats.total_games;
-    const totalWins = stats.total_wins;
-    const totalLosses = stats.total_losses;
-    const totalDraws = stats.total_draws;
+    const totalGames = profile.statistics.total_games;
+    const totalWins = profile.statistics.total_wins;
+    const totalLosses = profile.statistics.total_losses;
 
-    const playerCategoryBase = {
-      label: 'Vs player',
-      wins: stats.vs_player.wins,
-      losses: stats.vs_player.losses,
-      draws: stats.vs_player.draws
-    };
-
-    const playerGames = playerCategoryBase.wins + playerCategoryBase.losses + playerCategoryBase.draws;
-    const playerCategory = {
-      ...playerCategoryBase,
-      games: playerGames,
-      winRate: percent(playerCategoryBase.wins, playerGames),
-      lossRate: percent(playerCategoryBase.losses, playerGames),
-      drawRate: percent(playerCategoryBase.draws, playerGames),
-      tone: getWinRateTone(percent(playerCategoryBase.wins, playerGames))
-    };
-
-    const botCategories: Array<{
-      label: string;
-      difficulty: string;
-      wins: number;
-      losses: number;
-      draws: number;
-      games: number;
-      winRate: number;
-      lossRate: number;
-      drawRate: number;
-      tone: 'profile-kpi--rate-low' | 'profile-kpi--rate-mid' | 'profile-kpi--rate-high';
-    }> = stats.vs_bots.map((item) => {
-      const wins = item.wins;
-      const losses = item.losses;
-      const draws = item.draws;
-      const games = wins + losses + draws;
-      const winRate = percent(wins, games);
-      const lossRate = percent(losses, games);
-      const drawRate = percent(draws, games);
-
-      return {
-        label: formatGameLabel(item.name),
-        difficulty: item.difficulty,
-        wins,
-        losses,
-        draws,
-        games,
-        winRate,
-        lossRate,
-        drawRate,
-        tone: getWinRateTone(winRate)
-      };
+    const categories = [
+      {
+        label: 'Vs player',
+        wins: profile.statistics.vs_player.wins,
+        losses: profile.statistics.vs_player.losses
+      },
+      {
+        label: 'Vs bot - easy',
+        wins: profile.statistics.vs_bot.easy.wins,
+        losses: profile.statistics.vs_bot.easy.losses
+      },
+      {
+        label: 'Vs bot - medium',
+        wins: profile.statistics.vs_bot.medium.wins,
+        losses: profile.statistics.vs_bot.medium.losses
+      },
+      {
+        label: 'Vs bot - hard',
+        wins: profile.statistics.vs_bot.hard.wins,
+        losses: profile.statistics.vs_bot.hard.losses
+      }
+    ].map((category) => {
+      const games = category.wins + category.losses;
+      const winRate = percent(category.wins, games);
+      const lossRate = percent(category.losses, games);
+      return { ...category, games, winRate, lossRate, tone: getWinRateTone(winRate) };
     });
 
     return {
       totalGames,
       totalWins,
       totalLosses,
-      totalDraws,
-      completedGames: totalWins + totalLosses + totalDraws,
       overallWinRate: percent(totalWins, totalGames),
-      playerCategory,
-      botCategories
+      playerCategory: categories[0],
+      botCategories: categories.slice(1)
     };
   }, [profile]);
 
@@ -171,7 +142,6 @@ export function ProfilePage() {
           <section className="profile-kpis">
             <article className="profile-kpi"><span>Total games</span><strong>{derived.totalGames}</strong></article>
             <article className="profile-kpi profile-kpi--wins"><span>Total wins</span><strong>{derived.totalWins}</strong></article>
-            <article className="profile-kpi profile-kpi--draws"><span>Total draws</span><strong>{derived.totalDraws}</strong></article>
             <article className="profile-kpi profile-kpi--losses"><span>Total losses</span><strong>{derived.totalLosses}</strong></article>
             <article className={`profile-kpi ${getWinRateTone(derived.overallWinRate)}`}><span>Win rate</span><strong>{derived.overallWinRate}%</strong></article>
           </section>
@@ -181,19 +151,16 @@ export function ProfilePage() {
             <div
               className="profile-dual-bar"
               role="img"
-              aria-label={`Overall result split: ${derived.totalWins} wins, ${derived.totalDraws} draws and ${derived.totalLosses} losses`}
+              aria-label={`Overall result split: ${derived.totalWins} wins and ${derived.totalLosses} losses`}
             >
-              <div className="profile-dual-bar__wins" style={{ width: `${percent(derived.totalWins, derived.completedGames)}%` }}>
+              <div className="profile-dual-bar__wins" style={{ width: `${percent(derived.totalWins, derived.totalWins + derived.totalLosses)}%` }}>
                 W {derived.totalWins}
               </div>
-              <div className="profile-dual-bar__draws" style={{ width: `${percent(derived.totalDraws, derived.completedGames)}%` }}>
-                D {derived.totalDraws}
-              </div>
-              <div className="profile-dual-bar__losses" style={{ width: `${percent(derived.totalLosses, derived.completedGames)}%` }}>
+              <div className="profile-dual-bar__losses" style={{ width: `${percent(derived.totalLosses, derived.totalWins + derived.totalLosses)}%` }}>
                 L {derived.totalLosses}
               </div>
             </div>
-            {derived.completedGames === 0 && (
+            {derived.totalWins + derived.totalLosses === 0 && (
               <p className="profile-note">No finished games yet. Start a game to build your chart.</p>
             )}
           </section>
@@ -210,11 +177,10 @@ export function ProfilePage() {
                   </div>
                   <div className="profile-meter" role="img" aria-label={`${derived.playerCategory.label} win rate ${derived.playerCategory.winRate} percent`}>
                     <div className={`profile-meter__wins ${derived.playerCategory.tone}`} style={{ width: `${derived.playerCategory.winRate}%` }} />
-                    <div className="profile-meter__draws" style={{ width: `${derived.playerCategory.drawRate}%` }} />
                     <div className="profile-meter__losses" style={{ width: `${derived.playerCategory.lossRate}%` }} />
                   </div>
                   <p className="profile-meter-caption">
-                    Win rate {derived.playerCategory.winRate}% | W {derived.playerCategory.wins} / D {derived.playerCategory.draws} / L {derived.playerCategory.losses}
+                    Win rate {derived.playerCategory.winRate}% | W {derived.playerCategory.wins} / L {derived.playerCategory.losses}
                   </p>
                 </article>
               </div>
@@ -228,16 +194,14 @@ export function ProfilePage() {
                     <article className="profile-category-card" key={category.label}>
                       <div className="profile-category-head">
                         <h4>{category.label}</h4>
-                        <span className="profile-difficulty-tag">{category.difficulty}</span>
                         <span>{category.games} games</span>
                       </div>
                       <div className="profile-meter" role="img" aria-label={`${category.label} win rate ${category.winRate} percent`}>
                         <div className={`profile-meter__wins ${category.tone}`} style={{ width: `${category.winRate}%` }} />
-                        <div className="profile-meter__draws" style={{ width: `${category.drawRate}%` }} />
                         <div className="profile-meter__losses" style={{ width: `${category.lossRate}%` }} />
                       </div>
                       <p className="profile-meter-caption">
-                        Win rate {category.winRate}% | W {category.wins} / D {category.draws} / L {category.losses}
+                        Win rate {category.winRate}% | W {category.wins} / L {category.losses}
                       </p>
                     </article>
                   ))}
@@ -250,3 +214,4 @@ export function ProfilePage() {
     </Panel>
   );
 }
+

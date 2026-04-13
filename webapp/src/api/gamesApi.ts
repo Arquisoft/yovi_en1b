@@ -1,12 +1,5 @@
 import { requestJson } from './httpClient';
-import type {
-  CreateGamePayload,
-  FinishGamePayload,
-  GameOptions,
-  GameRecord,
-  Move,
-  SubmitMovePayload
-} from '../types/games';
+import type { CreateGamePayload, FinishGamePayload, GameRecord, Move, SubmitMovePayload } from '../types/games';
 
 export async function createGame(payload: CreateGamePayload): Promise<GameRecord> {
   return requestJson<GameRecord>('/games', {
@@ -50,6 +43,3 @@ export async function finishGame(gameId: string, payload: FinishGamePayload): Pr
   });
 }
 
-export async function getGameOptions(): Promise<GameOptions> {
-  return requestJson<GameOptions>('/games/options');
-}

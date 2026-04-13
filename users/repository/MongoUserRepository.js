@@ -67,10 +67,13 @@ class MongoUserRepository extends UserRepository {
   }
 
   /**
-   * .lean() returns plain JS objects instead of Mongoose documents — faster for read-only queries
+   * Note for future Nacho: .lean() se utiliza para optimizar las consultas
+   * a MongoDB al decirle a Mongoose que devuelva objetos JavaScript planos (POJOs)
+   *
+   * @returns {Promise<{overall: *, vs_bots: {random: *, ai: *, dijkstra: *}}>}
    */
   async getLeaderboard() {
-    const [overall, random, defensive, ncts] = await Promise.all([
+    const [overall, random, ai, dijkstra] = await Promise.all([
       User.find()
           .sort({ 'statistics.total_wins': -1 })
           .limit(LEADERBOARD_SIZE)
@@ -84,15 +87,15 @@ class MongoUserRepository extends UserRepository {
           .lean(),
 
       User.find()
-          .sort({ 'statistics.vs_bot.defensive.wins': -1 })
+          .sort({ 'statistics.vs_bot.ai.wins': -1 })
           .limit(LEADERBOARD_SIZE)
-          .select('username statistics.vs_bot.defensive')
+          .select('username statistics.vs_bot.ai')
           .lean(),
 
       User.find()
-          .sort({ 'statistics.vs_bot.ncts.wins': -1 })
+          .sort({ 'statistics.vs_bot.dijkstra.wins': -1 })
           .limit(LEADERBOARD_SIZE)
-          .select('username statistics.vs_bot.ncts')
+          .select('username statistics.vs_bot.dijkstra')
           .lean(),
     ]);
 
@@ -103,9 +106,9 @@ class MongoUserRepository extends UserRepository {
         total_games: u.statistics.total_games
       })),
       vs_bots: {
-        random:    random.map(u =>    ({ username: u.username, wins: u.statistics?.vs_bot?.random?.wins    ?? 0 })),
-        defensive: defensive.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.defensive?.wins ?? 0 })),
-        ncts:      ncts.map(u =>      ({ username: u.username, wins: u.statistics?.vs_bot?.ncts?.wins      ?? 0 }))
+        random:   random.map(u =>   ({ username: u.username, wins: u.statistics?.vs_bot?.random?.wins   ?? 0 })),
+        ai:       ai.map(u =>       ({ username: u.username, wins: u.statistics?.vs_bot?.ai?.wins       ?? 0 })),
+        dijkstra: dijkstra.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.dijkstra?.wins ?? 0 }))
       }
     };
   }

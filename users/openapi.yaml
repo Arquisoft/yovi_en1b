@@ -101,9 +101,9 @@ components:
           items:
             $ref: '#/components/schemas/BotStat'
           example:
-            - { name: "random",    difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
-            - { name: "defensive", difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
-            - { name: "ncts",      difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
+            - { name: "random",   difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
+            - { name: "ai",       difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
+            - { name: "dijkstra", difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
 
     StrategyOption:
       type: object
@@ -130,9 +130,9 @@ components:
           items:
             $ref: '#/components/schemas/StrategyOption'
           example:
-            - { name: "Random",    difficulty: "Easy 😄"   }
-            - { name: "Defensive", difficulty: "Medium 😐" }
-            - { name: "NCTS",      difficulty: "Hard 😈"   }
+            - { name: "Random",   difficulty: "Easy 😄"   }
+            - { name: "AI",       difficulty: "Medium 😐" }
+            - { name: "Dijkstra", difficulty: "Hard 😈"   }
         variants:
           type: array
           items:
@@ -181,11 +181,11 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
-            defensive:
+            ai:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
-            ncts:
+            dijkstra:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
@@ -455,33 +455,29 @@ paths:
     post:
       summary: Public bot play — no auth or game id required
       description: >
-        Open source endpoint for external users. Send a board position and optional bot_id
+        Open source endpoint for external users. Send a board position and strategy directly
         to get the bot's next move. No authentication or internal game id needed.
-        Defaults to the hardest bot (ncts) if bot_id is not provided.
-        board_size defaults to 5 if not provided.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [position]
+              required: [board_size]
               properties:
-                position:
+                yen_state:
                   type: string
                   nullable: true
                   description: Current board in YEN notation. Send null for the first move.
                   example: "B/.B/RB./B..R"
-                bot_id:
+                strategy:
                   type: string
-                  enum: [random, defensive, ncts]
-                  default: ncts
-                  description: "Bot strategy to use. Defaults to ncts (hardest) if not provided."
-                  example: "ncts"
+                  enum: [random, dijkstra, ai]
+                  default: random
+                  example: "random"
                 board_size:
                   type: integer
-                  default: 5
-                  example: 5
+                  example: 7
       responses:
         '200':
           description: Bot move returned from Gamey
@@ -501,7 +497,7 @@ paths:
                     nullable: true
                     example: null
         '400':
-          description: position is required
+          description: board_size is required
         '502':
           description: Gamey service returned an error
         '503':
@@ -535,9 +531,9 @@ paths:
                   example: "Tobias"
                 strategy:
                   type: string
-                  enum: [random, defensive, ncts]
+                  enum: [random, dijkstra, ai]
                   default: random
-                  description: "Difficulty is derived automatically: random=Easy 😄, defensive=Medium 😐, ncts=Hard 😈"
+                  description: "Difficulty is derived automatically: random=Easy 😄, dijkstra=Hard 😈, ai=Medium 😐"
                   example: "random"
       responses:
         '201':
