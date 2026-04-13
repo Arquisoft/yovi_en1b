@@ -75,6 +75,13 @@
   flex: 1;
 }
 
+.radio-text-inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .radio-text strong {
   color: #f8fafc;
   font-size: 1rem;
@@ -83,6 +90,28 @@
 .radio-text small {
   color: #94a3b8;
   font-size: 0.9rem;
+}
+
+.difficulty-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.8);
+  color: #bae6fd;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.strategy-loading {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .form-field {
@@ -228,4 +257,3 @@
   font-size: 0.95rem;
   font-weight: 500;
 }
-
