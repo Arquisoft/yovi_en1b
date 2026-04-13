@@ -7,7 +7,8 @@
 
 **Claim all three sides of the triangle. Sounds simple. It's not.**
 
- [**Wanna try? Play now → http://4.233.184.98**](http://4.233.184.98)
+ [**Play now → http://4.233.184.98**](http://4.233.184.98)
+ [**Check the documentation → https://arquisoft.github.io/yovi_en1b/**](https://arquisoft.github.io/yovi_en1b/)
 
 </div>
 
