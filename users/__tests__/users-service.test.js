@@ -169,18 +169,18 @@ describe('GET /leaderboard', () => {
         }
     })
 
-    it('vs_bots has random, ai and dijkstra arrays', async () => {
+    it('vs_bots has random, defensive and ncts arrays', async () => {
         const res = await request(app).get('/leaderboard')
 
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.dijkstra)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
     })
 
     it('vs_bots entries have username and wins', async () => {
         const res = await request(app).get('/leaderboard')
 
-        for (const botKey of ['random', 'ai', 'dijkstra']) {
+        for (const botKey of ['random', 'defensive', 'ncts']) {
             if (res.body.vs_bots[botKey].length > 0) {
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('username')
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('wins')
@@ -201,11 +201,11 @@ describe('GET /leaderboard', () => {
         expect(res.status).toBe(200)
         expect(Array.isArray(res.body.overall)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.dijkstra)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
 
         // wins field must always be a number, never undefined
-        for (const botKey of ['random', 'ai', 'dijkstra']) {
+        for (const botKey of ['random', 'defensive', 'ncts']) {
             res.body.vs_bots[botKey].forEach(entry => {
                 expect(typeof entry.wins).toBe('number')
             })
@@ -622,19 +622,47 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ yen_state: null, strategy: 'random', board_size: 7 })
+            .send({ position: 'B/.B/RB./B..R', bot_id: 'random', board_size: 7 })
 
         expect(res.status).toBe(200)
         expect(res.body).toHaveProperty('coordinates')
         expect(res.body).toHaveProperty('yen_state')
     })
 
-    it('returns 400 if board_size is missing', async () => {
+    it('returns 400 if position is missing', async () => {
         const res = await request(app)
             .post('/play')
-            .send({ strategy: 'random' })
+            .send({ bot_id: 'random', board_size: 7 })
 
         expect(res.status).toBe(400)
+    })
+
+    it('defaults to ncts bot when bot_id is not provided', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        }))
+
+        const res = await request(app)
+            .post('/play')
+            .send({ position: null })
+
+        expect(res.status).toBe(200)
+    })
+
+    it('defaults board_size to 5 when not provided', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        await request(app)
+            .post('/play')
+            .send({ position: null })
+
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+        expect(callBody.board_size).toBe(5)
     })
 
     it('returns 503 when Gamey is unreachable', async () => {
@@ -642,7 +670,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ board_size: 7 })
+            .send({ position: null })
 
         expect(res.status).toBe(503)
     })
@@ -652,7 +680,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ board_size: 7 })
+            .send({ position: null })
 
         expect(res.status).toBe(502)
     })
@@ -665,7 +693,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ board_size: 7 })
+            .send({ position: null })
 
         expect(res.status).toBe(200)
     })
@@ -697,15 +725,15 @@ describe('GET /games/options', () => {
 
         const names = res.body.strategies.map(s => s.name)
         expect(names).toContain('Random')
-        expect(names).toContain('AI')
-        expect(names).toContain('Dijkstra')
+        expect(names).toContain('Defensive')
+        expect(names).toContain('NCTS')
 
         const random = res.body.strategies.find(s => s.name === 'Random')
-        const ai = res.body.strategies.find(s => s.name === 'AI')
-        const dijkstra = res.body.strategies.find(s => s.name === 'Dijkstra')
+        const defensive = res.body.strategies.find(s => s.name === 'Defensive')
+        const ncts = res.body.strategies.find(s => s.name === 'NCTS')
         expect(random.difficulty).toBe('Easy 😄')
-        expect(ai.difficulty).toBe('Medium 😐')
-        expect(dijkstra.difficulty).toBe('Hard 😈')
+        expect(defensive.difficulty).toBe('Medium 😐')
+        expect(ncts.difficulty).toBe('Hard 😈')
     })
 
     it('returns variants as objects with a name property', async () => {
@@ -879,7 +907,7 @@ describe('PUT /games/:id/finish', () => {
 
         expect(res.status).toBe(200)
 
-        const BOT_DIFFICULTY = { random: 'Easy 😄', ai: 'Medium 😐', dijkstra: 'Hard 😈' }
+        const BOT_DIFFICULTY = { random: 'Easy 😄', defensive: 'Medium 😐', ncts: 'Hard 😈' }
 
         for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
             const entry = res.body.statistics.vs_bots.find(b => b.name === name)
@@ -1133,21 +1161,21 @@ describe('MongoUserRepository direct unit tests', () => {
         expect(updated.result).toBe('WIN')
     })
 
-    // ── updateStats: draws branch (covers vs_bot draws + findByIdAndUpdate) ──
+    //  updateStats: draws branch (covers vs_bot draws + findByIdAndUpdate) 
 
     it('updateStats increments draws for a BOT game (covers drawIncr and findByIdAndUpdate)', async () => {
         const user = await User.create({ username: 'DrawStatsUser', password_hash: 'x' })
-        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'dijkstra' })
+        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'ncts' })
 
         const updated = await repo.findById(user._id)
         expect(updated.statistics.total_draws).toBe(1)
-        expect(updated.statistics.vs_bot.dijkstra.draws).toBe(1)
+        expect(updated.statistics.vs_bot.ncts.draws).toBe(1)
         // wins and losses stay 0
         expect(updated.statistics.total_wins).toBe(0)
         expect(updated.statistics.total_losses).toBe(0)
     })
 
-    // ── getLeaderboard ?? 0 fallback: user appears in ALL three bot queries ──
+    //  getLeaderboard ?? 0 fallback: user appears in ALL three bot queries
 
     it('getLeaderboard returns wins: 0 for users with no vs_bot data in every bot category', async () => {
         // Give this user high bot wins in each category so they appear in the
@@ -1162,9 +1190,9 @@ describe('MongoUserRepository direct unit tests', () => {
                 total_losses: 0,
                 total_draws:  0,
                 vs_bot: {
-                    random:   { wins: 50, losses: 0, draws: 0 },
-                    ai:       { wins: 50, losses: 0, draws: 0 },
-                    dijkstra: { wins: 50, losses: 0, draws: 0 },
+                    random:    { wins: 50, losses: 0, draws: 0 },
+                    defensive: { wins: 50, losses: 0, draws: 0 },
+                    ncts:      { wins: 50, losses: 0, draws: 0 },
                 }
             }
         })
@@ -1174,7 +1202,7 @@ describe('MongoUserRepository direct unit tests', () => {
 
         const leaderboard = await repo.getLeaderboard()
 
-        for (const botKey of ['random', 'ai', 'dijkstra']) {
+        for (const botKey of ['random', 'defensive', 'ncts']) {
             const entry = leaderboard.vs_bots[botKey].find(e => e.username === 'NoBotDataUser')
             expect(entry).toBeDefined()           // user appears in results
             expect(entry.wins).toBe(0)            // ?? 0 fallback was hit

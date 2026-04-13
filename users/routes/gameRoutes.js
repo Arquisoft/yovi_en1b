@@ -6,15 +6,16 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 
 // Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
-    random:   'easy',
-    dijkstra: 'medium',
-    ai:       'hard'
+    random:    'easy',
+    defensive: 'medium',
+    ncts:      'hard'
 };
 
 // Helper: auto-finish a game if Gamey reports a winner
 async function autoFinishIfWinner(game, winner, repository) {
     if (!winner) return;
-    const result = winner === 'B' ? 'WIN' : 'LOSS';
+    const winningPlayer = game.moves.at(-1)?.player;
+    const result = winningPlayer === 'B' ? 'WIN' : 'LOSS';
     await repository.updateGame(game._id, {
         status: 'FINISHED',
         result,
@@ -52,9 +53,9 @@ module.exports = function gameRoutes(repository) {
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
             strategies: [
-                { name: 'Random',   difficulty: 'Easy 😄'   },
-                { name: 'AI',       difficulty: 'Medium 😐' },
-                { name: 'Dijkstra', difficulty: 'Hard 😈'   }
+                { name: 'Random',    difficulty: 'Easy 😄'   },
+                { name: 'Defensive', difficulty: 'Medium 😐' },
+                { name: 'NCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
                 { name: 'Classic Y'              },

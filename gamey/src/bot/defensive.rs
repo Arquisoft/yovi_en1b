@@ -16,7 +16,7 @@ pub struct DefensiveBot;
 
 impl YBot for DefensiveBot {
     fn name(&self) -> &str {
-        "medium-defensive"
+        "medium"
     }
 
     fn choose_move(&self, game: &GameY) -> Option<Coordinates> {
@@ -55,7 +55,7 @@ mod tests {
     #[test]
     fn test_defensive_bot_name() {
         let bot = DefensiveBot;
-        assert_eq!(bot.name(), "medium-defensive");
+        assert_eq!(bot.name(), "medium");
     }
 
     #[test]
