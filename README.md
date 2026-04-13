@@ -17,7 +17,7 @@
 
 | Name | Role |
 |---|---|
-| Alejandro | Database |
+| Alejandro | Database + DevOps |
 | Tobias | Frontend |
 | Bilal | Game Logic (Rust) |
 | Nacho | Backend |
