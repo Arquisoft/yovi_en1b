@@ -6,9 +6,9 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 
 // Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
-    random: 'easy',
-    dijkstra: 'medium',
-    ai: 'hard'
+    random:    'easy',
+    defensive: 'medium',
+    ncts:      'hard'
 };
 
 // Helper: auto-finish a game if Gamey reports a winner
@@ -24,7 +24,7 @@ async function autoFinishIfWinner(game, winner, repository) {
     });
     await repository.updateStats(game.player_id, {
         result,
-        type: game.game_type,
+        type:     game.game_type,
         strategy: game.strategy
     });
 }
@@ -53,9 +53,9 @@ module.exports = function gameRoutes(repository) {
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
             strategies: [
-                { name: 'Random', difficulty: 'Easy 😄' },
-                { name: 'AI', difficulty: 'Medium 😐' },
-                { name: 'Dijkstra', difficulty: 'Hard 😈' }
+                { name: 'Random',    difficulty: 'Easy 😄'   },
+                { name: 'Defensive', difficulty: 'Medium 😐' },
+                { name: 'NCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
                 { name: 'Classic Y'              },
@@ -80,11 +80,11 @@ module.exports = function gameRoutes(repository) {
             const resolvedStrategy = strategy || 'random';
 
             const game = await repository.createGame({
-                player_id: req.user.userId,
-                game_type: game_type || 'BOT',
-                name_of_enemy: name_of_enemy || null,
+                player_id:        req.user.userId,
+                game_type:        game_type || 'BOT',
+                name_of_enemy:    name_of_enemy || null,
                 board_size,
-                strategy: resolvedStrategy,
+                strategy:         resolvedStrategy,
                 difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
                 current_turn
             });
@@ -168,9 +168,9 @@ module.exports = function gameRoutes(repository) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     yen_state,
-                    strategy: game.strategy,
+                    strategy:         game.strategy,
                     difficulty_level: game.difficulty_level,
-                    board_size: game.board_size
+                    board_size:       game.board_size
                 })
             });
         } catch {
@@ -186,9 +186,9 @@ module.exports = function gameRoutes(repository) {
         try {
             game.moves.push({
                 move_number: game.moves.length + 1,
-                player: game.current_turn,
+                player:      game.current_turn,
                 coordinates,
-                yen_state: botYenState
+                yen_state:   botYenState
             });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
@@ -222,7 +222,7 @@ module.exports = function gameRoutes(repository) {
             if (result !== 'DRAW') {
                 await repository.updateStats(game.player_id, {
                     result,
-                    type: game.game_type,
+                    type:     game.game_type,
                     strategy: game.strategy
                 });
             }
