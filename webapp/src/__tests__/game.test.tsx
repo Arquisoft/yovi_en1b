@@ -226,17 +226,17 @@ describe('GamePage — undo', () => {
 // ─── finish ───────────────────────────────────────────────────────────────────
 
 describe('GamePage — finish', () => {
-  test('finish button sends DRAW result and shows it in UI', async () => {
+  test('finish button sends CANCELED result and shows canceled game in UI', async () => {
     server.use(
       http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)),
       http.put(`*/games/${GAME_TEST_DATA.gameId}/finish`, () =>
-        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'DRAW' })
+        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'CANCELED' })
       )
     );
     renderGamePage();
     await screen.findByLabelText('game board');
     await userEvent.click(screen.getByRole('button', { name: /finish/i }));
-    await screen.findByText(/draw/i);
+    await screen.findByText(/canceled game/i);
   });
 
   test('finish action is not available after game is already finished', async () => {
