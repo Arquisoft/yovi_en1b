@@ -28,6 +28,7 @@ const BASE_GAME: GameRecord = {
   name_of_enemy: GAME_TEST_DATA.enemyName,
   board_size: 3,
   strategy: 'random',
+  variants: [],
   difficulty_level: 'medium',
   rule_set: 'normal',
   current_turn: 'B',
@@ -137,6 +138,7 @@ describe('GamePage — move', () => {
     const redTurnGame: GameRecord = {
       ...BASE_GAME,
       current_turn: 'R',
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -169,6 +171,7 @@ describe('GamePage — move', () => {
     );
     const gameWithMove: GameRecord = {
       ...BASE_GAME,
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -200,6 +203,7 @@ describe('GamePage — undo', () => {
     const gameWithMove: GameRecord = {
       ...BASE_GAME,
       current_turn: 'R',
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -242,6 +246,7 @@ describe('GamePage — finish', () => {
   test('finish action is not available after game is already finished', async () => {
     const finishedGame: GameRecord = {
       ...BASE_GAME,
+      variants: [],
       status: 'FINISHED',
       result: 'WIN',
       moves: [{
@@ -264,6 +269,7 @@ describe('GamePage — bot metadata', () => {
     const botGame: GameRecord = {
       ...BASE_GAME,
       game_type: 'BOT',
+      variants: [],
       name_of_enemy: null,
       current_turn: 'B',
       difficulty_level: 'hard',

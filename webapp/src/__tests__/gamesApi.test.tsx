@@ -31,12 +31,12 @@ describe('gamesApi', () => {
   it('createGame sends POST with JSON payload', async () => {
     requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await createGame({ board_size: 5, game_type: 'BOT', rule_set: 'normal' });
+    await createGame({ board_size: 5, game_type: 'BOT', variants: ['Explosions'] });
 
     expect(requestJsonMock).toHaveBeenCalledWith('/games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board_size: 5, game_type: 'BOT', rule_set: 'normal' }),
+      body: JSON.stringify({ board_size: 5, game_type: 'BOT', variants: ['Explosions'] }),
     });
   });
 
@@ -49,7 +49,10 @@ describe('gamesApi', () => {
   });
 
   it('getGameOptions calls the options endpoint', async () => {
-    requestJsonMock.mockResolvedValueOnce({ strategies: [], variants: [] });
+    requestJsonMock.mockResolvedValueOnce({
+      strategies: [],
+      variants: [{ name: 'Explosions', description: 'TODO', allowed_strategies: ['ai'] }],
+    });
 
     await getGameOptions();
 

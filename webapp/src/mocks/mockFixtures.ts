@@ -16,6 +16,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     name_of_enemy: 'Alex',
     board_size: 5,
     strategy: 'random',
+    variants: [],
     difficulty_level: 'medium',
     rule_set: 'normal',
     current_turn: 'R',
@@ -32,6 +33,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     name_of_enemy: null,
     board_size: 5,
     strategy: 'random',
+    variants: [],
     difficulty_level: 'easy',
     rule_set: 'normal',
     current_turn: 'R',
@@ -48,6 +50,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     name_of_enemy: null,
     board_size: 5,
     strategy: 'ai',
+    variants: [],
     difficulty_level: 'medium',
     rule_set: 'normal',
     current_turn: 'B',
@@ -64,6 +67,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     name_of_enemy: null,
     board_size: 5,
     strategy: 'dijkstra',
+    variants: [],
     difficulty_level: 'hard',
     rule_set: 'normal',
     current_turn: 'B',
@@ -74,4 +78,3 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     moves: []
   }
 ];
-

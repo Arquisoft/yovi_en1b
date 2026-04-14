@@ -18,6 +18,10 @@ const DEFAULT_STRATEGY_OPTIONS = [
   { name: 'dijkstra', difficulty: 'hard' }
 ] as const;
 
+const DEFAULT_VARIANTS = [
+  { name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }
+] as const;
+
 function formatLabel(value: string): string {
   if (value.toLowerCase() === 'ai') {
     return 'AI';
@@ -73,6 +77,7 @@ function createGameRecord(userId: string, payload: CreateGamePayload): GameRecor
     name_of_enemy: payload.name_of_enemy ?? null,
     board_size: payload.board_size,
     strategy: payload.strategy ?? 'random',
+    variants: payload.variants ?? [],
     difficulty_level: payload.difficulty_level ?? 'medium',
     rule_set: payload.rule_set ?? 'normal',
     current_turn: 'B',
@@ -220,7 +225,7 @@ function getUserStatistics(userId: string): UserStatistics {
     total_games: userGames.length,
     total_wins: 0,
     total_losses: 0,
-    total_draws: 0,
+    total_canceled: 0,
     vs_player: emptyWinLoss(),
     vs_bots: []
   };
@@ -228,7 +233,7 @@ function getUserStatistics(userId: string): UserStatistics {
   for (const game of userGames) {
     if (game.result === 'WIN') stats.total_wins += 1;
     if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'DRAW') stats.total_draws += 1;
+    if (game.result === 'DRAW') stats.total_canceled += 1;
 
     if (game.game_type === 'PLAYER') {
       if (game.result === 'WIN') stats.vs_player.wins += 1;
@@ -424,7 +429,7 @@ export const handlers = [
         name: formatLabel(item.name),
         difficulty: formatLabel(item.difficulty)
       })),
-      variants: ['Classic Y', 'Master Y (coming soon)', 'Pie Rule (coming soon)']
+      variants: DEFAULT_VARIANTS
     })
   ),
 

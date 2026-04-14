@@ -151,13 +151,13 @@
 .form-field input[type='password']:disabled,
 .form-field select:disabled {
   background: #0f172a;
-  color: #64748b;
+  color: #94a3b8;
   border-color: #1e293b;
   cursor: not-allowed;
 }
 
 .form-field input[type='text']::placeholder {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .slider {
@@ -211,7 +211,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 .form-actions {
@@ -225,10 +225,10 @@
   padding: 14px 20px;
   border: 1px solid #0ea5e9;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, #0b4f7a 0%, #075985 100%);
+  color: #f8fafc;
   font-size: 1rem;
   transition: all 0.2s ease;
 }
@@ -250,10 +250,90 @@
 
 .form-error {
   padding: 16px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fee2e2;
   border: 1px solid #7f1d1d;
   border-radius: 8px;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.variants-note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.variants-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.variant-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.variant-card:hover {
+  background: #334155;
+  border-color: #0ea5e9;
+}
+
+.variant-card--selected {
+  border-color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.14);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.18) inset;
+}
+
+.variant-card input[type='checkbox'] {
+  margin-top: 4px;
+  cursor: pointer;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border: 2px solid #475569;
+  border-radius: 6px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.variant-card input[type='checkbox']:checked {
+  border-color: #0ea5e9;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+}
+
+.variant-card input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.variant-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.variant-card__content strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.variant-card__content small {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.home-action-label {
+  font-size: 1rem;
 }
