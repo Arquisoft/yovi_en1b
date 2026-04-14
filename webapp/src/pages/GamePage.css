@@ -165,7 +165,8 @@
   border: 0;
   padding: 0;
   appearance: none;
-  transition: background 0.15s ease;
+
+  transition: background 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
   user-select: none;
 }
@@ -192,6 +193,12 @@
 
 .hex-wrap--disabled {
   cursor: default;
+}
+
+.hex-wrap--history-highlight,
+.hex-wrap.blue.hex-wrap--history-highlight,
+.hex-wrap.red.hex-wrap--history-highlight {
+  background: #ffffff;
 }
 
 .hex {
@@ -258,6 +265,7 @@
   border: 1px solid #334155;
   border-radius: 8px;
   background: #0f172a;
+  cursor: pointer;
 }
 
 .move-number {

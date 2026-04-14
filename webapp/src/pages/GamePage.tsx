@@ -21,12 +21,14 @@ interface BoardProps {
   readonly movesByCell: Map<string, Move>;
   readonly onPlayMove: (coordinates: Coordinates) => Promise<void>;
   readonly visualTurn: 'B' | 'R';
+  readonly highlightedCellKey: string | null;
 }
 
 interface MoveHistoryProps {
   readonly moves: Move[];
   readonly bluePlayerName: string;
   readonly redPlayerName: string;
+  readonly onMoveHover: (coordinates: Coordinates | null) => void;
 }
 
 function buildBoard(size: number): HexCell[][] {
@@ -107,7 +109,7 @@ function getRowKey(row: HexCell[]): string {
   return first ? `row-${first.x}-${first.y}-${first.z}-${row.length}` : `row-empty-${row.length}`;
 }
 
-function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }: BoardProps) {
+function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn, highlightedCellKey }: BoardProps) {
   return (
     <section className="board-wrap">
       <div className="board" aria-label="game board">
@@ -123,7 +125,8 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }
               const ownerClass = getOwnerClass(owner);
               const disabled = !canPlay || Boolean(owner);
               const cellLabel = getCellAriaLabel(cell.coordinates, owner);
-              const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''} turn-indicator-${visualTurn}`;
+              const isHighlighted = highlightedCellKey === key;
+              const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''}${isHighlighted ? ' hex-wrap--history-highlight' : ''} turn-indicator-${visualTurn}`;
 
               return (
                 <button
@@ -148,13 +151,7 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }
   );
 }
 
-interface MoveHistoryProps {
-  readonly moves: Move[];
-  readonly bluePlayerName: string;
-  readonly redPlayerName: string;
-}
-
-function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps) {
+function MoveHistory({ moves, bluePlayerName, redPlayerName, onMoveHover }: MoveHistoryProps) {
   const orderedMoves = useMemo(() => [...moves].reverse(), [moves]);
 
   if (moves.length === 0) {
@@ -176,7 +173,14 @@ function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps)
           const badgeClass = isBlue ? 'blue' : 'red';
 
           return (
-            <li key={move.move_number} className="move-history-item">
+            <li
+              key={move.move_number}
+              className="move-history-item"
+              onMouseEnter={() => onMoveHover(move.coordinates)}
+              onMouseLeave={() => onMoveHover(null)}
+              onFocus={() => onMoveHover(move.coordinates)}
+              onBlur={() => onMoveHover(null)}
+            >
               <span className="move-number">#{move.move_number}</span>
               <span className={`move-player-badge ${badgeClass}`}>{playerName}</span>
               <span className="move-text">
@@ -199,6 +203,7 @@ export function GamePage() {
   const [botThinking, setBotThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [highlightedCellKey, setHighlightedCellKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -282,6 +287,10 @@ export function GamePage() {
   }, [id, game]);
 
   const rows = useMemo(() => (game ? buildBoard(game.board_size) : []), [game]);
+
+  useEffect(() => {
+    setHighlightedCellKey(null);
+  }, [game?.moves]);
 
   const movesByCell = useMemo(() => {
     const map = new Map<string, Move>();
@@ -459,12 +468,14 @@ export function GamePage() {
           movesByCell={movesByCell}
           onPlayMove={playMoveAt}
           visualTurn={visualTurn}
+          highlightedCellKey={highlightedCellKey}
         />
 
         <MoveHistory
           moves={game.moves}
           bluePlayerName="You"
           redPlayerName={enemyTitle}
+          onMoveHover={(coordinates) => setHighlightedCellKey(coordinates ? coordinateKey(coordinates) : null)}
         />
       </div>
     </Panel>

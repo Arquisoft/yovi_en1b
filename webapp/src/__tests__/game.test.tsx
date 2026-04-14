@@ -289,3 +289,44 @@ describe('GamePage — bot metadata', () => {
     expect(screen.queryByLabelText('Bot settings')).not.toBeInTheDocument();
   });
 });
+
+// ─── move history hover ────────────────────────────────────────────────────────
+
+describe('GamePage — move history hover', () => {
+  test('hovering a move highlights its board field and clears on unhover', async () => {
+    const gameWithMoves: GameRecord = {
+      ...BASE_GAME,
+      moves: [
+        {
+          move_number: 1,
+          player: 'B',
+          coordinates: { x: 0, y: 0, z: 2 },
+          created_at: new Date().toISOString()
+        },
+        {
+          move_number: 2,
+          player: 'R',
+          coordinates: { x: 0, y: 1, z: 1 },
+          created_at: new Date().toISOString()
+        }
+      ]
+    };
+
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(gameWithMoves)));
+
+    renderGamePage();
+
+    await screen.findByLabelText('game board');
+    const firstMoveItem = screen.getByText('#1').closest('li');
+    expect(firstMoveItem).not.toBeNull();
+
+    const firstMoveHex = screen.getByLabelText(/^Hex \(0, 0, 2\)/i);
+    expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
+
+    await userEvent.hover(firstMoveItem as HTMLElement);
+    expect(firstMoveHex).toHaveClass('hex-wrap--history-highlight');
+
+    await userEvent.unhover(firstMoveItem as HTMLElement);
+    expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
+  });
+});
