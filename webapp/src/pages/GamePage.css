@@ -150,7 +150,6 @@
   margin-bottom: -14px;
 }
 
-/* Hex wrapper draws border color, inner .hex draws fill color. */
 .hex-wrap {
   --hex-size: 60px;
   --hex-border: 3px;
@@ -343,7 +342,7 @@
   border: 2px solid #f87171;
 }
 
-.game-result-box--draw {
+.game-result-box--canceled {
   background: linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%);
   border: 2px solid #c4b5fd;
 }

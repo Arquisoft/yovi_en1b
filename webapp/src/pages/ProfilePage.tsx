@@ -84,22 +84,22 @@ export function ProfilePage() {
     const totalGames = stats.total_games;
     const totalWins = stats.total_wins;
     const totalLosses = stats.total_losses;
-    const totalDraws = stats.total_draws;
+    const totalCanceled = stats.total_canceled;
 
     const playerCategoryBase = {
       label: 'Vs player',
       wins: stats.vs_player.wins,
       losses: stats.vs_player.losses,
-      draws: stats.vs_player.draws
+      canceled: stats.vs_player.draws
     };
 
-    const playerGames = playerCategoryBase.wins + playerCategoryBase.losses + playerCategoryBase.draws;
+    const playerGames = playerCategoryBase.wins + playerCategoryBase.losses + playerCategoryBase.canceled;
     const playerCategory = {
       ...playerCategoryBase,
       games: playerGames,
       winRate: percent(playerCategoryBase.wins, playerGames),
       lossRate: percent(playerCategoryBase.losses, playerGames),
-      drawRate: percent(playerCategoryBase.draws, playerGames),
+      canceledRate: percent(playerCategoryBase.canceled, playerGames),
       tone: getWinRateTone(percent(playerCategoryBase.wins, playerGames))
     };
 
@@ -141,8 +141,8 @@ export function ProfilePage() {
       totalGames,
       totalWins,
       totalLosses,
-      totalDraws,
-      completedGames: totalWins + totalLosses + totalDraws,
+      totalCanceled,
+      completedGames: totalWins + totalLosses + totalCanceled,
       overallWinRate: percent(totalWins, totalGames),
       playerCategory,
       botCategories
@@ -171,7 +171,7 @@ export function ProfilePage() {
           <section className="profile-kpis">
             <article className="profile-kpi"><span>Total games</span><strong>{derived.totalGames}</strong></article>
             <article className="profile-kpi profile-kpi--wins"><span>Total wins</span><strong>{derived.totalWins}</strong></article>
-            <article className="profile-kpi profile-kpi--draws"><span>Total draws</span><strong>{derived.totalDraws}</strong></article>
+            <article className="profile-kpi profile-kpi--draws"><span>Canceled games</span><strong>{derived.totalCanceled}</strong></article>
             <article className="profile-kpi profile-kpi--losses"><span>Total losses</span><strong>{derived.totalLosses}</strong></article>
             <article className={`profile-kpi ${getWinRateTone(derived.overallWinRate)}`}><span>Win rate</span><strong>{derived.overallWinRate}%</strong></article>
           </section>
@@ -181,13 +181,13 @@ export function ProfilePage() {
             <div
               className="profile-dual-bar"
               role="img"
-              aria-label={`Overall result split: ${derived.totalWins} wins, ${derived.totalDraws} draws and ${derived.totalLosses} losses`}
+              aria-label={`Overall result split: ${derived.totalWins} wins, ${derived.totalCanceled} canceled and ${derived.totalLosses} losses`}
             >
               <div className="profile-dual-bar__wins" style={{ width: `${percent(derived.totalWins, derived.completedGames)}%` }}>
                 W {derived.totalWins}
               </div>
-              <div className="profile-dual-bar__draws" style={{ width: `${percent(derived.totalDraws, derived.completedGames)}%` }}>
-                D {derived.totalDraws}
+              <div className="profile-dual-bar__draws" style={{ width: `${percent(derived.totalCanceled, derived.completedGames)}%` }}>
+                C {derived.totalCanceled}
               </div>
               <div className="profile-dual-bar__losses" style={{ width: `${percent(derived.totalLosses, derived.completedGames)}%` }}>
                 L {derived.totalLosses}
@@ -210,11 +210,11 @@ export function ProfilePage() {
                   </div>
                   <div className="profile-meter" role="img" aria-label={`${derived.playerCategory.label} win rate ${derived.playerCategory.winRate} percent`}>
                     <div className={`profile-meter__wins ${derived.playerCategory.tone}`} style={{ width: `${derived.playerCategory.winRate}%` }} />
-                    <div className="profile-meter__draws" style={{ width: `${derived.playerCategory.drawRate}%` }} />
+                    <div className="profile-meter__draws" style={{ width: `${derived.playerCategory.canceledRate}%` }} />
                     <div className="profile-meter__losses" style={{ width: `${derived.playerCategory.lossRate}%` }} />
                   </div>
                   <p className="profile-meter-caption">
-                    Win rate {derived.playerCategory.winRate}% | W {derived.playerCategory.wins} / D {derived.playerCategory.draws} / L {derived.playerCategory.losses}
+                    Win rate {derived.playerCategory.winRate}% | W {derived.playerCategory.wins} / C {derived.playerCategory.canceled} / L {derived.playerCategory.losses}
                   </p>
                 </article>
               </div>
@@ -237,7 +237,7 @@ export function ProfilePage() {
                         <div className="profile-meter__losses" style={{ width: `${category.lossRate}%` }} />
                       </div>
                       <p className="profile-meter-caption">
-                        Win rate {category.winRate}% | W {category.wins} / D {category.draws} / L {category.losses}
+                        Win rate {category.winRate}% | W {category.wins} / C {category.draws} / L {category.losses}
                       </p>
                     </article>
                   ))}
