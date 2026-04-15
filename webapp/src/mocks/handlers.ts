@@ -198,7 +198,7 @@ function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R
   return {
     ...nextGame,
     status: free.length === 0 ? 'FINISHED' : 'IN_PROGRESS',
-    result: free.length === 0 ? 'DRAW' : null
+    result: free.length === 0 ? 'CANCELED' : null
   };
 }
 
@@ -233,12 +233,12 @@ function getUserStatistics(userId: string): UserStatistics {
   for (const game of userGames) {
     if (game.result === 'WIN') stats.total_wins += 1;
     if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'DRAW') stats.total_canceled += 1;
+    if (game.result === 'CANCELED') stats.total_canceled += 1;
 
     if (game.game_type === 'PLAYER') {
       if (game.result === 'WIN') stats.vs_player.wins += 1;
       if (game.result === 'LOSS') stats.vs_player.losses += 1;
-      if (game.result === 'DRAW') stats.vs_player.draws += 1;
+      if (game.result === 'CANCELED') stats.vs_player.draws += 1;
       continue;
     }
 
@@ -246,7 +246,7 @@ function getUserStatistics(userId: string): UserStatistics {
     if (existing) {
       if (game.result === 'WIN') existing.wins += 1;
       if (game.result === 'LOSS') existing.losses += 1;
-      if (game.result === 'DRAW') existing.draws += 1;
+      if (game.result === 'CANCELED') existing.draws += 1;
     }
   }
 
@@ -514,7 +514,7 @@ export const handlers = [
 
     const free = getFreeCoordinates(game);
     if (free.length === 0) {
-      const finished = { ...game, status: 'FINISHED' as const, result: 'DRAW' as const };
+      const finished = { ...game, status: 'FINISHED' as const, result: 'CANCELED' as const };
       mockGames.set(finished._id, finished);
       return HttpResponse.json(finished);
     }
@@ -565,7 +565,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'DRAW'; duration_seconds?: number };
+    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'CANCELED'; duration_seconds?: number };
     if (!body.result) {
       return HttpResponse.json({ error: 'result is required' }, { status: 400 });
     }

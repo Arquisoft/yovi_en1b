@@ -24,11 +24,11 @@ function formatDuration(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
-function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'draw' | 'pending' {
+function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'canceled' | 'pending' {
   if (game.status !== 'FINISHED') return 'pending';
   if (game.result === 'WIN') return 'win';
   if (game.result === 'LOSS') return 'loss';
-  if (game.result === 'DRAW') return 'draw';
+  if (game.result === 'CANCELED') return 'canceled';
   return 'pending';
 }
 
@@ -135,8 +135,8 @@ export function GameHistoryPage() {
           <ul className="history-list" aria-label="Played games history">
             {sortedGames.map((game) => {
               const enemy = getEnemyLabel(game, username);
-              const outcome = getOutcome(game);
               const resultLabel = game.status === 'FINISHED' ? (game.result ?? 'FINISHED') : 'IN PROGRESS';
+              const outcome = getOutcome(game);
 
               return (
                 <li key={game._id} className={`history-item history-item--${outcome}`}>
@@ -147,8 +147,8 @@ export function GameHistoryPage() {
                     aria-label={`Open ${enemy} game from ${formatDate(game.created_at)}`}
                   >
                     <div className="history-item__top">
-                      <span className="history-type">{game.game_type}</span>
                       <span className={`history-result history-result--${outcome}`}>{resultLabel}</span>
+                      <span className="history-type">{game.game_type}</span>
                     </div>
 
                     <div className="history-item__main">

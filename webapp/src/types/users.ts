@@ -16,7 +16,7 @@ export type UserStatistics = {
   total_games: number;
   total_wins: number;
   total_losses: number;
-  total_draws: number;
+  total_canceled: number;
   vs_player: WinLossStats;
   vs_bots: BotStat[];
 };
@@ -43,4 +43,3 @@ export type Leaderboard = {
   overall: LeaderboardEntry[];
   vs_bots: Record<string, BotLeaderboardEntry[]>;
 };
-

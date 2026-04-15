@@ -35,7 +35,7 @@ export type GameRecord = {
   rule_set: RuleSet;
   current_turn: 'B' | 'R';
   status: 'IN_PROGRESS' | 'FINISHED';
-  result: 'WIN' | 'LOSS' | 'DRAW' | null;
+  result: 'WIN' | 'LOSS' | 'CANCELED' | null;
   duration_seconds: number;
   created_at: string;
   moves: Move[];
@@ -58,7 +58,7 @@ export type SubmitMovePayload = {
 };
 
 export type FinishGamePayload = {
-  result: 'WIN' | 'LOSS' | 'DRAW';
+  result: 'WIN' | 'LOSS' | 'CANCELED';
   duration_seconds?: number;
 };
 
