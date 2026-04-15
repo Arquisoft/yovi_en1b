@@ -3,6 +3,7 @@ import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/a
 import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
 import type { UserProfile, UserStatistics, WinLossStats, Leaderboard, BotLeaderboardEntry } from '../types/users';
 import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
+import { buildEmptyYenState, getNeighborCoordinates, parseYenState, serializeYenState } from '../utils/yenState';
 
 const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
@@ -43,6 +44,10 @@ function isOnBoard(size: number, coordinates: Coordinates): boolean {
   );
 }
 
+function getLatestYenState(game: GameRecord): string {
+  return game.moves.at(-1)?.yen_state ?? game.yen_final_state ?? buildEmptyYenState(game.board_size);
+}
+
 function listBoardCoordinates(size: number): Coordinates[] {
   const all: Coordinates[] = [];
   for (let row = 0; row < size; row += 1) {
@@ -53,9 +58,27 @@ function listBoardCoordinates(size: number): Coordinates[] {
   return all;
 }
 
+function createInitialYenState(size: number, variants: string[]): string {
+  const map = parseYenState(size, buildEmptyYenState(size));
+
+  if (!variants.includes('Explosions')) {
+    return serializeYenState(size, map);
+  }
+
+  const mineCandidates = listBoardCoordinates(size).filter((coord) => coord.x > 0 && coord.y > 0 && coord.z > 0);
+  const mineCount = Math.min(3, Math.max(1, Math.floor(size / 3)));
+
+  for (let index = 0; index < mineCount && index < mineCandidates.length; index += 1) {
+    const selected = mineCandidates[(index * 2) % mineCandidates.length];
+    map.set(coordinateKey(selected), { owner: null, hasMine: true });
+  }
+
+  return serializeYenState(size, map);
+}
+
 function getFreeCoordinates(game: GameRecord): Coordinates[] {
-  const occupied = new Set(game.moves.map((move) => coordinateKey(move.coordinates)));
-  return listBoardCoordinates(game.board_size).filter((coordinates) => !occupied.has(coordinateKey(coordinates)));
+  const currentMap = parseYenState(game.board_size, getLatestYenState(game));
+  return listBoardCoordinates(game.board_size).filter((coordinates) => !currentMap.get(coordinateKey(coordinates))?.owner);
 }
 
 function extractUserId(request: Request): string | null {
@@ -70,6 +93,8 @@ function extractUserId(request: Request): string | null {
 
 function createGameRecord(userId: string, payload: CreateGamePayload): GameRecord {
   const gameId = `game-${gameCounter++}`;
+  const variants = payload.variants ?? [];
+
   return {
     _id: gameId,
     player_id: userId,
@@ -77,7 +102,7 @@ function createGameRecord(userId: string, payload: CreateGamePayload): GameRecor
     name_of_enemy: payload.name_of_enemy ?? null,
     board_size: payload.board_size,
     strategy: payload.strategy ?? 'random',
-    variants: payload.variants ?? [],
+    variants,
     difficulty_level: payload.difficulty_level ?? 'medium',
     rule_set: payload.rule_set ?? 'normal',
     current_turn: 'B',
@@ -85,6 +110,7 @@ function createGameRecord(userId: string, payload: CreateGamePayload): GameRecor
     result: null,
     duration_seconds: 0,
     created_at: new Date().toISOString(),
+    yen_final_state: createInitialYenState(payload.board_size, variants),
     moves: []
   };
 }
@@ -97,21 +123,14 @@ function getGameForUser(gameId: string, userId: string): GameRecord | null {
   return game;
 }
 
-const HEX_DIRECTIONS: Coordinates[] = [
-  { x: 1, y: -1, z: 0 },
-  { x: 1, y: 0, z: -1 },
-  { x: 0, y: 1, z: -1 },
-  { x: -1, y: 1, z: 0 },
-  { x: -1, y: 0, z: 1 },
-  { x: 0, y: -1, z: 1 }
-];
+function hasWinningConnection(state: ReturnType<typeof parseYenState>, boardSize: number, player: 'B' | 'R'): boolean {
+  const owned = new Set<string>();
 
-function hasWinningConnection(game: GameRecord, player: 'B' | 'R'): boolean {
-  const owned = new Set(
-    game.moves
-      .filter((move) => move.player === player)
-      .map((move) => coordinateKey(move.coordinates))
-  );
+  for (const [key, cell] of state.entries()) {
+    if (cell.owner === player) {
+      owned.add(key);
+    }
+  }
 
   const visited = new Set<string>();
 
@@ -127,6 +146,7 @@ function hasWinningConnection(game: GameRecord, player: 'B' | 'R'): boolean {
     while (queue.length > 0) {
       const current = queue.shift()!;
       const key = coordinateKey(current);
+
       if (visited.has(key)) {
         continue;
       }
@@ -137,20 +157,11 @@ function hasWinningConnection(game: GameRecord, player: 'B' | 'R'): boolean {
       if (current.y === 0) touched.add('y');
       if (current.z === 0) touched.add('z');
 
-      for (const delta of HEX_DIRECTIONS) {
-        const next = {
-          x: current.x + delta.x,
-          y: current.y + delta.y,
-          z: current.z + delta.z
-        };
+      for (const neighbor of getNeighborCoordinates(boardSize, current)) {
+        const neighborKey = coordinateKey(neighbor);
 
-        if (!isOnBoard(game.board_size, next)) {
-          continue;
-        }
-
-        const nextKey = coordinateKey(next);
-        if (!visited.has(nextKey) && owned.has(nextKey)) {
-          queue.push(next);
+        if (!visited.has(neighborKey) && owned.has(neighborKey)) {
+          queue.push(neighbor);
         }
       }
     }
@@ -164,34 +175,46 @@ function hasWinningConnection(game: GameRecord, player: 'B' | 'R'): boolean {
 }
 
 function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R'): GameRecord {
+  const currentMap = parseYenState(game.board_size, getLatestYenState(game));
+  const nextMap = new Map(currentMap);
+
+  const targetKey = coordinateKey(coordinates);
+  const target = nextMap.get(targetKey);
+  const explosionsEnabled = game.variants.includes('Explosions');
+
+  if (explosionsEnabled && target?.hasMine && !target.owner) {
+    nextMap.set(targetKey, { owner: player, hasMine: false });
+
+    for (const neighbor of getNeighborCoordinates(game.board_size, coordinates)) {
+      nextMap.set(coordinateKey(neighbor), { owner: null, hasMine: false });
+    }
+  } else {
+    nextMap.set(targetKey, { owner: player, hasMine: false });
+  }
+
+  const nextYenState = serializeYenState(game.board_size, nextMap);
+
   const move: Move = {
     move_number: game.moves.length + 1,
     player,
     coordinates,
+    yen_state: nextYenState,
     created_at: new Date().toISOString()
   };
 
-  const nextMoves = [...game.moves, move];
   const nextGame: GameRecord = {
     ...game,
-    moves: nextMoves,
+    moves: [...game.moves, move],
+    yen_final_state: nextYenState,
     current_turn: player === 'B' ? 'R' : 'B'
   };
 
-  if (hasWinningConnection(nextGame, 'B')) {
-    return {
-      ...nextGame,
-      status: 'FINISHED',
-      result: 'WIN'
-    };
+  if (hasWinningConnection(nextMap, game.board_size, 'B')) {
+    return { ...nextGame, status: 'FINISHED', result: 'WIN' };
   }
 
-  if (hasWinningConnection(nextGame, 'R')) {
-    return {
-      ...nextGame,
-      status: 'FINISHED',
-      result: 'LOSS'
-    };
+  if (hasWinningConnection(nextMap, game.board_size, 'R')) {
+    return { ...nextGame, status: 'FINISHED', result: 'LOSS' };
   }
 
   const free = getFreeCoordinates(nextGame);
@@ -483,7 +506,8 @@ export const handlers = [
       return HttpResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
 
-    if (game.moves.some((move) => coordinateKey(move.coordinates) === coordinateKey(coordinates))) {
+    const currentMap = parseYenState(game.board_size, getLatestYenState(game));
+    if (currentMap.get(coordinateKey(coordinates))?.owner) {
       return HttpResponse.json({ error: 'Coordinate is already occupied' }, { status: 400 });
     }
 
@@ -545,6 +569,7 @@ export const handlers = [
     const nextGame: GameRecord = {
       ...game,
       moves: nextMoves,
+      yen_final_state: nextMoves.at(-1)?.yen_state ?? buildEmptyYenState(game.board_size),
       current_turn: nextMoves.length % 2 === 0 ? 'B' : 'R',
       status: 'IN_PROGRESS',
       result: null
@@ -574,6 +599,7 @@ export const handlers = [
       ...game,
       status: 'FINISHED',
       result: body.result,
+      yen_final_state: game.moves.at(-1)?.yen_state ?? game.yen_final_state ?? null,
       duration_seconds: body.duration_seconds ?? game.duration_seconds
     };
 

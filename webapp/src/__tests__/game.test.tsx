@@ -336,3 +336,70 @@ describe('GamePage — move history hover', () => {
     expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
   });
 });
+
+// ─── explosions variant ───────────────────────────────────────────────────────
+
+describe('GamePage — explosions variant', () => {
+  test('renders a mine and previews affected neighbors on hover', async () => {
+    const explosionGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      variants: ['Explosions'],
+      name_of_enemy: null,
+      strategy: 'ai',
+      yen_final_state: 'e/../...'
+    };
+
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(explosionGame)));
+
+    renderGamePage();
+
+    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    await userEvent.hover(mineHex);
+
+    expect(screen.getByLabelText(/^Hex \(0, 1, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
+  });
+
+  test('clicking a mine applies returned yen_state snapshot', async () => {
+    const explosionGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      variants: ['Explosions'],
+      name_of_enemy: null,
+      strategy: 'ai',
+      current_turn: 'B',
+      yen_final_state: 'e/../...'
+    };
+
+    server.use(
+      http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(explosionGame)),
+      http.post(`*/games/${GAME_TEST_DATA.gameId}/move`, () =>
+        HttpResponse.json(
+          {
+            ...explosionGame,
+            current_turn: 'R',
+            moves: [
+              {
+                move_number: 1,
+                player: 'B',
+                coordinates: { x: 0, y: 0, z: 2 },
+                yen_state: 'B/../...',
+                created_at: new Date().toISOString()
+              }
+            ],
+            yen_final_state: 'B/../...'
+          },
+          { status: 201 }
+        )
+      )
+    );
+
+    renderGamePage();
+
+    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    await userEvent.click(mineHex);
+
+    await screen.findByLabelText(/^Hex \(0, 0, 2\) - Blue$/i);
+    expect(screen.queryByLabelText(/^Hex \(0, 0, 2\) - mine$/i)).not.toBeInTheDocument();
+  });
+});

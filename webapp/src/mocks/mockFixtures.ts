@@ -24,6 +24,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     result: 'WIN',
     duration_seconds: 180,
     created_at: '2026-03-16T10:00:00.000Z',
+    yen_final_state: 'B/.R/BR./B..R/.....',
     moves: []
   },
   {
@@ -41,6 +42,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     result: 'WIN',
     duration_seconds: 120,
     created_at: '2026-03-16T11:00:00.000Z',
+    yen_final_state: 'B/.B/BR./R..R/.....',
     moves: []
   },
   {
@@ -58,6 +60,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     result: 'LOSS',
     duration_seconds: 240,
     created_at: '2026-03-16T12:00:00.000Z',
+    yen_final_state: 'R/.R/RB./B..R/.....',
     moves: []
   },
   {
@@ -72,9 +75,10 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     rule_set: 'normal',
     current_turn: 'B',
     status: 'FINISHED',
-    result: 'DRAW',
+    result: 'CANCELED',
     duration_seconds: 300,
     created_at: '2026-03-16T13:00:00.000Z',
+    yen_final_state: 'B/.R/RB./B..R/.....',
     moves: []
   }
 ];

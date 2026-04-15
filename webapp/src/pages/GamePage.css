@@ -200,6 +200,44 @@
   background: #ffffff;
 }
 
+.hex.blue {
+  background: linear-gradient(160deg, #60a5fa 0%, #1d4ed8 100%);
+  color: transparent;
+}
+
+.hex.red {
+  background: linear-gradient(160deg, #f87171 0%, #b91c1c 100%);
+  color: transparent;
+}
+
+.hex-wrap--mine-neighbor, .hex-wrap.blue.hex-wrap--mine-neighbor, .hex-wrap.red.hex-wrap--mine-neighbor  {
+  background: rgba(250, 204, 21, 0.7);
+  z-index: 1;
+}
+
+.hex-wrap--exploding {
+  animation: mineBlastPulse 0.52s ease-out;
+}
+
+.hex-wrap--exploding .hex {
+  box-shadow: 0 0 0 2px rgba(254, 240, 138, 0.92), 0 0 28px rgba(251, 191, 36, 0.75);
+}
+
+@keyframes mineBlastPulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(1.08);
+    filter: brightness(1.45);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
 .hex {
   width: calc(var(--hex-size) - 2 * var(--hex-border));
   height: calc((var(--hex-size) - 2 * var(--hex-border)) * 1.1547);
@@ -214,20 +252,31 @@
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   transition: background 0.15s ease;
   pointer-events: none;
+  position: relative;
+  overflow: hidden;
 }
 
-.hex-wrap:hover:not(.hex-wrap--disabled) .hex {
-  background: #334155;
+.hex-wrap--mine .hex {
+  background: linear-gradient(165deg, #334155 0%, #0f172a 100%);
 }
 
-.hex.blue {
-  background: linear-gradient(160deg, #60a5fa 0%, #1d4ed8 100%);
-  color: transparent;
+.hex-mine {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f8fafc 0%, #cbd5e1 20%, #475569 22%, #0f172a 100%);
+  box-shadow: 0 1px 0 rgba(148, 163, 184, 0.6), 0 0 10px rgba(148, 163, 184, 0.2);
 }
 
-.hex.red {
-  background: linear-gradient(160deg, #f87171 0%, #b91c1c 100%);
-  color: transparent;
+.hex-mine::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: #f59e0b;
+  transform: translate(11px, -6px) rotate(-28deg);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
 }
 
 /* Focus ring for keyboard accessibility on board buttons */

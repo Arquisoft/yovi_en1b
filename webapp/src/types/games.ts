@@ -20,6 +20,7 @@ export type Move = {
   move_number: number;
   player: 'B' | 'R';
   coordinates: Coordinates;
+  yen_state?: string | null;
   created_at: string;
 };
 
@@ -38,6 +39,7 @@ export type GameRecord = {
   result: 'WIN' | 'LOSS' | 'CANCELED' | null;
   duration_seconds: number;
   created_at: string;
+  yen_final_state?: string | null;
   moves: Move[];
 };
 
