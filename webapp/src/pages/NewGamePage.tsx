@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createGame, getGameOptions } from '../api/gamesApi';
 import { Panel } from '../components/ui/Panel';
-import type { CreateGamePayload, GameType, StrategyOption } from '../types/games';
+import type { CreateGamePayload, GameType, StrategyOption, VariantOption } from '../types/games';
 import { formatGameLabel } from '../utils/gameLabels';
 import './NewGamePage.css';
 
@@ -12,7 +12,9 @@ export function NewGamePage() {
   const [boardSize, setBoardSize] = useState(5);
   const [opponentName, setOpponentName] = useState('');
   const [strategies, setStrategies] = useState<StrategyOption[]>([]);
+  const [variants, setVariants] = useState<VariantOption[]>([]);
   const [selectedStrategyName, setSelectedStrategyName] = useState('');
+  const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export function NewGamePage() {
         if (!mounted) return;
 
         setStrategies(options.strategies ?? []);
+        setVariants(options.variants ?? []);
         if (options.strategies?.length) {
           setSelectedStrategyName(options.strategies[0].name);
         }
@@ -51,6 +54,34 @@ export function NewGamePage() {
     [strategies, selectedStrategyName]
   );
 
+  const normalizedStrategyName = selectedStrategyName.toLowerCase();
+
+  const visibleVariants = useMemo(() => {
+    if (gameType !== 'BOT') {
+      return variants;
+    }
+
+    return variants.filter((variant) => {
+      if (!variant.allowed_strategies?.length) {
+        return true;
+      }
+
+      return variant.allowed_strategies.includes(normalizedStrategyName);
+    });
+  }, [gameType, variants, normalizedStrategyName]);
+
+  const toggleVariant = (name: string) => {
+    setSelectedVariants((current) => (
+      current.includes(name)
+        ? current.filter((variant) => variant !== name)
+        : [...current, name]
+    ));
+  };
+
+  useEffect(() => {
+    setSelectedVariants((current) => current.filter((name) => visibleVariants.some((variant) => variant.name === name)));
+  }, [visibleVariants]);
+
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -72,7 +103,7 @@ export function NewGamePage() {
       const payload: CreateGamePayload = {
         board_size: boardSize,
         game_type: gameType,
-        rule_set: 'normal'
+        variants: selectedVariants
       };
 
       if (gameType === 'PLAYER') {
@@ -199,23 +230,36 @@ export function NewGamePage() {
         )}
 
         <fieldset className="form-section">
-          <legend>Rules</legend>
-          <div className="form-group">
-            <label className="radio-label">
-              <input
-                type="radio"
-                name="rules"
-                value="normal"
-                defaultChecked
-                disabled={loading}
-                aria-label="Standard Rules"
-              />
-              <span className="radio-text">
-                <strong>Standard Rules</strong>
-                <small>Connect three sides of the triangle</small>
-              </span>
-            </label>
-          </div>
+          <legend>Variants</legend>
+          <p className="variants-note">Standard rules are always on. You can add one or more extras below.</p>
+          {loadingOptions ? (
+            <p className="strategy-loading">Loading available variants...</p>
+          ) : (
+            <div className="variants-grid" aria-label="Game variants">
+              {visibleVariants.map((variant) => {
+                const checked = selectedVariants.includes(variant.name);
+
+                return (
+                  <label className={`variant-card${checked ? ' variant-card--selected' : ''}`} key={variant.name}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleVariant(variant.name)}
+                      disabled={loading}
+                      aria-label={variant.name}
+                    />
+                    <span className="variant-card__content">
+                      <strong>{variant.name}</strong>
+                      <small>{variant.description}</small>
+                    </span>
+                  </label>
+                );
+              })}
+              {visibleVariants.length === 0 && (
+                <p className="strategy-loading">No variants available for selected strategy.</p>
+              )}
+            </div>
+          )}
         </fieldset>
 
         <div className="form-actions">

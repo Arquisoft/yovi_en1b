@@ -4,6 +4,12 @@ export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 
 export type RuleSet = 'normal' | 'extended' | 'custom';
 
+export type VariantOption = {
+  name: string;
+  description: string;
+  allowed_strategies?: string[];
+};
+
 export type Coordinates = {
   x: number;
   y: number;
@@ -14,6 +20,7 @@ export type Move = {
   move_number: number;
   player: 'B' | 'R';
   coordinates: Coordinates;
+  yen_state?: string | null;
   created_at: string;
 };
 
@@ -24,6 +31,7 @@ export type GameRecord = {
   name_of_enemy: string | null;
   board_size: number;
   strategy: string;
+  variants: string[];
   difficulty_level: DifficultyLevel;
   rule_set: RuleSet;
   current_turn: 'B' | 'R';
@@ -31,6 +39,7 @@ export type GameRecord = {
   result: 'WIN' | 'LOSS' | 'CANCELED' | null;
   duration_seconds: number;
   created_at: string;
+  yen_final_state?: string | null;
   moves: Move[];
 };
 
@@ -41,6 +50,7 @@ export type CreateGamePayload = {
   game_type: GameType;
   name_of_enemy?: string;
   strategy?: string;
+  variants?: string[];
   difficulty_level?: DifficultyLevel;
   rule_set?: RuleSet;
 };
@@ -61,5 +71,5 @@ export type StrategyOption = {
 
 export type GameOptions = {
   strategies: StrategyOption[];
-  variants: string[];
+  variants: VariantOption[];
 };
