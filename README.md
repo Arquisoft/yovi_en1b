@@ -49,16 +49,16 @@ yovi_en1b/
 
 ## 🎮 What can you do?
 
-| Feature | Description |
-|---|---|
-| **🔐 Auth** | Register and log in securely with bcrypt + JWT |
-| **🤖 vs Bot** | Face the AI at easy, medium, or hard |
-| **🧑‍🤝‍🧑 vs Player** | Local multiplayer, same device |
-| **🕘 History** | Browse all your past games |
-| **🔁 Replay** | Watch any game back move by move |
-| **📊 Stats** | Wins, losses, and performance by difficulty |
-| **📡 Monitoring** | Prometheus metrics on the backend |
-| **🗃️ Database** | Access MongoDB via Compass at `mongodb://127.0.0.1:27017/app_database` |
+| Feature | Description                                                 |
+|---|-------------------------------------------------------------|
+| **🔐 Authentication** | Register and log in securely to keep track about your games |
+| **💥 Game Variants** | Play special modes such as the one with explosion           |
+| **🗺️ Board Sizes** | Choose between different board sizes for each match         |
+| **🧑‍🤝‍🧑 vs Player** | Play locally against another player on the same device      |
+| **🤖 vs Bots** | Challenge bots powered by several strategies                |
+| **🕘 Game History** | Browse previous games and review what happened              |
+| **🏆 Leaderboard** | Compare results and rankings with other players             |
+| **📊 Statistics** | Track wins, losses, and performance over time               |
 
 ---
 
@@ -129,7 +129,7 @@ cd gamey && cargo run
 
 ## 📚 More info
 
-- 📖 Architecture and documentation: [`docs/`](docs/)
+- 📖 Architecture and documentation: `docs/`
 - 🧪 Service-specific setup: see the README files in each subproject
 
 ---
