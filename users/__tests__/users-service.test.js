@@ -632,37 +632,41 @@ describe('POST /play', () => {
     it('returns 400 if position is missing', async () => {
         const res = await request(app)
             .post('/play')
-            .send({ bot_id: 'random', board_size: 7 })
+            .send({ bot_id: 'random' })
 
         expect(res.status).toBe(400)
     })
 
-    it('defaults to ncts bot when bot_id is not provided', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
-        }))
-
-        const res = await request(app)
-            .post('/play')
-            .send({ position: null })
-
-        expect(res.status).toBe(200)
-    })
-
-    it('defaults board_size to 5 when not provided', async () => {
+    it('defaults to ncts bot when no strategy is provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
         })
         vi.stubGlobal('fetch', fetchMock)
 
-        await request(app)
+        const res = await request(app)
             .post('/play')
-            .send({ position: null })
+            .send({ position: 'B/.B/RB./B..R' })
 
+        expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
-        expect(callBody.board_size).toBe(5)
+        expect(callBody.strategy).toBe('ncts')  // bot_id maps to strategy
+    })
+
+    it('uses provided board_size when given', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        const res = await request(app)
+            .post('/play')
+            .send({ position: 'B/.B/RB./B..R', board_size: 7 })
+
+        expect(res.status).toBe(200)
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+        expect(callBody.board_size).toBe(7)
     })
 
     it('returns 503 when Gamey is unreachable', async () => {
@@ -670,7 +674,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ position: null })
+            .send({ position: 'B/.B/RB./B..R' })
 
         expect(res.status).toBe(503)
     })
@@ -680,7 +684,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ position: null })
+            .send({ position: 'B/.B/RB./B..R' })
 
         expect(res.status).toBe(502)
     })
@@ -693,7 +697,7 @@ describe('POST /play', () => {
 
         const res = await request(app)
             .post('/play')
-            .send({ position: null })
+            .send({ position: 'B/.B/RB./B..R' })
 
         expect(res.status).toBe(200)
     })

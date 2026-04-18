@@ -11,12 +11,13 @@ module.exports = function playRoute() {
     };
 
     // Public bot play — no auth, no game id needed
+    // position = yen_state, bot_id = strategy (public API naming)
     router.post('/play', async function publicBotPlay(req, res) {
         const { position, bot_id, board_size } = req.body || {};
 
-        if (!position) return res.status(400).json({ error: 'position is required' });
+        if (position === undefined) return res.status(400).json({ error: 'position is required' });
 
-        const resolvedStrategy = bot_id || 'ncts';  // default to hardest bot
+        const resolvedStrategy = bot_id || 'ncts';
 
         let gameyResponse;
         try {
@@ -27,7 +28,7 @@ module.exports = function playRoute() {
                     yen_state:        position,
                     strategy:         resolvedStrategy,
                     difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'hard',
-                    board_size:       board_size ?? 5  // default board size if not provided
+                    board_size:       board_size ?? 5
                 })
             });
         } catch {
