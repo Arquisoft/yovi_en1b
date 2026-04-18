@@ -28,6 +28,7 @@ const BASE_GAME: GameRecord = {
   name_of_enemy: GAME_TEST_DATA.enemyName,
   board_size: 3,
   strategy: 'random',
+  variants: [],
   difficulty_level: 'medium',
   rule_set: 'normal',
   current_turn: 'B',
@@ -137,6 +138,7 @@ describe('GamePage — move', () => {
     const redTurnGame: GameRecord = {
       ...BASE_GAME,
       current_turn: 'R',
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -169,6 +171,7 @@ describe('GamePage — move', () => {
     );
     const gameWithMove: GameRecord = {
       ...BASE_GAME,
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -200,6 +203,7 @@ describe('GamePage — undo', () => {
     const gameWithMove: GameRecord = {
       ...BASE_GAME,
       current_turn: 'R',
+      variants: [],
       moves: [{
         move_number: 1,
         player: 'B',
@@ -226,22 +230,23 @@ describe('GamePage — undo', () => {
 // ─── finish ───────────────────────────────────────────────────────────────────
 
 describe('GamePage — finish', () => {
-  test('finish button sends DRAW result and shows it in UI', async () => {
+  test('finish button sends CANCELED result and shows canceled status in UI', async () => {
     server.use(
       http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)),
       http.put(`*/games/${GAME_TEST_DATA.gameId}/finish`, () =>
-        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'DRAW' })
+        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'CANCELED' })
       )
     );
     renderGamePage();
     await screen.findByLabelText('game board');
     await userEvent.click(screen.getByRole('button', { name: /finish/i }));
-    await screen.findByText(/draw/i);
+    await screen.findByText(/^canceled$/i);
   });
 
   test('finish action is not available after game is already finished', async () => {
     const finishedGame: GameRecord = {
       ...BASE_GAME,
+      variants: [],
       status: 'FINISHED',
       result: 'WIN',
       moves: [{
@@ -264,6 +269,7 @@ describe('GamePage — bot metadata', () => {
     const botGame: GameRecord = {
       ...BASE_GAME,
       game_type: 'BOT',
+      variants: [],
       name_of_enemy: null,
       current_turn: 'B',
       difficulty_level: 'hard',
@@ -287,5 +293,113 @@ describe('GamePage — bot metadata', () => {
 
     await screen.findByLabelText('game board');
     expect(screen.queryByLabelText('Bot settings')).not.toBeInTheDocument();
+  });
+});
+
+// ─── move history hover ────────────────────────────────────────────────────────
+
+describe('GamePage — move history hover', () => {
+  test('hovering a move highlights its board field and clears on unhover', async () => {
+    const gameWithMoves: GameRecord = {
+      ...BASE_GAME,
+      moves: [
+        {
+          move_number: 1,
+          player: 'B',
+          coordinates: { x: 0, y: 0, z: 2 },
+          created_at: new Date().toISOString()
+        },
+        {
+          move_number: 2,
+          player: 'R',
+          coordinates: { x: 0, y: 1, z: 1 },
+          created_at: new Date().toISOString()
+        }
+      ]
+    };
+
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(gameWithMoves)));
+
+    renderGamePage();
+
+    await screen.findByLabelText('game board');
+    const firstMoveItem = screen.getByText('#1').closest('li');
+    expect(firstMoveItem).not.toBeNull();
+
+    const firstMoveHex = screen.getByLabelText(/^Hex \(0, 0, 2\)/i);
+    expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
+
+    await userEvent.hover(firstMoveItem as HTMLElement);
+    expect(firstMoveHex).toHaveClass('hex-wrap--history-highlight');
+
+    await userEvent.unhover(firstMoveItem as HTMLElement);
+    expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
+  });
+});
+
+// ─── explosions variant ───────────────────────────────────────────────────────
+
+describe('GamePage — explosions variant', () => {
+  test('renders a mine and previews affected neighbors on hover', async () => {
+    const explosionGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      variants: ['Explosions'],
+      name_of_enemy: null,
+      strategy: 'ai',
+      yen_final_state: 'e/../...'
+    };
+
+    server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(explosionGame)));
+
+    renderGamePage();
+
+    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    await userEvent.hover(mineHex);
+
+    expect(screen.getByLabelText(/^Hex \(0, 1, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
+  });
+
+  test('clicking a mine applies returned yen_state snapshot', async () => {
+    const explosionGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      variants: ['Explosions'],
+      name_of_enemy: null,
+      strategy: 'ai',
+      current_turn: 'B',
+      yen_final_state: 'e/../...'
+    };
+
+    server.use(
+      http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(explosionGame)),
+      http.post(`*/games/${GAME_TEST_DATA.gameId}/move`, () =>
+        HttpResponse.json(
+          {
+            ...explosionGame,
+            current_turn: 'R',
+            moves: [
+              {
+                move_number: 1,
+                player: 'B',
+                coordinates: { x: 0, y: 0, z: 2 },
+                yen_state: 'B/../...',
+                created_at: new Date().toISOString()
+              }
+            ],
+            yen_final_state: 'B/../...'
+          },
+          { status: 201 }
+        )
+      )
+    );
+
+    renderGamePage();
+
+    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    await userEvent.click(mineHex);
+
+    await screen.findByLabelText(/^Hex \(0, 0, 2\) - Blue$/i);
+    expect(screen.queryByLabelText(/^Hex \(0, 0, 2\) - mine$/i)).not.toBeInTheDocument();
   });
 });

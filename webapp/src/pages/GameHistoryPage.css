@@ -61,7 +61,7 @@
   border-color: rgba(239, 68, 68, 0.35);
 }
 
-.history-item--draw {
+.history-item--canceled {
   background: linear-gradient(135deg, rgba(91, 33, 182, 0.18), rgba(15, 23, 42, 0.95));
   border-color: rgba(139, 92, 246, 0.35);
 }

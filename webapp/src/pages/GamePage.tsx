@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { finishGame, getGame, playBotTurn, submitMove, undoMove } from '../api/gamesApi';
 import type { Coordinates, GameRecord, Move } from '../types/games';
 import { Panel } from '../components/ui/Panel';
 import { formatGameLabel } from '../utils/gameLabels';
+import {
+  coordinateKey,
+  getNeighborCoordinates,
+  parseYenState,
+  type YenCellState
+} from '../utils/yenState';
 import './GamePage.css';
 
 const HEX_SIZE = 60;
 const HEX_GAP = 2;
 const COL_STEP = HEX_SIZE + HEX_GAP;
+const EXPLOSION_ANIMATION_MS = 520;
 
 interface HexCell {
   coordinates: Coordinates;
@@ -18,15 +25,20 @@ interface BoardProps {
   readonly boardSize: number;
   readonly rows: HexCell[][];
   readonly canPlay: boolean;
-  readonly movesByCell: Map<string, Move>;
+  readonly cellStateByKey: Map<string, YenCellState>;
   readonly onPlayMove: (coordinates: Coordinates) => Promise<void>;
   readonly visualTurn: 'B' | 'R';
+  readonly highlightedCellKey: string | null;
+  readonly previewNeighborKeys: ReadonlySet<string>;
+  readonly explodingCellKeys: ReadonlySet<string>;
+  readonly onBoardHover: (coordinates: Coordinates | null) => void;
 }
 
 interface MoveHistoryProps {
   readonly moves: Move[];
   readonly bluePlayerName: string;
   readonly redPlayerName: string;
+  readonly onMoveHover: (coordinates: Coordinates | null) => void;
 }
 
 function buildBoard(size: number): HexCell[][] {
@@ -39,10 +51,6 @@ function buildBoard(size: number): HexCell[][] {
 
 function rowOffset(size: number, rowLen: number): number {
   return ((size - rowLen) * COL_STEP) / 2;
-}
-
-function coordinateKey(c: Coordinates): string {
-  return `${c.x}:${c.y}:${c.z}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -77,7 +85,7 @@ function getEnemyTitle(game: GameRecord): string {
   return game.name_of_enemy ?? 'Player 2 (Red)';
 }
 
-function getOwnerClass(owner: Move['player'] | undefined): string {
+function getOwnerClass(owner: Move['player'] | null | undefined): string {
   if (owner === 'B') {
     return ' blue';
   }
@@ -89,17 +97,22 @@ function getOwnerClass(owner: Move['player'] | undefined): string {
   return '';
 }
 
-function getCellAriaLabel(coordinates: Coordinates, owner: Move['player'] | undefined): string {
-  let ownerLabel: string | null = null;
+function getCellAriaLabel(coordinates: Coordinates, cellState: YenCellState | undefined): string {
+  const owner = cellState?.owner;
 
   if (owner === 'B') {
-    ownerLabel = 'Blue';
-  } else if (owner === 'R') {
-    ownerLabel = 'Red';
+    return `Hex (${coordinates.x}, ${coordinates.y}, ${coordinates.z}) - Blue`;
   }
 
-  const suffix = ownerLabel ? ` - ${ownerLabel}` : '';
-  return `Hex (${coordinates.x}, ${coordinates.y}, ${coordinates.z})${suffix}`;
+  if (owner === 'R') {
+    return `Hex (${coordinates.x}, ${coordinates.y}, ${coordinates.z}) - Red`;
+  }
+
+  if (cellState?.hasMine) {
+    return `Hex (${coordinates.x}, ${coordinates.y}, ${coordinates.z}) - mine`;
+  }
+
+  return `Hex (${coordinates.x}, ${coordinates.y}, ${coordinates.z})`;
 }
 
 function getRowKey(row: HexCell[]): string {
@@ -107,7 +120,18 @@ function getRowKey(row: HexCell[]): string {
   return first ? `row-${first.x}-${first.y}-${first.z}-${row.length}` : `row-empty-${row.length}`;
 }
 
-function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }: BoardProps) {
+function Board({
+  boardSize,
+  rows,
+  canPlay,
+  cellStateByKey,
+  onPlayMove,
+  visualTurn,
+  highlightedCellKey,
+  previewNeighborKeys,
+  explodingCellKeys,
+  onBoardHover
+}: BoardProps) {
   return (
     <section className="board-wrap">
       <div className="board" aria-label="game board">
@@ -119,11 +143,15 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }
           >
             {row.map((cell) => {
               const key = coordinateKey(cell.coordinates);
-              const owner = movesByCell.get(key)?.player;
-              const ownerClass = getOwnerClass(owner);
-              const disabled = !canPlay || Boolean(owner);
-              const cellLabel = getCellAriaLabel(cell.coordinates, owner);
-              const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''} turn-indicator-${visualTurn}`;
+              const state = cellStateByKey.get(key);
+              const ownerClass = getOwnerClass(state?.owner);
+              const isOccupied = Boolean(state?.owner);
+              const hasMine = Boolean(state?.hasMine) && !isOccupied;
+              const disabled = !canPlay || isOccupied;
+              const isHighlighted = highlightedCellKey === key;
+              const isNeighborPreview = previewNeighborKeys.has(key);
+              const isExploding = explodingCellKeys.has(key);
+              const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''}${isHighlighted ? ' hex-wrap--history-highlight' : ''}${hasMine ? ' hex-wrap--mine' : ''}${isNeighborPreview ? ' hex-wrap--mine-neighbor' : ''}${isExploding ? ' hex-wrap--exploding' : ''} turn-indicator-${visualTurn}`;
 
               return (
                 <button
@@ -132,12 +160,18 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }
                   className={cellClass}
                   disabled={disabled}
                   aria-disabled={disabled}
-                  aria-label={cellLabel}
+                  aria-label={getCellAriaLabel(cell.coordinates, state)}
+                  onMouseEnter={() => onBoardHover(cell.coordinates)}
+                  onMouseLeave={() => onBoardHover(null)}
+                  onFocus={() => onBoardHover(cell.coordinates)}
+                  onBlur={() => onBoardHover(null)}
                   onClick={() => {
                     void onPlayMove(cell.coordinates);
                   }}
                 >
-                  <div className={`hex${ownerClass}`}>{owner ?? ''}</div>
+                  <div className={`hex${ownerClass}`}>
+                    {hasMine ? <span className="hex-mine" aria-hidden="true" /> : null}
+                  </div>
                 </button>
               );
             })}
@@ -148,13 +182,7 @@ function Board({ boardSize, rows, canPlay, movesByCell, onPlayMove, visualTurn }
   );
 }
 
-interface MoveHistoryProps {
-  readonly moves: Move[];
-  readonly bluePlayerName: string;
-  readonly redPlayerName: string;
-}
-
-function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps) {
+function MoveHistory({ moves, bluePlayerName, redPlayerName, onMoveHover }: MoveHistoryProps) {
   const orderedMoves = useMemo(() => [...moves].reverse(), [moves]);
 
   if (moves.length === 0) {
@@ -176,7 +204,14 @@ function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps)
           const badgeClass = isBlue ? 'blue' : 'red';
 
           return (
-            <li key={move.move_number} className="move-history-item">
+            <li
+              key={move.move_number}
+              className="move-history-item"
+              onMouseEnter={() => onMoveHover(move.coordinates)}
+              onMouseLeave={() => onMoveHover(null)}
+              onFocus={() => onMoveHover(move.coordinates)}
+              onBlur={() => onMoveHover(null)}
+            >
               <span className="move-number">#{move.move_number}</span>
               <span className={`move-player-badge ${badgeClass}`}>{playerName}</span>
               <span className="move-text">
@@ -190,6 +225,19 @@ function MoveHistory({ moves, bluePlayerName, redPlayerName }: MoveHistoryProps)
   );
 }
 
+function getLegacyCellStateFromMoves(moves: Move[]): Map<string, YenCellState> {
+  const map = new Map<string, YenCellState>();
+
+  for (const move of moves) {
+    map.set(coordinateKey(move.coordinates), {
+      owner: move.player,
+      hasMine: false
+    });
+  }
+
+  return map;
+}
+
 export function GamePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -199,6 +247,10 @@ export function GamePage() {
   const [botThinking, setBotThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [highlightedCellKey, setHighlightedCellKey] = useState<string | null>(null);
+  const [hoveredCellKey, setHoveredCellKey] = useState<string | null>(null);
+  const [explodingCellKeys, setExplodingCellKeys] = useState<Set<string>>(new Set());
+  const explosionResetTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -281,17 +333,53 @@ export function GamePage() {
     };
   }, [id, game]);
 
+  useEffect(() => {
+    return () => {
+      if (explosionResetTimeoutRef.current !== null) {
+        globalThis.clearTimeout(explosionResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const rows = useMemo(() => (game ? buildBoard(game.board_size) : []), [game]);
 
-  const movesByCell = useMemo(() => {
-    const map = new Map<string, Move>();
+  useEffect(() => {
+    setHighlightedCellKey(null);
+  }, [game?.moves]);
 
-    for (const move of game?.moves ?? []) {
-      map.set(coordinateKey(move.coordinates), move);
+  const latestYenState = game?.moves.at(-1)?.yen_state ?? game?.yen_final_state ?? null;
+
+  const cellStateByKey = useMemo(() => {
+    if (!game) {
+      return new Map<string, YenCellState>();
     }
 
-    return map;
-  }, [game?.moves]);
+    if (latestYenState) {
+      return parseYenState(game.board_size, latestYenState);
+    }
+
+    return getLegacyCellStateFromMoves(game.moves);
+  }, [game, latestYenState]);
+
+  const minePreviewNeighbors = useMemo(() => {
+    if (!game || !hoveredCellKey) {
+      return new Set<string>();
+    }
+
+    const hoveredCell = cellStateByKey.get(hoveredCellKey);
+    if (!hoveredCell?.hasMine || hoveredCell.owner) {
+      return new Set<string>();
+    }
+
+    const [x, y, z] = hoveredCellKey.split(':').map(Number);
+    if ([x, y, z].some((value) => Number.isNaN(value))) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      getNeighborCoordinates(game.board_size, { x, y, z }).map((coordinates) => coordinateKey(coordinates))
+    );
+  }, [game, hoveredCellKey, cellStateByKey]);
 
   const blueMoves = (game?.moves ?? []).filter((move) => move.player === 'B').length;
   const redMoves = (game?.moves ?? []).filter((move) => move.player === 'R').length;
@@ -303,9 +391,17 @@ export function GamePage() {
   const visualTurn: 'B' | 'R' = botThinking ? 'R' : (game?.current_turn ?? 'B');
 
   const playMoveAt = async (coordinates: Coordinates) => {
-    if (!id || !canPlay || movesByCell.has(coordinateKey(coordinates))) {
+    if (!id || !canPlay) {
       return;
     }
+
+    const key = coordinateKey(coordinates);
+    const currentCell = cellStateByKey.get(key);
+    if (currentCell?.owner) {
+      return;
+    }
+
+    const shouldAnimateExplosion = Boolean(currentCell?.hasMine);
 
     setActionLoading(true);
     setError(null);
@@ -313,6 +409,23 @@ export function GamePage() {
     try {
       const next = await submitMove(id, { coordinates });
       setGame(next);
+
+      if (shouldAnimateExplosion && game) {
+        const blastKeys = new Set<string>([key]);
+        for (const neighbor of getNeighborCoordinates(game.board_size, coordinates)) {
+          blastKeys.add(coordinateKey(neighbor));
+        }
+
+        setExplodingCellKeys(blastKeys);
+
+        if (explosionResetTimeoutRef.current !== null) {
+          globalThis.clearTimeout(explosionResetTimeoutRef.current);
+        }
+
+        explosionResetTimeoutRef.current = globalThis.setTimeout(() => {
+          setExplodingCellKeys(new Set());
+        }, EXPLOSION_ANIMATION_MS);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit move');
     } finally {
@@ -347,7 +460,7 @@ export function GamePage() {
     setError(null);
 
     try {
-      const next = await finishGame(id, { result: 'DRAW', duration_seconds: elapsed });
+      const next = await finishGame(id, { result: 'CANCELED', duration_seconds: elapsed });
       setGame(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finish game');
@@ -383,13 +496,13 @@ export function GamePage() {
   const getResultBoxClass = (): string => {
     if (game.result === 'WIN') return 'blue';
     if (game.result === 'LOSS') return 'red';
-    return 'draw';
+    return 'canceled';
   };
 
   const getResultText = (): string => {
     if (game.result === 'WIN') return 'YOU WIN';
     if (game.result === 'LOSS') return 'YOU LOSE';
-    return 'DRAW';
+    return 'CANCELED';
   };
 
   return (
@@ -421,8 +534,8 @@ export function GamePage() {
                     className="icon-btn icon-btn--danger"
                     onClick={handleFinish}
                     disabled={actionLoading || !inProgress}
-                    title="Finish game as draw"
-                    aria-label="Finish game as draw"
+                    title="Finish game as canceled"
+                    aria-label="Finish game as canceled"
                   >
                     ⏹
                   </button>
@@ -456,15 +569,20 @@ export function GamePage() {
           boardSize={game.board_size}
           rows={rows}
           canPlay={canPlay}
-          movesByCell={movesByCell}
+          cellStateByKey={cellStateByKey}
           onPlayMove={playMoveAt}
           visualTurn={visualTurn}
+          highlightedCellKey={highlightedCellKey}
+          previewNeighborKeys={minePreviewNeighbors}
+          explodingCellKeys={explodingCellKeys}
+          onBoardHover={(coordinates) => setHoveredCellKey(coordinates ? coordinateKey(coordinates) : null)}
         />
 
         <MoveHistory
           moves={game.moves}
           bluePlayerName="You"
           redPlayerName={enemyTitle}
+          onMoveHover={(coordinates) => setHighlightedCellKey(coordinates ? coordinateKey(coordinates) : null)}
         />
       </div>
     </Panel>
