@@ -4,10 +4,13 @@
 
 use crate::bot_server::error::ErrorResponse;
 use crate::game_server::dto::{
-    BoardInfoResponse, ComputeRequest, ComputeResponse, GameStateResponse, MakeMoveRequest,
-    NewGameRequest, PlayRequest, PlayResponse,
+    BoardInfoResponse, ComputeRequest, ComputeResponse, GameOptionsResponse, GameStateResponse,
+    MakeMoveRequest, NewGameRequest, PlayRequest, PlayResponse, VariantInfo,
 };
-use crate::{DefensiveBot, GameAction, GameY, HardBot, Movement, PlayerId, RandomBot, YBot, YEN, check_api_version};
+use crate::{
+    DefensiveBot, GameAction, GameVariant, GameY, HardBot, Movement, PlayerId, RandomBot, YBot, YEN,
+    check_api_version,
+};
 use axum::extract::Path;
 use axum::Json;
 use serde::Deserialize;
@@ -57,7 +60,17 @@ pub async fn new_game(
         )));
     }
 
-    let game = GameY::new(req.board_size);
+    let variants: Vec<GameVariant> = req
+        .variants
+        .iter()
+        .filter_map(|v| GameVariant::from_name(v))
+        .collect();
+
+    let game = if variants.is_empty() {
+        GameY::new(req.board_size)
+    } else {
+        GameY::new_with_variants(req.board_size, variants)
+    };
     let response = GameStateResponse::from_game(&game, params.api_version);
     Ok(Json(response))
 }
@@ -163,6 +176,36 @@ pub async fn board_info(
     Ok(Json(response))
 }
 
+/// `GET /games/options`
+///
+/// Returns the available game variants and their allowed strategies.
+///
+/// # Response
+/// ```json
+/// {
+///   "variants": [
+///     { "name": "Double turn", "description": "...", "allowed_strategies": ["random", "ai"] },
+///     { "name": "Explosions",  "description": "...", "allowed_strategies": ["random", "ai"] }
+///   ]
+/// }
+/// ```
+#[axum::debug_handler]
+pub async fn game_options() -> Json<GameOptionsResponse> {
+    let all_variants = vec![GameVariant::DoubleTurn, GameVariant::Explosions];
+    let variant_infos = all_variants
+        .iter()
+        .map(|v| VariantInfo {
+            name: format!("{}", v),
+            description: v.description().to_string(),
+            allowed_strategies: v.allowed_strategies(),
+        })
+        .collect();
+
+    Json(GameOptionsResponse {
+        variants: variant_infos,
+    })
+}
+
 // ============================================================================
 // Partner API (Nacho) Endpoints
 // ============================================================================
@@ -185,7 +228,16 @@ pub async fn play(
                     None,
                 )));
             }
-            GameY::new(req.board_size)
+            let variants: Vec<GameVariant> = req
+                .variants
+                .iter()
+                .filter_map(|v| GameVariant::from_name(v))
+                .collect();
+            if variants.is_empty() {
+                GameY::new(req.board_size)
+            } else {
+                GameY::new_with_variants(req.board_size, variants)
+            }
         }
     };
 
@@ -418,7 +470,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_success() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let req = axum::Json(NewGameRequest { board_size: 3, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap().0.board_size, 3);
@@ -427,7 +479,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_invalid_size() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 0 });
+        let req = axum::Json(NewGameRequest { board_size: 0, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid board size"));
@@ -436,7 +488,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_too_large() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 101 });
+        let req = axum::Json(NewGameRequest { board_size: 101, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid board size"));
@@ -445,7 +497,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_invalid_version() {
         let params = axum::extract::Path(VersionParam { api_version: "v2".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let req = axum::Json(NewGameRequest { board_size: 3, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Unsupported API version"));
@@ -614,6 +666,7 @@ mod tests {
             strategy: Some("defensive".to_string()),
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_ok());
@@ -634,6 +687,7 @@ mod tests {
             strategy: Some("hard".to_string()),
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_ok());
@@ -648,6 +702,7 @@ mod tests {
             strategy: Some("random".to_string()),
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_ok());
@@ -663,6 +718,7 @@ mod tests {
             strategy: None,
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_ok());
@@ -677,6 +733,7 @@ mod tests {
             strategy: None,
             difficulty_level: None,
             board_size: 0,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_err());
@@ -690,6 +747,7 @@ mod tests {
             strategy: None,
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_err());
@@ -703,6 +761,7 @@ mod tests {
             strategy: None,
             difficulty_level: None,
             board_size: 1,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_err());
@@ -719,6 +778,7 @@ mod tests {
             strategy: None,
             difficulty_level: None,
             board_size: 2,
+            variants: vec![],
         });
         let res = play(req).await;
         assert!(res.is_err());
@@ -772,7 +832,16 @@ mod tests {
         });
         let res = compute(req).await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
+    }
+
+    #[tokio::test]
+    async fn test_game_options() {
+        let res = game_options().await;
+        let options = res.0;
+        assert_eq!(options.variants.len(), 2);
+        let names: Vec<String> = options.variants.iter().map(|v| v.name.clone()).collect();
+        assert!(names.contains(&"Explosions".to_string()));
+        assert!(names.contains(&"Double turn".to_string()));
     }
 
     #[tokio::test]

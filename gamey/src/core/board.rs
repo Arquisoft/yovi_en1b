@@ -1,7 +1,7 @@
 use crate::core::SetIdx;
 use crate::core::player_set::PlayerSet;
 use crate::{Coordinates, PlayerId};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The physical board for the Y game.
 ///
@@ -22,6 +22,9 @@ pub struct Board {
 
     /// Flat indices of cells that haven't been claimed yet.
     available_cells: Vec<u32>,
+
+    /// Coordinates of bomb cells (Explosions variant).
+    bombs: HashSet<Coordinates>,
 }
 
 impl Board {
@@ -39,6 +42,19 @@ impl Board {
             board_map: HashMap::new(),
             sets: Vec::new(),
             available_cells: (0..total_cells).collect(),
+            bombs: HashSet::new(),
+        }
+    }
+
+    /// Creates a board with pre-placed bombs.
+    pub fn new_with_bombs(board_size: u32, bombs: HashSet<Coordinates>) -> Self {
+        let total_cells = Coordinates::total_cells(board_size);
+        Self {
+            board_size,
+            board_map: HashMap::new(),
+            sets: Vec::new(),
+            available_cells: (0..total_cells).collect(),
+            bombs,
         }
     }
 
@@ -77,11 +93,26 @@ impl Board {
         &self.board_map
     }
 
+    /// Returns the set of bomb positions on the board.
+    pub fn bombs(&self) -> &HashSet<Coordinates> {
+        &self.bombs
+    }
+
+    /// Returns true if the given coordinate is a bomb.
+    pub fn is_bomb(&self, coords: &Coordinates) -> bool {
+        self.bombs.contains(coords)
+    }
+
     /// Drops a stone on the board. Returns `true` if this move wins the game.
     ///
     /// Does NOT check whether the cell is already taken — that's the caller's job.
     /// Use `is_empty_at()` first.
+    ///
+    /// If the cell is a bomb, the bomb detonates after placement: all occupied
+    /// neighbor cells are cleared and the bomb is consumed.
     pub fn place_piece(&mut self, player: PlayerId, coords: Coordinates) -> bool {
+        let is_bomb = self.bombs.remove(&coords);
+
         let cell_idx = coords.to_index(self.board_size);
         self.available_cells.retain(|&x| x != cell_idx);
 
@@ -94,6 +125,23 @@ impl Board {
         };
         self.sets.push(new_set);
         self.board_map.insert(coords, (set_idx, player));
+
+        // If bomb, detonate: clear all occupied neighbors
+        if is_bomb {
+            let neighbors = coords.neighbors(self.board_size);
+            for neighbor in &neighbors {
+                if self.board_map.remove(neighbor).is_some() {
+                    let neighbor_idx = neighbor.to_index(self.board_size);
+                    if !self.available_cells.contains(&neighbor_idx) {
+                        self.available_cells.push(neighbor_idx);
+                    }
+                }
+            }
+            // Note: Union-Find sets for cleared pieces become orphaned but harmless.
+            // The placed piece remains but is now isolated (no merging with cleared neighbors).
+            // Check only if this single cell wins (unlikely but possible on size-1).
+            return self.sets[set_idx].is_winning_configuration();
+        }
 
         // Edge case: on a size-1 board, the single cell touches all 3 sides
         let mut won = self.sets[set_idx].is_winning_configuration();
@@ -238,5 +286,52 @@ mod tests {
     fn test_get_cell_empty() {
         let board = Board::new(5);
         assert_eq!(board.get_cell(&Coordinates::new(2, 1, 1)), None);
+    }
+
+    #[test]
+    fn test_bombs_creation_and_check() {
+        let mut bombs = std::collections::HashSet::new();
+        let bomb_coord = Coordinates::new(1, 1, 0);
+        bombs.insert(bomb_coord);
+        
+        let board = Board::new_with_bombs(3, bombs);
+        assert!(board.is_bomb(&bomb_coord));
+        assert!(!board.is_bomb(&Coordinates::new(0, 0, 2)));
+        assert_eq!(board.bombs().len(), 1);
+    }
+
+    #[test]
+    fn test_explosion_clears_neighbors() {
+        let mut bombs = std::collections::HashSet::new();
+        let bomb_coord = Coordinates::new(1, 1, 0); // center-ish of size 3 board
+        bombs.insert(bomb_coord);
+        
+        let mut board = Board::new_with_bombs(3, bombs);
+        
+        // Place some pieces around the bomb
+        let neighbor_1 = Coordinates::new(1, 0, 1);
+        let neighbor_2 = Coordinates::new(2, 0, 0);
+        
+        board.place_piece(PlayerId::new(0), neighbor_1);
+        board.place_piece(PlayerId::new(1), neighbor_2);
+        
+        // Both pieces should exist
+        assert_eq!(board.get_cell(&neighbor_1), Some(PlayerId::new(0)));
+        assert_eq!(board.get_cell(&neighbor_2), Some(PlayerId::new(1)));
+        
+        // Place piece on bomb!
+        let won = board.place_piece(PlayerId::new(0), bomb_coord);
+        assert!(!won);
+        
+        // The piece placed on the bomb stays
+        assert_eq!(board.get_cell(&bomb_coord), Some(PlayerId::new(0)));
+        
+        // The neighbors are cleared
+        assert_eq!(board.get_cell(&neighbor_1), None);
+        assert_eq!(board.get_cell(&neighbor_2), None);
+        
+        // The bomb is consumed
+        assert!(!board.is_bomb(&bomb_coord));
+        assert_eq!(board.bombs().len(), 0);
     }
 }
