@@ -740,11 +740,13 @@ describe('GET /games/options', () => {
         expect(ncts.difficulty).toBe('Hard 😈')
     })
 
-    it('returns variants as objects with a name property', async () => {
+    it('returns variants as objects with name, description and allowed_strategies', async () => {
         const res = await request(app).get('/games/options')
 
         res.body.variants.forEach(v => {
             expect(v).toHaveProperty('name')
+            expect(v).toHaveProperty('description')
+            expect(v).toHaveProperty('allowed_strategies')
         })
     })
 
@@ -752,9 +754,8 @@ describe('GET /games/options', () => {
         const res = await request(app).get('/games/options')
 
         const names = res.body.variants.map(v => v.name)
-        expect(names).toContain('Classic Y')
-        expect(names).toContain('Master Y (coming soon)')
-        expect(names).toContain('Pie Rule (coming soon)')
+        expect(names[0]).toBe('Classic Y')   // Classic Y must be first
+        expect(names).toContain('Explosions')
     })
 
     it('does not require authentication', async () => {
@@ -841,7 +842,7 @@ describe('POST /games/:id/undo', () => {
 
         await request(app)
             .put(`/games/${finishedId}/finish`)
-            .send({ result: 'DRAW' })
+            .send({ result: 'UNFINISHED' })
             .set('Authorization', `Bearer ${token}`)
 
         const res = await request(app)
@@ -923,7 +924,7 @@ describe('PUT /games/:id/finish', () => {
         }
     })
 
-    it('does NOT update stats when result is DRAW (user quit)', async () => {
+    it('does NOT update stats when result is UNFINISHED (user quit)', async () => {
         const statsBefore = (await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)).body.statistics
@@ -934,7 +935,7 @@ describe('PUT /games/:id/finish', () => {
             .set('Authorization', `Bearer ${token}`)
         await request(app)
             .put(`/games/${createRes.body._id}/finish`)
-            .send({ result: 'DRAW' })
+            .send({ result: 'UNFINISHED' })
             .set('Authorization', `Bearer ${token}`)
 
         const statsAfter = (await request(app)

@@ -223,7 +223,7 @@ components:
           example: IN_PROGRESS
         result:
           type: string
-          enum: [WIN, LOSS, DRAW]
+          enum: [WIN, LOSS, UNFINISHED]
           nullable: true
           example: null
         duration_seconds:
@@ -723,7 +723,7 @@ paths:
   /games/{id}/finish:
     put:
       summary: Finish a game
-      description: Marks a game as FINISHED manually — used when a user quits (DRAW). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Requires authentication.
+      description: Marks a game as FINISHED manually — used when a user quits (UNFINISHED). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Statistics are only updated for WIN/LOSS. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -743,8 +743,8 @@ paths:
               properties:
                 result:
                   type: string
-                  enum: [WIN, LOSS, DRAW]
-                  example: "DRAW"
+                  enum: [WIN, LOSS, UNFINISHED]
+                  example: "UNFINISHED"
                 yen_final_state:
                   type: string
                   nullable: true

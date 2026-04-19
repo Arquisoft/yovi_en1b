@@ -11,6 +11,16 @@ const STRATEGY_DIFFICULTY = {
     ncts:      'hard'
 };
 
+// Valid variants and their constraints
+const VALID_VARIANTS = {
+    explosions: {
+        name:               'Explosions',
+        description:        'A bomb appears randomly on the board at game start. Playing on the bomb captures that cell and clears all neighbouring cells.',
+        allowed_strategies: ['random', 'ai'],
+        min_board_size:     7
+    }
+};
+
 // Helper: auto-finish a game if Gamey reports a winner
 async function autoFinishIfWinner(game, winner, repository) {
     if (!winner) return;
@@ -58,21 +68,30 @@ module.exports = function gameRoutes(repository) {
                 { name: 'NCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
-                { name: 'Classic Y'              },
-                { name: 'Master Y (coming soon)' },
-                { name: 'Pie Rule (coming soon)' }
+                { name: 'Classic Y', description: 'Standard Game Y rules — connect all three sides of the triangle.', allowed_strategies: ['random', 'defensive', 'ncts'] },
+                { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }
             ]
         });
     });
 
     // Create a new game
     router.post('/', authMiddleware, async function createGame(req, res) {
-        const { board_size, strategy, game_type, name_of_enemy } = req.body || {};
+        const { board_size, strategy, game_type, name_of_enemy, variants } = req.body || {};
 
         if (!board_size) return res.status(400).json({ error: 'board_size is required' });
 
         if (game_type === 'PLAYER' && !name_of_enemy) {
             return res.status(400).json({ error: 'name_of_enemy is required for PLAYER games' });
+        }
+
+        // Validate variants
+        const resolvedVariants = variants ?? [];
+        for (const v of resolvedVariants) {
+            const config = VALID_VARIANTS[v.toLowerCase()];
+            if (!config) return res.status(400).json({ error: `Unknown variant: ${v}` });
+            if (config.min_board_size && board_size < config.min_board_size) {
+                return res.status(400).json({ error: `Variant '${v}' requires board_size >= ${config.min_board_size}` });
+            }
         }
 
         try {
@@ -86,6 +105,7 @@ module.exports = function gameRoutes(repository) {
                 board_size,
                 strategy:         resolvedStrategy,
                 difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
+                variants:         resolvedVariants,
                 current_turn
             });
             res.status(201).json(game);
@@ -170,7 +190,8 @@ module.exports = function gameRoutes(repository) {
                     yen_state,
                     strategy:         game.strategy,
                     difficulty_level: game.difficulty_level,
-                    board_size:       game.board_size
+                    board_size:       game.board_size,
+                    variants:         game.variants
                 })
             });
         } catch {
@@ -200,11 +221,11 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Finish a game manually (DRAW when user quits)
+    // Finish a game manually (UNFINISHED when user quits — does not affect statistics)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state } = req.body || {};
 
-        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or DRAW)' });
+        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or UNFINISHED)' });
 
         try {
             const game = await repository.findGameById(req.params.id);
@@ -219,7 +240,7 @@ module.exports = function gameRoutes(repository) {
                 duration_seconds
             });
 
-            if (result !== 'DRAW') {
+            if (result !== 'UNFINISHED') {
                 await repository.updateStats(game.player_id, {
                     result,
                     type:     game.game_type,
