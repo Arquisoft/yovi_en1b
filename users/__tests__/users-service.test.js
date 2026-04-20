@@ -754,8 +754,8 @@ describe('GET /games/options', () => {
         const res = await request(app).get('/games/options')
 
         const names = res.body.variants.map(v => v.name)
-        expect(names[0]).toBe('Classic Y')   // Classic Y must be first
         expect(names).toContain('Explosions')
+        expect(names).not.toContain('Classic Y')
     })
 
     it('does not require authentication', async () => {

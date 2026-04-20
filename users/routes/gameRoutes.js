@@ -68,7 +68,6 @@ module.exports = function gameRoutes(repository) {
                 { name: 'NCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
-                { name: 'Classic Y', description: 'Standard Game Y rules — connect all three sides of the triangle.', allowed_strategies: ['random', 'defensive', 'ncts'] },
                 { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }
             ]
         });

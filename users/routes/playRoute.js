@@ -12,12 +12,19 @@ module.exports = function playRoute() {
 
     // Public bot play — no auth, no game id needed
     // position = yen_state, bot_id = strategy (public API naming)
-    router.post('/play', async function publicBotPlay(req, res) {
-        const { position, bot_id, board_size } = req.body || {};
+    router.get('/play', async function publicBotPlay(req, res) {
+        const { position, bot_id, board_size } = req.query;
 
         if (position === undefined) return res.status(400).json({ error: 'position is required' });
 
         const resolvedStrategy = bot_id || 'ncts';
+
+        let parsedPosition;
+        try {
+            parsedPosition = JSON.parse(position);
+        } catch {
+            return res.status(400).json({ error: 'position must be valid JSON in YEN format' });
+        }
 
         let gameyResponse;
         try {
@@ -25,10 +32,10 @@ module.exports = function playRoute() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    yen_state:        position,
+                    yen_state:        parsedPosition,
                     strategy:         resolvedStrategy,
                     difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'hard',
-                    board_size:       board_size ?? 5
+                    board_size:       parsedPosition.size ?? board_size ?? 5
                 })
             });
         } catch {
