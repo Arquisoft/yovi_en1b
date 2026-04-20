@@ -70,6 +70,11 @@ pub fn create_router(state: AppState) -> axum::Router {
             "/{api_version}/game/board-info/{board_size}",
             axum::routing::get(crate::game_server::handlers::board_info),
         )
+        // Game options (variants info)
+        .route(
+            "/games/options",
+            axum::routing::get(crate::game_server::handlers::game_options),
+        )
         // Partner API
         .route(
             "/play",
