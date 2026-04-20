@@ -35,7 +35,7 @@ module.exports = function playRoute() {
                     yen_state:        parsedPosition,
                     strategy:         resolvedStrategy,
                     difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'hard',
-                    board_size:       parsedPosition.size ?? board_size ?? 5
+                    board_size:       board_size !== undefined ? Number(board_size) : (parsedPosition.size ?? 5)
                 })
             });
         } catch {

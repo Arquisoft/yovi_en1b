@@ -613,16 +613,18 @@ describe('GET /games/:id/play', () => {
 
 // ─── Public play endpoint ─────────────────────────────────────────────────────
 
-describe('POST /play', () => {
+const YEN_POSITION = JSON.stringify({ size: 4, turn: 0, players: ['B', 'R'], layout: 'B/.B/RB./B..R' })
+
+describe('GET /play', () => {
     it('returns bot move without auth or game id', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R', bot_id: 'random', board_size: 7 })
+            .get('/play')
+            .query({ position: YEN_POSITION, bot_id: 'random', board_size: 7 })
 
         expect(res.status).toBe(200)
         expect(res.body).toHaveProperty('coordinates')
@@ -631,38 +633,64 @@ describe('POST /play', () => {
 
     it('returns 400 if position is missing', async () => {
         const res = await request(app)
-            .post('/play')
-            .send({ bot_id: 'random' })
+            .get('/play')
+            .query({ bot_id: 'random' })
 
         expect(res.status).toBe(400)
     })
 
-    it('defaults to ncts bot when no strategy is provided', async () => {
+    it('returns 400 if position is not valid JSON', async () => {
+        const res = await request(app)
+            .get('/play')
+            .query({ position: 'not-valid-json' })
+
+        expect(res.status).toBe(400)
+    })
+
+    it('defaults to ncts bot when no bot_id is provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         })
         vi.stubGlobal('fetch', fetchMock)
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
         expect(callBody.strategy).toBe('ncts')  // bot_id maps to strategy
     })
 
-    it('uses provided board_size when given', async () => {
+    it('derives board_size from position.size when board_size param is not provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         })
         vi.stubGlobal('fetch', fetchMock)
 
+        // No board_size query param — route must fall back to position.size (4)
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R', board_size: 7 })
+            .get('/play')
+            .query({ position: YEN_POSITION })
+
+        expect(res.status).toBe(200)
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+        expect(callBody.board_size).toBe(4)  // falls back to position.size
+    })
+
+    it('uses explicit board_size query param over position.size when both are present', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        // board_size: 7 should take priority over position.size (4)
+        const res = await request(app)
+            .get('/play')
+            .query({ position: YEN_POSITION, board_size: 7 })
 
         expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
@@ -673,8 +701,8 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(503)
     })
@@ -683,8 +711,8 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(502)
     })
@@ -692,12 +720,12 @@ describe('POST /play', () => {
     it('does not require authentication', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(200)
     })
