@@ -360,7 +360,11 @@ fn pick_bot(strategy: Option<&str>, difficulty_level: Option<&str>) -> Box<dyn Y
 /// recognized alias.
 fn match_bot(name: &str) -> Option<Box<dyn YBot>> {
     match name.to_lowercase().as_str() {
-        "hard" | "ai" | "mcts" | "aggressive" => Some(Box::new(HardBot::default())),
+        // "ncts" is the label the users service uses (see gameRoutes.js) —
+        // it maps to the hard-mode MCTS bot. Included explicitly so the
+        // strategy match wins directly instead of depending on the
+        // difficulty_level fallback.
+        "hard" | "ai" | "mcts" | "ncts" | "aggressive" => Some(Box::new(HardBot::default())),
         "medium" | "defensive" | "balanced" => Some(Box::new(DefensiveBot)),
         "random" | "random_bot" | "easy" => Some(Box::new(RandomBot)),
         _ => None,
@@ -987,6 +991,9 @@ mod tests {
         assert_eq!(pick_bot(Some("hard"), None).name(), "hard");
         assert_eq!(pick_bot(Some("ai"), None).name(), "hard");
         assert_eq!(pick_bot(Some("mcts"), None).name(), "hard");
+        // "ncts" is sent by the users service (gameRoutes.js) for hard mode.
+        assert_eq!(pick_bot(Some("ncts"), None).name(), "hard");
+        assert_eq!(pick_bot(Some("NCTS"), None).name(), "hard");
         assert_eq!(pick_bot(Some("aggressive"), None).name(), "hard");
         assert_eq!(pick_bot(Some("AGGRESSIVE"), None).name(), "hard");
         // Unknown values fall through to the difficulty_level, and failing

@@ -365,8 +365,12 @@ impl TryFrom<YEN> for GameY {
             variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
         }
 
-        // Parse bomb positions from the "e" field
-        let bombs: HashSet<Coordinates> = match game.explosives() {
+        // Parse bomb positions from the "e" field *and* from any 'e' characters
+        // in the layout string. Both sources are unioned — historically bombs
+        // were only in the `explosives` field, but we now also emit them as 'e'
+        // inside `layout` so the frontend can render them directly from
+        // `yen_state` without a separate field (issue #203).
+        let mut bombs: HashSet<Coordinates> = match game.explosives() {
             Some(e_str) if !e_str.is_empty() => e_str
                 .split(',')
                 .filter_map(|s| s.trim().parse::<u32>().ok())
@@ -374,6 +378,19 @@ impl TryFrom<YEN> for GameY {
                 .collect(),
             _ => HashSet::new(),
         };
+
+        // Also scan the layout string for 'e' (empty cells containing a bomb).
+        // We parse row-by-row so we can compute (x, y, z) for each 'e' found.
+        for (row, row_str) in game.layout().split('/').enumerate() {
+            for (col, cell) in row_str.chars().enumerate() {
+                if cell == 'e' {
+                    let x = col as u32;
+                    let y = (row as u32).saturating_sub(col as u32);
+                    let z = game.size().saturating_sub(1).saturating_sub(row as u32);
+                    bombs.insert(Coordinates::new(x, y, z));
+                }
+            }
+        }
 
         let board = if bombs.is_empty() {
             Board::new(game.size())
@@ -425,7 +442,10 @@ impl TryFrom<YEN> for GameY {
                             coords,
                         })?;
                     }
-                    '.' => {}
+                    // '.' is an empty cell; 'e' is an empty cell that also has
+                    // a bomb on it — the bomb bookkeeping was done above when
+                    // we scanned the layout, so here we just treat 'e' as '.'.
+                    '.' | 'e' => {}
                     _ => {
                         return Err(GameYError::InvalidCharInLayout {
                             char: *cell,
@@ -464,9 +484,15 @@ impl From<&GameY> for YEN {
                 let z = size - 1 - row;
                 let coords = Coordinates::new(x, y, z);
 
+                // Empty + bomb cells are encoded as 'e' so the frontend can
+                // render the mine without needing a separate `explosives`
+                // field. Occupied bomb cells stay as the owner — the bomb will
+                // have been consumed on placement, so an occupied bomb cell is
+                // not possible in practice.
                 let cell_char = match game.board.board_map().get(&coords) {
                     Some((_, player)) if player.id() == 0 => 'B',
                     Some((_, player)) if player.id() == 1 => 'R',
+                    _ if game.board.bombs().contains(&coords) => 'e',
                     _ => '.',
                 };
                 layout.push(cell_char);
@@ -811,19 +837,104 @@ mod tests {
     fn test_gamey_yen_with_variants_and_bombs() {
         let mut yen = YEN::new(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string());
         yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
-        
+
         let game = GameY::try_from(yen).unwrap();
         assert_eq!(game.variants().len(), 2);
         assert!(game.variants().contains(&GameVariant::DoubleTurn));
         assert!(game.variants().contains(&GameVariant::Explosions));
-        
+
         let bombs = game.bomb_positions();
         assert_eq!(bombs.len(), 1);
         assert_eq!(bombs[0], Coordinates::from_index(4, 7));
-        
+
         // Round trip test
         let yen_back = YEN::from(&game);
         assert_eq!(yen_back.variants().len(), 2);
         assert_eq!(yen_back.explosives(), Some("4"));
+    }
+
+    /// Bombs on empty cells must round-trip through the layout string as 'e' —
+    /// that's what lets the frontend render the mine without an auxiliary
+    /// field. Regression test for issue #203 (part 2: frontend visibility).
+    #[test]
+    fn test_bomb_emitted_as_e_in_layout() {
+        // Build a size-7 game with a bomb at flat index 4 (row 2, col 1 →
+        // coords (1, 1, 4)).
+        let mut bombs = HashSet::new();
+        let bomb_coords = Coordinates::from_index(4, 7);
+        bombs.insert(bomb_coords);
+
+        let mut game = GameY {
+            board: Board::new_with_bombs(7, bombs),
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants: vec![GameVariant::Explosions],
+            moves_this_turn: 0,
+        };
+
+        // Place a B piece somewhere non-bomb so the layout has both a player
+        // piece and an 'e' — exercises both branches of the cell matcher.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 6),
+        })
+        .unwrap();
+
+        let yen: YEN = (&game).into();
+        let layout = yen.layout();
+
+        // Layout should contain 'e' exactly once (the one bomb) and one 'B'
+        // (the piece we placed).
+        assert_eq!(layout.chars().filter(|c| *c == 'e').count(), 1, "layout missing 'e' marker: {}", layout);
+        assert_eq!(layout.chars().filter(|c| *c == 'B').count(), 1);
+
+        // And round-tripping the YEN back into a GameY must recover the bomb.
+        let reloaded = GameY::try_from(yen).unwrap();
+        assert_eq!(reloaded.bomb_positions().len(), 1);
+        assert!(reloaded.bomb_positions().contains(&bomb_coords));
+    }
+
+    /// Parsing a layout that carries 'e' characters (and no explosives field)
+    /// must still populate the bombs set. This is the inbound side of the
+    /// round-trip: the users service stores `yen_state` (just the layout) and
+    /// sends it back without the `explosives` field, so layout alone must be
+    /// enough.
+    #[test]
+    fn test_bomb_parsed_from_e_in_layout_only() {
+        // Row 0: top (1 cell); Row 1: middle (2 cells); Row 2: bottom (3 cells)
+        // The 'e' is at row 2, col 0 → coords (0, 2, 0).
+        let yen = YEN::new_with_variants(
+            3,
+            0,
+            vec!['B', 'R'],
+            "./../e..".to_string(),
+            vec!["Explosions".to_string()],
+            None, // no explosives field — bomb only in layout
+        );
+        let game = GameY::try_from(yen).unwrap();
+        let bombs = game.bomb_positions();
+        assert_eq!(bombs.len(), 1);
+        assert!(bombs.contains(&Coordinates::new(0, 2, 0)));
+    }
+
+    /// When *both* the `explosives` field and inline 'e' markers are present
+    /// they should union (duplicates dedup since bombs is a HashSet).
+    #[test]
+    fn test_bomb_layout_and_explosives_union() {
+        // 'e' at row 1, col 1 → (1, 0, 1). explosives "0" = flat index 0
+        // which is row 0, col 0 → (0, 0, 2).
+        let yen = YEN::new_with_variants(
+            3,
+            0,
+            vec!['B', 'R'],
+            "./.e/...".to_string(),
+            vec!["Explosions".to_string()],
+            Some("0".to_string()),
+        );
+        let game = GameY::try_from(yen).unwrap();
+        let bombs = game.bomb_positions();
+        assert_eq!(bombs.len(), 2, "should union layout bomb + explosives bomb");
     }
 }

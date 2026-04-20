@@ -137,10 +137,16 @@ impl Board {
                     }
                 }
             }
-            // Note: Union-Find sets for cleared pieces become orphaned but harmless.
-            // The placed piece remains but is now isolated (no merging with cleared neighbors).
-            // Check only if this single cell wins (unlikely but possible on size-1).
-            return self.sets[set_idx].is_winning_configuration();
+            // Rebuild Union-Find from scratch so that detonated cells don't
+            // leave orphaned sets whose `touches_side_*` flags could later be
+            // merged into a live component and trigger a phantom win. The set
+            // indices in `board_map` are only meaningful relative to `sets`,
+            // so rebuilding both together is safe.
+            self.rebuild_union_find();
+            // The winning flags after rebuild are on the remaining cells'
+            // fresh sets; look up the placed cell's new set index and check.
+            let (new_set_idx, _) = self.board_map[&coords];
+            return self.sets[new_set_idx].is_winning_configuration();
         }
 
         // Edge case: on a size-1 board, the single cell touches all 3 sides
@@ -181,10 +187,55 @@ impl Board {
             self.sets[root_j].touches_side_b |= self.sets[root_i].touches_side_b;
             self.sets[root_j].touches_side_c |= self.sets[root_i].touches_side_c;
         }
-        
+
         self.sets[root_j].touches_side_a
             && self.sets[root_j].touches_side_b
             && self.sets[root_j].touches_side_c
+    }
+
+    /// Rebuilds `sets` and `board_map` from the cells that are currently
+    /// occupied. Used after a bomb detonation to discard the stale set
+    /// metadata of the pieces that were cleared — without this, the
+    /// `touches_side_*` flags of an orphaned set could be folded into a
+    /// living component and wrongly signal a win.
+    fn rebuild_union_find(&mut self) {
+        // Snapshot the surviving pieces and reset the union-find state.
+        let mut survivors: Vec<(Coordinates, PlayerId)> = self
+            .board_map
+            .iter()
+            .map(|(coords, (_, player))| (*coords, *player))
+            .collect();
+        // Deterministic ordering is nice for tests and reasoning, and it
+        // doesn't change correctness.
+        survivors.sort_by_key(|(c, _)| c.to_index(self.board_size));
+
+        self.sets.clear();
+        self.board_map.clear();
+
+        for (coords, player) in survivors {
+            let set_idx = self.sets.len();
+            let new_set = PlayerSet {
+                parent: set_idx,
+                touches_side_a: coords.touches_side_a(),
+                touches_side_b: coords.touches_side_b(),
+                touches_side_c: coords.touches_side_c(),
+            };
+            self.sets.push(new_set);
+            self.board_map.insert(coords, (set_idx, player));
+
+            // Merge with already-re-inserted neighbors of the same player.
+            // Because we're iterating in order, each neighbor we find here has
+            // already been assigned a fresh set index.
+            let neighbors = coords.neighbors(self.board_size);
+            for neighbor in neighbors {
+                if let Some((neighbor_set, neighbor_player)) = self.board_map.get(&neighbor)
+                    && *neighbor_player == player
+                    && neighbor != coords
+                {
+                    self.union(set_idx, *neighbor_set);
+                }
+            }
+        }
     }
 }
 
@@ -298,6 +349,61 @@ mod tests {
         assert!(board.is_bomb(&bomb_coord));
         assert!(!board.is_bomb(&Coordinates::new(0, 0, 2)));
         assert_eq!(board.bombs().len(), 1);
+    }
+
+    /// After a bomb detonates the union-find must be free of ghost sets:
+    /// the `touches_side_*` flags that belonged to cleared cells should not
+    /// leak into newly-formed components and trigger a phantom win. We
+    /// exercise the rebuild directly and verify it produces exactly one set
+    /// per surviving cell.
+    #[test]
+    fn test_explosion_rebuilds_union_find_without_orphans() {
+        use std::collections::HashSet;
+        // Size-5 board with a bomb in the middle. Around it we cram a bunch
+        // of P0 pieces; the detonation will wipe most of them out.
+        let bomb_coord = Coordinates::new(2, 1, 1);
+        let mut bombs = HashSet::new();
+        bombs.insert(bomb_coord);
+        let mut board = Board::new_with_bombs(5, bombs);
+
+        // Place a scatter of P0 pieces: some adjacent to the bomb, some not.
+        // All-same-player so the board ends up in a single union-find
+        // component of size 4 before the bomb.
+        board.place_piece(PlayerId::new(0), Coordinates::new(1, 1, 2)); // adj
+        board.place_piece(PlayerId::new(0), Coordinates::new(2, 0, 2)); // adj
+        board.place_piece(PlayerId::new(0), Coordinates::new(1, 2, 1)); // adj
+        board.place_piece(PlayerId::new(0), Coordinates::new(0, 4, 0)); // NOT adj
+
+        // Before detonation we have 4 P0 pieces + 0 other → at least 4 sets
+        // in `sets`. After P1 detonates the bomb, three of those P0 pieces
+        // are cleared; only (0, 4, 0) and the bomb-placed P1 piece survive.
+        let pre_sets = board.sets.len();
+        assert!(pre_sets >= 4);
+
+        // Detonate.
+        let won = board.place_piece(PlayerId::new(1), bomb_coord);
+        assert!(!won);
+
+        // After rebuild, there should be exactly one set per surviving cell.
+        assert_eq!(
+            board.board_map.len(),
+            2,
+            "expected 2 surviving cells (P1 on bomb + far P0)"
+        );
+        assert_eq!(
+            board.sets.len(),
+            2,
+            "rebuild should discard the orphaned sets from cleared cells"
+        );
+
+        // And the surviving P0 piece's set must reflect only its own
+        // side-touches — in particular, it must NOT inherit the side-touches
+        // of the wiped-out (1, 1, 2) / (2, 0, 2) / (1, 2, 1) pieces.
+        let (p0_set_idx, _) = board.board_map[&Coordinates::new(0, 4, 0)];
+        let p0_set = &board.sets[p0_set_idx];
+        assert!(p0_set.touches_side_a, "(0,4,0) touches A (x=0)");
+        assert!(!p0_set.touches_side_b, "(0,4,0) does not touch B (y != 0)");
+        assert!(p0_set.touches_side_c, "(0,4,0) touches C (z=0)");
     }
 
     #[test]
