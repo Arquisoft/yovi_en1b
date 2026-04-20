@@ -12,7 +12,7 @@ pub enum GameVariant {
     /// then all occupied neighbor cells are cleared. Board must be ≥ 7×7.
     Explosions,
 
-    /// Double Turn: both players play 2 moves at a time instead of 1.
+    /// Double Turn: both players play 2 moves at a time instead of 1. Board must be ≥ 7×7.
     DoubleTurn,
 }
 
@@ -47,9 +47,9 @@ impl GameVariant {
     pub fn description(&self) -> &str {
         match self {
             GameVariant::Explosions => {
-                "A random bomb appears on the board at the start. Capturing it clears all neighboring pieces."
+                "A random bomb appears on the board at the start (min 7x7). Capturing it clears neighboring pieces."
             }
-            GameVariant::DoubleTurn => "Both players play 2 moves at a time instead of 1.",
+            GameVariant::DoubleTurn => "Both players play 2 moves at a time instead of 1 (min 7x7).",
         }
     }
 }

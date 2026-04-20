@@ -62,8 +62,13 @@ impl GameY {
 
     /// Creates a new game with the specified variants.
     ///
-    /// If `Explosions` is active and `board_size >= 7`, a random bomb is placed.
-    pub fn new_with_variants(board_size: u32, variants: Vec<GameVariant>) -> Self {
+    /// Variants (Explosions, DoubleTurn) require a board size of at least 7x7.
+    pub fn new_with_variants(board_size: u32, mut variants: Vec<GameVariant>) -> Self {
+        // Enforce 7x7 minimum for variants
+        if board_size < 7 {
+            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+        }
+
         let board = if variants.contains(&GameVariant::Explosions) && board_size >= 7 {
             let total_cells = Coordinates::total_cells(board_size);
             let bomb_idx = *(0..total_cells)
@@ -349,11 +354,16 @@ impl TryFrom<YEN> for GameY {
     type Error = GameYError;
 
     fn try_from(game: YEN) -> Result<Self> {
-        let variants: Vec<GameVariant> = game
+        let mut variants: Vec<GameVariant> = game
             .variants()
             .iter()
             .filter_map(|v| GameVariant::from_name(v))
             .collect();
+
+        // Enforce 7x7 minimum for variants
+        if game.size() < 7 {
+            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+        }
 
         // Parse bomb positions from the "e" field
         let bombs: HashSet<Coordinates> = match game.explosives() {
@@ -750,20 +760,21 @@ mod tests {
 
     #[test]
     fn test_gamey_variants_initialization() {
-        // Size < 7 does not place a bomb
+        // Size < 7 does not place a bomb and ignores variants
         let variants = vec![GameVariant::Explosions, GameVariant::DoubleTurn];
-        let game1 = GameY::new_with_variants(3, variants.clone());
-        assert_eq!(game1.variants().len(), 2);
+        let game1 = GameY::new_with_variants(5, variants.clone());
+        assert_eq!(game1.variants().len(), 0); // Both filtered out
         assert_eq!(game1.bomb_positions().len(), 0);
 
-        // Size >= 7 does place a bomb
+        // Size >= 7 does place a bomb and keeps variants
         let game2 = GameY::new_with_variants(7, variants);
+        assert_eq!(game2.variants().len(), 2);
         assert_eq!(game2.bomb_positions().len(), 1);
     }
 
     #[test]
     fn test_gamey_double_turn_logic() {
-        let mut game = GameY::new_with_variants(3, vec![GameVariant::DoubleTurn]);
+        let mut game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
         
         // Starts with Player 0
         assert_eq!(game.next_player(), Some(PlayerId::new(0)));
@@ -798,8 +809,8 @@ mod tests {
 
     #[test]
     fn test_gamey_yen_with_variants_and_bombs() {
-        let mut yen = YEN::new(3, 0, vec!['B', 'R'], ".../.../...".to_string());
-        yen = YEN::new_with_variants(3, 0, vec!['B', 'R'], ".../.../...".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
+        let mut yen = YEN::new(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string());
+        yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
         
         let game = GameY::try_from(yen).unwrap();
         assert_eq!(game.variants().len(), 2);
@@ -808,7 +819,7 @@ mod tests {
         
         let bombs = game.bomb_positions();
         assert_eq!(bombs.len(), 1);
-        assert_eq!(bombs[0], Coordinates::from_index(4, 3));
+        assert_eq!(bombs[0], Coordinates::from_index(4, 7));
         
         // Round trip test
         let yen_back = YEN::from(&game);

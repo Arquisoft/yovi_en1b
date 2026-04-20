@@ -66,6 +66,14 @@ pub async fn new_game(
         .filter_map(|v| GameVariant::from_name(v))
         .collect();
 
+    if req.board_size < 7 && !variants.is_empty() {
+        return Err(Json(ErrorResponse::error(
+            "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
+            Some(params.api_version),
+            None,
+        )));
+    }
+
     let game = if variants.is_empty() {
         GameY::new(req.board_size)
     } else {
@@ -233,6 +241,14 @@ pub async fn play(
                 .iter()
                 .filter_map(|v| GameVariant::from_name(v))
                 .collect();
+
+            if req.board_size < 7 && !variants.is_empty() {
+                return Err(Json(ErrorResponse::error(
+                    "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
+                    None,
+                    None,
+                )));
+            }
             if variants.is_empty() {
                 GameY::new(req.board_size)
             } else {
