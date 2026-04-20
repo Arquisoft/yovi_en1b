@@ -107,7 +107,7 @@ describe('NewGamePage — validation', () => {
 
 describe('NewGamePage — game creation', () => {
   test('successful BOT game creation submits selected variants', async () => {
-    let receivedBody: { variants?: string[] } | null = null;
+    let receivedBody: any = null;
 
     server.use(
       http.post('*/games', async ({ request }) => {
@@ -142,7 +142,7 @@ describe('NewGamePage — game creation', () => {
   });
 
   test('successful PLAYER game creation carries selected variants too', async () => {
-    let receivedBody: { variants?: string[]; name_of_enemy?: string } | null = null;
+    let receivedBody: any = null;
 
     server.use(
       http.post('*/games', async ({ request }) => {
