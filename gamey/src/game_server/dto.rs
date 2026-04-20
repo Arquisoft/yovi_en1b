@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 pub struct NewGameRequest {
     /// The board size (length of one side of the triangle).
     pub board_size: u32,
+    /// Optional list of active variant names (e.g., ["Explosions", "DoubleTurn"]).
+    #[serde(default)]
+    pub variants: Vec<String>,
 }
 
 /// Request body for making a move in an existing game.
@@ -57,6 +60,12 @@ pub struct GameStateResponse {
     pub available_cells: Vec<u32>,
     /// Detailed info for every cell on the board.
     pub cells: Vec<CellInfo>,
+    /// Active game variants.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<String>,
+    /// Flat indices of bomb cells (Explosions variant).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bomb_cells: Vec<u32>,
 }
 
 /// Simplified game status for the frontend.
@@ -124,6 +133,9 @@ pub struct PlayRequest {
     pub difficulty_level: Option<String>,
     /// The board size.
     pub board_size: u32,
+    /// Optional list of active variant names.
+    #[serde(default)]
+    pub variants: Vec<String>,
 }
 
 /// Response format for the /play endpoint.
@@ -153,6 +165,24 @@ pub struct ComputeResponse {
     pub yen_state: String,
     /// The winner of the game ("B", "R", or null).
     pub winner: Option<String>,
+}
+
+/// Response format for the GET /games/options endpoint.
+#[derive(Serialize, Debug)]
+pub struct GameOptionsResponse {
+    /// Available game variants.
+    pub variants: Vec<VariantInfo>,
+}
+
+/// Information about a single game variant.
+#[derive(Serialize, Debug)]
+pub struct VariantInfo {
+    /// The name of the variant (e.g., "Double turn", "Explosions").
+    pub name: String,
+    /// Human-readable description of the variant.
+    pub description: String,
+    /// Which bot strategies support this variant.
+    pub allowed_strategies: Vec<String>,
 }
 
 // ============================================================================
@@ -207,6 +237,12 @@ impl GameStateResponse {
             total_cells,
             available_cells: game.available_cells().clone(),
             cells,
+            variants: game.variants().iter().map(|v| format!("{:?}", v)).collect(),
+            bomb_cells: game
+                .bomb_positions()
+                .iter()
+                .map(|c| c.to_index(board_size))
+                .collect(),
         }
     }
 }

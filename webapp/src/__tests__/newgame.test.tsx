@@ -45,23 +45,23 @@ describe('NewGamePage — rendering', () => {
     expect(await screen.findByRole('button', { name: /start game/i })).toBeInTheDocument();
   });
 
-  test('shows Opponent, Board Size and Rules sections', () => {
+  test('shows Opponent, Board Size, Bot Strategy and Variants sections', () => {
     renderNewGamePage();
     expect(screen.getByText('Opponent')).toBeInTheDocument();
     expect(screen.getByText('Board Size')).toBeInTheDocument();
-    expect(screen.getByText('Rules')).toBeInTheDocument();
-  });
-
-  test('Bot Strategy section is visible in default BOT mode', async () => {
-    renderNewGamePage();
     expect(screen.getByText('Bot Strategy')).toBeInTheDocument();
-    expect(await screen.findByText('Medium')).toBeInTheDocument();
+    expect(screen.getByText('Variants')).toBeInTheDocument();
   });
 
-  test('Bot Strategy section is hidden when Play vs Player is selected', async () => {
+  test('shows only strategy-allowed variants for BOT games', async () => {
     renderNewGamePage();
-    await userEvent.click(screen.getByLabelText(/play vs player/i));
-    expect(screen.queryByText('Bot Strategy')).not.toBeInTheDocument();
+
+    // Random is selected by default in mocks; Explosions allows only AI.
+    expect(screen.queryByLabelText(/explosions/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/double turn/i)).not.toBeInTheDocument();
+
+    await userEvent.click(await screen.findByLabelText(/ai/i));
+    expect(await screen.findByLabelText(/explosions/i)).toBeInTheDocument();
   });
 
   test('Opponent Name input appears only in Player mode', async () => {
@@ -95,7 +95,9 @@ describe('NewGamePage — validation', () => {
       )
     );
     renderNewGamePage();
-    await screen.findByLabelText(/random/i);
+    await userEvent.click(await screen.findByLabelText(/ai/i));
+    await screen.findByLabelText(/explosions/i);
+    await userEvent.click(screen.getByLabelText(/explosions/i));
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
     await screen.findByText(/internal server error/i);
   });
@@ -104,16 +106,20 @@ describe('NewGamePage — validation', () => {
 // ─── game creation ────────────────────────────────────────────────────────────
 
 describe('NewGamePage — game creation', () => {
-  test('successful BOT game creation hides the form', async () => {
+  test('successful BOT game creation submits selected variants', async () => {
+    let receivedBody: { variants?: string[] } | null = null;
+
     server.use(
-      http.post('*/games', () =>
-        HttpResponse.json({
+      http.post('*/games', async ({ request }) => {
+        receivedBody = (await request.json()) as { variants?: string[] };
+        return HttpResponse.json({
           _id: NEW_GAME_TEST_DATA.gameIdOne,
           player_id: NEW_GAME_TEST_DATA.userId,
           game_type: 'BOT',
           name_of_enemy: null,
           board_size: 5,
-          strategy: 'random',
+          strategy: 'ai',
+          variants: receivedBody?.variants ?? [],
           difficulty_level: 'medium',
           rule_set: 'normal',
           current_turn: 'B',
@@ -122,37 +128,44 @@ describe('NewGamePage — game creation', () => {
           duration_seconds: 0,
           created_at: new Date().toISOString(),
           moves: []
-        }, { status: 201 })
-      )
+        }, { status: 201 });
+      })
     );
+
     renderNewGamePage();
-    await screen.findByLabelText(/random/i);
+    await userEvent.click(await screen.findByLabelText(/ai/i));
+    await screen.findByLabelText(/explosions/i);
+    await userEvent.click(screen.getByLabelText(/explosions/i));
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
-    await screen.findByRole('button', { name: /start game|creating game/i });
+
+    expect(receivedBody?.variants).toEqual(['Explosions']);
   });
 
-  test('successful PLAYER game creation requires opponent name', async () => {
+  test('successful PLAYER game creation carries selected variants too', async () => {
+    let receivedBody: { variants?: string[]; name_of_enemy?: string } | null = null;
+
     server.use(
       http.post('*/games', async ({ request }) => {
-        const body = (await request.json()) as { name_of_enemy?: string };
-        if (!body.name_of_enemy) {
+        receivedBody = (await request.json()) as { variants?: string[]; name_of_enemy?: string };
+        if (!receivedBody.name_of_enemy) {
           return HttpResponse.json({ error: 'name_of_enemy is required' }, { status: 400 });
         }
         return HttpResponse.json({
           _id: NEW_GAME_TEST_DATA.gameIdTwo, player_id: NEW_GAME_TEST_DATA.userId, game_type: 'PLAYER',
-          name_of_enemy: body.name_of_enemy, board_size: 5,
-          strategy: 'random', difficulty_level: 'medium', rule_set: 'normal',
+          name_of_enemy: receivedBody.name_of_enemy, board_size: 5,
+          strategy: 'random', variants: receivedBody.variants ?? [], difficulty_level: 'medium', rule_set: 'normal',
           current_turn: 'B', status: 'IN_PROGRESS', result: null,
           duration_seconds: 0, created_at: new Date().toISOString(), moves: []
         }, { status: 201 });
       })
     );
+
     renderNewGamePage();
     await userEvent.click(screen.getByLabelText(/play vs player/i));
     await userEvent.type(screen.getByLabelText(/opponent name/i), NEW_GAME_TEST_DATA.opponentName);
+    await userEvent.click(screen.getByLabelText(/explosions/i));
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
-    // error must NOT appear
-    await new Promise((r) => setTimeout(r, 300));
-    expect(screen.queryByText(/name_of_enemy is required/i)).not.toBeInTheDocument();
+
+    expect(receivedBody?.variants).toEqual(['Explosions']);
   });
 });

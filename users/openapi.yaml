@@ -101,9 +101,9 @@ components:
           items:
             $ref: '#/components/schemas/BotStat'
           example:
-            - { name: "random",   difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
-            - { name: "ai",       difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
-            - { name: "dijkstra", difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
+            - { name: "random",    difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
+            - { name: "defensive", difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
+            - { name: "ncts",      difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
 
     StrategyOption:
       type: object
@@ -130,9 +130,9 @@ components:
           items:
             $ref: '#/components/schemas/StrategyOption'
           example:
-            - { name: "Random",   difficulty: "Easy 😄"   }
-            - { name: "AI",       difficulty: "Medium 😐" }
-            - { name: "Dijkstra", difficulty: "Hard 😈"   }
+            - { name: "Random",    difficulty: "Easy 😄"   }
+            - { name: "Defensive", difficulty: "Medium 😐" }
+            - { name: "NCTS",      difficulty: "Hard 😈"   }
         variants:
           type: array
           items:
@@ -181,11 +181,11 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
-            ai:
+            defensive:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
-            dijkstra:
+            ncts:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
@@ -223,7 +223,7 @@ components:
           example: IN_PROGRESS
         result:
           type: string
-          enum: [WIN, LOSS, DRAW]
+          enum: [WIN, LOSS, UNFINISHED]
           nullable: true
           example: null
         duration_seconds:
@@ -455,29 +455,33 @@ paths:
     post:
       summary: Public bot play — no auth or game id required
       description: >
-        Open source endpoint for external users. Send a board position and strategy directly
+        Open source endpoint for external users. Send a board position and optional bot_id
         to get the bot's next move. No authentication or internal game id needed.
+        Defaults to the hardest bot (ncts) if bot_id is not provided.
+        board_size defaults to 5 if not provided.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [board_size]
+              required: [position]
               properties:
-                yen_state:
+                position:
                   type: string
                   nullable: true
                   description: Current board in YEN notation. Send null for the first move.
                   example: "B/.B/RB./B..R"
-                strategy:
+                bot_id:
                   type: string
-                  enum: [random, dijkstra, ai]
-                  default: random
-                  example: "random"
+                  enum: [random, defensive, ncts]
+                  default: ncts
+                  description: "Bot strategy to use. Defaults to ncts (hardest) if not provided."
+                  example: "ncts"
                 board_size:
                   type: integer
-                  example: 7
+                  default: 5
+                  example: 5
       responses:
         '200':
           description: Bot move returned from Gamey
@@ -497,7 +501,7 @@ paths:
                     nullable: true
                     example: null
         '400':
-          description: board_size is required
+          description: position is required
         '502':
           description: Gamey service returned an error
         '503':
@@ -531,9 +535,9 @@ paths:
                   example: "Tobias"
                 strategy:
                   type: string
-                  enum: [random, dijkstra, ai]
+                  enum: [random, defensive, ncts]
                   default: random
-                  description: "Difficulty is derived automatically: random=Easy 😄, dijkstra=Hard 😈, ai=Medium 😐"
+                  description: "Difficulty is derived automatically: random=Easy 😄, defensive=Medium 😐, ncts=Hard 😈"
                   example: "random"
       responses:
         '201':
@@ -719,7 +723,7 @@ paths:
   /games/{id}/finish:
     put:
       summary: Finish a game
-      description: Marks a game as FINISHED manually — used when a user quits (DRAW). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Requires authentication.
+      description: Marks a game as FINISHED manually — used when a user quits (UNFINISHED). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Statistics are only updated for WIN/LOSS. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -739,8 +743,8 @@ paths:
               properties:
                 result:
                   type: string
-                  enum: [WIN, LOSS, DRAW]
-                  example: "DRAW"
+                  enum: [WIN, LOSS, UNFINISHED]
+                  example: "UNFINISHED"
                 yen_final_state:
                   type: string
                   nullable: true
