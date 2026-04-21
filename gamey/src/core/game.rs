@@ -60,9 +60,32 @@ impl GameY {
         }
     }
 
+    /// Returns the number of bombs that should be placed for a given board size
+    /// in the Explosions variant.
+    ///
+    /// Scales in steps of three: sizes 7–9 get 1 bomb, 10–12 get 2,
+    /// 13–15 get 3, and so on. Returns 0 for boards smaller than 7.
+    ///
+    /// ```
+    /// use gamey::GameY;
+    /// assert_eq!(GameY::bomb_count_for_size(7), 1);
+    /// assert_eq!(GameY::bomb_count_for_size(9), 1);
+    /// assert_eq!(GameY::bomb_count_for_size(10), 2);
+    /// assert_eq!(GameY::bomb_count_for_size(13), 3);
+    /// ```
+    pub fn bomb_count_for_size(board_size: u32) -> u32 {
+        if board_size < 7 {
+            0
+        } else {
+            ((board_size - 4) / 3).max(1)
+        }
+    }
+
     /// Creates a new game with the specified variants.
     ///
     /// Variants (Explosions, DoubleTurn) require a board size of at least 7x7.
+    /// When Explosions is active the number of bombs placed is determined by
+    /// [`GameY::bomb_count_for_size`] — larger boards get more bombs.
     pub fn new_with_variants(board_size: u32, mut variants: Vec<GameVariant>) -> Self {
         // Enforce 7x7 minimum for variants
         if board_size < 7 {
@@ -71,13 +94,16 @@ impl GameY {
 
         let board = if variants.contains(&GameVariant::Explosions) && board_size >= 7 {
             let total_cells = Coordinates::total_cells(board_size);
-            let bomb_idx = *(0..total_cells)
-                .collect::<Vec<_>>()
-                .choose(&mut rand::rng())
-                .unwrap();
-            let bomb_coords = Coordinates::from_index(bomb_idx, board_size);
-            let mut bombs = HashSet::new();
-            bombs.insert(bomb_coords);
+            let bomb_count = Self::bomb_count_for_size(board_size) as usize;
+
+            let mut rng = rand::rng();
+            // Sample `bomb_count` unique cell indices without replacement.
+            let all_indices: Vec<u32> = (0..total_cells).collect();
+            let bombs: HashSet<Coordinates> = all_indices
+                .choose_multiple(&mut rng, bomb_count)
+                .map(|&idx| Coordinates::from_index(idx, board_size))
+                .collect();
+
             Board::new_with_bombs(board_size, bombs)
         } else {
             Board::new(board_size)
@@ -213,30 +239,49 @@ impl GameY {
     fn handle_placement(&mut self, player: PlayerId, coords: Coordinates) -> Result<()> {
         self.validate_placement(player, coords)?;
 
+        // Check whether this cell carries a bomb *before* placing — the board
+        // consumes the bomb on placement, so we must snapshot this now.
+        let bomb_detonated = self.board.is_bomb(&coords);
+
         // Delegate to Board — it handles set creation, neighbor merging, win check
         let won = self.board.place_piece(player, coords);
 
-        self.update_status_after_placement(player, won);
+        self.update_status_after_placement(player, won, bomb_detonated);
         Ok(())
     }
 
     /// Updates the game status (Finished vs Ongoing).
-    fn update_status_after_placement(&mut self, player: PlayerId, won: bool) {
+    ///
+    /// `bomb_detonated` is true when the placement triggered a bomb explosion.
+    /// In DoubleTurn mode a bomb explosion always ends the current player's
+    /// turn — the chaotic explosion forfeits the extra move — so we reset the
+    /// counter and switch immediately rather than letting the player take a
+    /// second placement this turn.
+    fn update_status_after_placement(&mut self, player: PlayerId, won: bool, bomb_detonated: bool) {
         if self.check_game_over() {
             tracing::info!("Game was already over. Move ignored for status update.");
         } else if won {
             tracing::debug!("Player {} wins the game!", player);
             self.status = GameStatus::Finished { winner: player };
         } else if self.variants.contains(&GameVariant::DoubleTurn) {
-            self.moves_this_turn += 1;
-            if self.moves_this_turn >= 2 {
-                // Player used both moves, switch to opponent
+            if bomb_detonated {
+                // Bomb explosion always forfeits the remainder of the turn,
+                // even when the player still had moves left (DoubleTurn).
                 self.moves_this_turn = 0;
                 self.status = GameStatus::Ongoing {
                     next_player: other_player(player),
                 };
+            } else {
+                self.moves_this_turn += 1;
+                if self.moves_this_turn >= 2 {
+                    // Player used both moves, switch to opponent
+                    self.moves_this_turn = 0;
+                    self.status = GameStatus::Ongoing {
+                        next_player: other_player(player),
+                    };
+                }
+                // else: stay on same player for second move
             }
-            // else: stay on same player for second move
         } else {
             self.status = GameStatus::Ongoing {
                 next_player: other_player(player),
@@ -785,6 +830,25 @@ mod tests {
     }
 
     #[test]
+    fn test_bomb_count_for_size() {
+        // Below minimum: no bombs
+        assert_eq!(GameY::bomb_count_for_size(6), 0);
+        // Size 7-9: 1 bomb
+        assert_eq!(GameY::bomb_count_for_size(7), 1);
+        assert_eq!(GameY::bomb_count_for_size(8), 1);
+        assert_eq!(GameY::bomb_count_for_size(9), 1);
+        // Size 10-12: 2 bombs
+        assert_eq!(GameY::bomb_count_for_size(10), 2);
+        assert_eq!(GameY::bomb_count_for_size(11), 2);
+        assert_eq!(GameY::bomb_count_for_size(12), 2);
+        // Size 13-15: 3 bombs
+        assert_eq!(GameY::bomb_count_for_size(13), 3);
+        assert_eq!(GameY::bomb_count_for_size(15), 3);
+        // Size 16-18: 4 bombs
+        assert_eq!(GameY::bomb_count_for_size(16), 4);
+    }
+
+    #[test]
     fn test_gamey_variants_initialization() {
         // Size < 7 does not place a bomb and ignores variants
         let variants = vec![GameVariant::Explosions, GameVariant::DoubleTurn];
@@ -792,10 +856,74 @@ mod tests {
         assert_eq!(game1.variants().len(), 0); // Both filtered out
         assert_eq!(game1.bomb_positions().len(), 0);
 
-        // Size >= 7 does place a bomb and keeps variants
+        // Size 7 → 1 bomb
         let game2 = GameY::new_with_variants(7, variants);
         assert_eq!(game2.variants().len(), 2);
-        assert_eq!(game2.bomb_positions().len(), 1);
+        assert_eq!(game2.bomb_positions().len(), GameY::bomb_count_for_size(7) as usize);
+    }
+
+    /// In DoubleTurn mode, detonating a bomb on the *first* of the two moves
+    /// must switch the turn to the opponent immediately — the explosion forfeits
+    /// the remaining move(s). Previously, `moves_this_turn` was simply
+    /// incremented, leaving the same player at the controls for another move.
+    #[test]
+    fn test_explosion_forfeits_double_turn() {
+        use std::collections::HashSet;
+
+        // Build a size-7 game with DoubleTurn only (we place the bomb manually
+        // so we know exactly where it is).
+        let bomb_coord = Coordinates::new(3, 2, 1); // interior cell, far from edges
+        let mut bombs = HashSet::new();
+        bombs.insert(bomb_coord);
+
+        let mut game = GameY {
+            board: Board::new_with_bombs(7, bombs),
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants: vec![GameVariant::DoubleTurn],
+            moves_this_turn: 0,
+        };
+
+        // Sanity: Player 0 starts, moves_this_turn is 0.
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+
+        // Player 0 detonates the bomb on their *first* DoubleTurn move.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: bomb_coord,
+        })
+        .unwrap();
+
+        // The explosion must have switched the turn to Player 1, not kept
+        // Player 0 for a second move.
+        assert_eq!(
+            game.next_player(),
+            Some(PlayerId::new(1)),
+            "bomb explosion must forfeit the remaining DoubleTurn move and switch to Player 1"
+        );
+    }
+
+    /// Confirm that a normal (non-bomb) move in DoubleTurn still keeps the
+    /// same player for their second move.
+    #[test]
+    fn test_normal_move_does_not_forfeit_double_turn() {
+        let mut game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+
+        // First normal move — player 0 should keep the turn.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 6),
+        })
+        .unwrap();
+
+        assert_eq!(
+            game.next_player(),
+            Some(PlayerId::new(0)),
+            "first normal move in DoubleTurn must not switch the turn"
+        );
     }
 
     #[test]
