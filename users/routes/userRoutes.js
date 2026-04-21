@@ -4,7 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const STRATEGY_DIFFICULTY = {
     random:    'Easy 😄',
     defensive: 'Medium 😐',
-    ncts:      'Hard 😈'
+    mcts:      'Hard 😈'
 };
 
 module.exports = function userRoutes(repository) {
