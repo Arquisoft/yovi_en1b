@@ -60,49 +60,74 @@ impl GameY {
         }
     }
 
-    /// Returns the number of bombs that should be placed for a given board size
-    /// in the Explosions variant.
+    /// Returns the number of bombs to place for a given board size in the
+    /// Explosions variant.
     ///
-    /// Scales in steps of three: sizes 7–9 get 1 bomb, 10–12 get 2,
-    /// 13–15 get 3, and so on. Returns 0 for boards smaller than 7.
+    /// - Size 0 : 0 bombs (degenerate; handled gracefully).
+    /// - Sizes 1–7 : exactly **1** bomb — small boards stay playable.
+    /// - Sizes 8+   : a **random** value in \[1, 4\] inclusive — bigger boards
+    ///   get a variable number of hazards for added unpredictability.
     ///
     /// ```
     /// use gamey::GameY;
+    /// assert_eq!(GameY::bomb_count_for_size(1), 1);
     /// assert_eq!(GameY::bomb_count_for_size(7), 1);
-    /// assert_eq!(GameY::bomb_count_for_size(9), 1);
-    /// assert_eq!(GameY::bomb_count_for_size(10), 2);
-    /// assert_eq!(GameY::bomb_count_for_size(13), 3);
+    /// let c = GameY::bomb_count_for_size(10);
+    /// assert!(c >= 1 && c <= 4);
     /// ```
     pub fn bomb_count_for_size(board_size: u32) -> u32 {
-        if board_size < 7 {
-            0
-        } else {
-            ((board_size - 4) / 3).max(1)
+        match board_size {
+            0 => 0,
+            1..=7 => 1,
+            // [1u32, 2, 3, 4].choose reuses the IndexedRandom import already
+            // in scope and avoids a separate Rng::gen_range import.
+            _ => *[1u32, 2, 3, 4].choose(&mut rand::rng()).unwrap(),
         }
     }
 
     /// Creates a new game with the specified variants.
     ///
-    /// Variants (Explosions, DoubleTurn) require a board size of at least 7x7.
-    /// When Explosions is active the number of bombs placed is determined by
-    /// [`GameY::bomb_count_for_size`] — larger boards get more bombs.
+    /// **Size restriction changes:**
+    /// - `Explosions` now works on **any** board size; the number of bombs is
+    ///   determined by [`GameY::bomb_count_for_size`].
+    /// - `DoubleTurn` still requires a board of at least 7 cells per side for
+    ///   meaningful two-move turns.
     pub fn new_with_variants(board_size: u32, mut variants: Vec<GameVariant>) -> Self {
-        // Enforce 7x7 minimum for variants
+        // DoubleTurn still requires a reasonably large board; Explosions no
+        // longer has a minimum size restriction.
         if board_size < 7 {
-            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+            variants.retain(|v| !matches!(v, GameVariant::DoubleTurn));
         }
 
-        let board = if variants.contains(&GameVariant::Explosions) && board_size >= 7 {
+        let board = if variants.contains(&GameVariant::Explosions) {
             let total_cells = Coordinates::total_cells(board_size);
             let bomb_count = Self::bomb_count_for_size(board_size) as usize;
 
             let mut rng = rand::rng();
-            // Sample `bomb_count` unique cell indices without replacement.
-            let all_indices: Vec<u32> = (0..total_cells).collect();
-            let bombs: HashSet<Coordinates> = all_indices
-                .choose_multiple(&mut rng, bomb_count)
-                .map(|&idx| Coordinates::from_index(idx, board_size))
+            // Place bombs one-by-one, removing each chosen cell and all its
+            // neighbours from the candidate pool after each placement.  This
+            // guarantees that no two bombs are adjacent — they can never
+            // chain-detonate at game-start and every bomb blast affects only
+            // its own neighbourhood.
+            let mut candidates: Vec<Coordinates> = (0..total_cells)
+                .map(|idx| Coordinates::from_index(idx, board_size))
                 .collect();
+
+            let mut bombs: HashSet<Coordinates> = HashSet::new();
+            for _ in 0..bomb_count {
+                if candidates.is_empty() {
+                    break; // board too small to fit more non-adjacent bombs
+                }
+                // Pick a random cell from the remaining candidates.
+                let chosen = *candidates.choose(&mut rng).unwrap();
+                bombs.insert(chosen);
+                // Exclude the chosen cell and all its neighbours so the next
+                // bomb cannot land adjacent to this one.
+                let forbidden: HashSet<Coordinates> = std::iter::once(chosen)
+                    .chain(chosen.neighbors(board_size))
+                    .collect();
+                candidates.retain(|c| !forbidden.contains(c));
+            }
 
             Board::new_with_bombs(board_size, bombs)
         } else {
@@ -405,9 +430,9 @@ impl TryFrom<YEN> for GameY {
             .filter_map(|v| GameVariant::from_name(v))
             .collect();
 
-        // Enforce 7x7 minimum for variants
+        // DoubleTurn still requires a large board; Explosions has no minimum.
         if game.size() < 7 {
-            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+            variants.retain(|v| !matches!(v, GameVariant::DoubleTurn));
         }
 
         // Parse bomb positions from the "e" field *and* from any 'e' characters
@@ -831,35 +856,77 @@ mod tests {
 
     #[test]
     fn test_bomb_count_for_size() {
-        // Below minimum: no bombs
-        assert_eq!(GameY::bomb_count_for_size(6), 0);
-        // Size 7-9: 1 bomb
-        assert_eq!(GameY::bomb_count_for_size(7), 1);
-        assert_eq!(GameY::bomb_count_for_size(8), 1);
-        assert_eq!(GameY::bomb_count_for_size(9), 1);
-        // Size 10-12: 2 bombs
-        assert_eq!(GameY::bomb_count_for_size(10), 2);
-        assert_eq!(GameY::bomb_count_for_size(11), 2);
-        assert_eq!(GameY::bomb_count_for_size(12), 2);
-        // Size 13-15: 3 bombs
-        assert_eq!(GameY::bomb_count_for_size(13), 3);
-        assert_eq!(GameY::bomb_count_for_size(15), 3);
-        // Size 16-18: 4 bombs
-        assert_eq!(GameY::bomb_count_for_size(16), 4);
+        // Size 0: edge case
+        assert_eq!(GameY::bomb_count_for_size(0), 0);
+        // Sizes 1-7: always exactly 1 bomb
+        for size in 1..=7u32 {
+            assert_eq!(
+                GameY::bomb_count_for_size(size),
+                1,
+                "size {size} should always yield 1 bomb"
+            );
+        }
+        // Sizes >= 8: random value in [1, 4] — run many times to verify range
+        for _ in 0..50 {
+            let c = GameY::bomb_count_for_size(8);
+            assert!(c >= 1 && c <= 4, "size 8 bomb count {c} out of [1,4]");
+            let c = GameY::bomb_count_for_size(15);
+            assert!(c >= 1 && c <= 4, "size 15 bomb count {c} out of [1,4]");
+        }
     }
 
     #[test]
     fn test_gamey_variants_initialization() {
-        // Size < 7 does not place a bomb and ignores variants
+        // Size < 7: DoubleTurn is filtered out, but Explosions is now allowed.
         let variants = vec![GameVariant::Explosions, GameVariant::DoubleTurn];
         let game1 = GameY::new_with_variants(5, variants.clone());
-        assert_eq!(game1.variants().len(), 0); // Both filtered out
-        assert_eq!(game1.bomb_positions().len(), 0);
+        assert!(
+            game1.variants().contains(&GameVariant::Explosions),
+            "Explosions should be active on size-5 boards"
+        );
+        assert!(
+            !game1.variants().contains(&GameVariant::DoubleTurn),
+            "DoubleTurn should still be restricted to size >= 7"
+        );
+        // Size <= 7 → exactly 1 bomb
+        assert_eq!(game1.bomb_positions().len(), 1);
 
-        // Size 7 → 1 bomb
+        // Size 7: both variants active, 1 bomb (size <= 7 rule)
         let game2 = GameY::new_with_variants(7, variants);
         assert_eq!(game2.variants().len(), 2);
-        assert_eq!(game2.bomb_positions().len(), GameY::bomb_count_for_size(7) as usize);
+        assert_eq!(game2.bomb_positions().len(), 1);
+
+        // Size >= 8: both active, bomb count in [1,4]
+        let game3 = GameY::new_with_variants(9, vec![GameVariant::Explosions]);
+        let bc = game3.bomb_positions().len() as u32;
+        assert!(bc >= 1 && bc <= 4, "size-9 bomb count {bc} out of [1,4]");
+    }
+
+    /// Randomly-placed bombs must never be adjacent to each other.
+    ///
+    /// Adjacent bombs would chain-detonate on the very first trigger, wiping
+    /// out huge sections of the board instantly. The placement algorithm should
+    /// exclude each chosen cell's neighbours from the candidate pool after
+    /// every placement.
+    #[test]
+    fn test_bombs_not_adjacent_to_each_other() {
+        // Run many times to catch non-deterministic failures.
+        for _ in 0..100 {
+            // Use a large board so we reliably get multiple bombs.
+            let game = GameY::new_with_variants(10, vec![GameVariant::Explosions]);
+            let bombs = game.bomb_positions();
+
+            for &bomb in &bombs {
+                let neighbours = bomb.neighbors(10);
+                for neighbour in &neighbours {
+                    assert!(
+                        !bombs.contains(neighbour),
+                        "bombs {bomb:?} and {neighbour:?} are adjacent — \
+                         placement must guarantee no two bombs touch"
+                    );
+                }
+            }
+        }
     }
 
     /// In DoubleTurn mode, detonating a bomb on the *first* of the two moves

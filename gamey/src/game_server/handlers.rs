@@ -66,14 +66,8 @@ pub async fn new_game(
         .filter_map(|v| GameVariant::from_name(v))
         .collect();
 
-    if req.board_size < 7 && !variants.is_empty() {
-        return Err(Json(ErrorResponse::error(
-            "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
-            Some(params.api_version),
-            None,
-        )));
-    }
-
+    // DoubleTurn still enforces a minimum inside new_with_variants; no need
+    // for a blanket rejection here. Explosions now works on any board size.
     let game = if variants.is_empty() {
         GameY::new(req.board_size)
     } else {
@@ -198,7 +192,7 @@ pub async fn play(
 ) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state {
         Some(layout_str) => {
-            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref())?
+            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref(), req.turn)?
         }
         None => {
             if req.board_size == 0 || req.board_size > 100 {
@@ -214,13 +208,6 @@ pub async fn play(
                 .filter_map(|v| GameVariant::from_name(v))
                 .collect();
 
-            if req.board_size < 7 && !variants.is_empty() {
-                return Err(Json(ErrorResponse::error(
-                    "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
-                    None,
-                    None,
-                )));
-            }
             if variants.is_empty() {
                 GameY::new(req.board_size)
             } else {
@@ -256,12 +243,19 @@ pub async fn play(
     })?;
 
     let response_yen: YEN = (&game).into();
+    // Embed the authoritative turn directly inside `yen_state` as a "t{n}|"
+    // prefix (e.g. "t1|R/BR/...").  The client treats `yen_state` as an opaque
+    // string and echoes it back unchanged, so the server can always recover the
+    // correct turn on the next request — even when the piece-count heuristic
+    // would give the wrong answer after a bomb explosion.
+    let authoritative_turn = response_yen.turn();
     Ok(Json(PlayResponse {
         coordinates: coords,
-        yen_state: response_yen.layout().to_string(),
+        yen_state: format!("t{}|{}", authoritative_turn, response_yen.layout()),
         winner: get_winner_string(&game),
         variants: response_yen.variants().to_vec(),
         explosives: response_yen.explosives().map(|s| s.to_string()),
+        turn: authoritative_turn,
     }))
 }
 
@@ -275,7 +269,7 @@ pub async fn compute(
 ) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state_prev {
         Some(layout_str) => {
-            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref())?
+            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref(), req.turn)?
         }
         None => {
             // Reconstruct board size from first move coordinates
@@ -287,7 +281,7 @@ pub async fn compute(
                 .iter()
                 .filter_map(|v| GameVariant::from_name(v))
                 .collect();
-            if board_size >= 7 && !variants.is_empty() {
+            if !variants.is_empty() {
                 GameY::new_with_variants(board_size, variants)
             } else {
                 GameY::new(board_size)
@@ -308,8 +302,6 @@ pub async fn compute(
         player: *next_player,
         coords: req.coordinates,
     }).map_err(|err| {
-        // Here we could check if it's the second move and they wanted to swap,
-        // but the API specifically provides coordinates, so it's a placement.
         Json(ErrorResponse::error(
             &format!("Invalid move: {}", err),
             None,
@@ -318,11 +310,16 @@ pub async fn compute(
     })?;
 
     let response_yen: YEN = (&game).into();
+    // Same "t{n}|" prefix trick as in /play — embeds the authoritative turn
+    // into the layout string so it survives the round-trip without any
+    // client-side changes.
+    let authoritative_turn = response_yen.turn();
     Ok(Json(ComputeResponse {
-        yen_state: response_yen.layout().to_string(),
+        yen_state: format!("t{}|{}", authoritative_turn, response_yen.layout()),
         winner: get_winner_string(&game),
         variants: response_yen.variants().to_vec(),
         explosives: response_yen.explosives().map(|s| s.to_string()),
+        turn: authoritative_turn,
     }))
 }
 
@@ -372,21 +369,50 @@ fn match_bot(name: &str) -> Option<Box<dyn YBot>> {
 }
 
 /// Helper: parses a YEN layout string into a [`GameY`] instance, preserving
-/// variants and bomb positions.
+/// variants, bomb positions, and — critically — the correct turn.
 ///
-/// Previously this helper dropped the variants list and bomb positions
-/// entirely, so round-tripping through `/play` or `/compute` turned an
-/// Explosions game into a plain game (issue #203). It now forwards both
-/// pieces of information to [`YEN::new_with_variants`].
+/// ## Turn resolution order (highest priority first)
+///
+/// 1. **`explicit_turn`** – the `turn` field from the JSON request body, when
+///    the client sends it.
+/// 2. **Embedded prefix** – the server encodes the authoritative turn directly
+///    inside `yen_state` as a `"t{n}|"` prefix (e.g. `"t1|R/BR/..."`).
+///    Because the client echoes `yen_state` back unchanged, this survives the
+///    round-trip without *any* client-side changes — which is important for
+///    the Explosions variant where a bomb can leave the mover with fewer pieces
+///    than the opponent, causing the naïve piece-count heuristic to give the
+///    wrong answer.
+/// 3. **Piece-count heuristic** – fallback for old layouts that carry neither
+///    of the above.  Works correctly for all non-explosion scenarios but will
+///    mis-fire when an explosion shifted piece counts unexpectedly.
 fn parse_yen_layout(
     layout_str: String,
     variants: &[String],
     explosives: Option<&str>,
+    explicit_turn: Option<u32>,
 ) -> Result<GameY, Json<ErrorResponse>> {
+    // ── Step 1: strip the optional "t{n}|" turn prefix ───────────────────────
+    // The server embeds this prefix into every `yen_state` response so the
+    // turn survives the round-trip even when the client does not include the
+    // separate `turn` request field.
+    let (layout_str, prefix_turn) = if let Some(rest) = layout_str.strip_prefix("t0|") {
+        (rest.to_string(), Some(0u32))
+    } else if let Some(rest) = layout_str.strip_prefix("t1|") {
+        (rest.to_string(), Some(1u32))
+    } else {
+        (layout_str, None)
+    };
+
     let size = layout_str.split('/').count() as u32;
-    let b_count = layout_str.chars().filter(|c| *c == 'B').count();
-    let r_count = layout_str.chars().filter(|c| *c == 'R').count();
-    let turn = if b_count > r_count { 1 } else { 0 };
+
+    // ── Step 2: pick the most-authoritative turn source ───────────────────────
+    let turn = explicit_turn          // highest priority: explicit request field
+        .or(prefix_turn)              // then: embedded prefix
+        .unwrap_or_else(|| {          // last resort: piece-count heuristic
+            let b_count = layout_str.chars().filter(|c| *c == 'B').count();
+            let r_count = layout_str.chars().filter(|c| *c == 'R').count();
+            if b_count > r_count { 1 } else { 0 }
+        });
 
     let yen = YEN::new_with_variants(
         size,
@@ -717,6 +743,7 @@ mod tests {
             board_size,
             variants: vec![],
             explosives: None,
+            turn: None,
         })
     }
 
@@ -730,6 +757,7 @@ mod tests {
             coordinates,
             variants: vec![],
             explosives: None,
+            turn: None,
         })
     }
 
@@ -805,6 +833,7 @@ mod tests {
             board_size: 2,
             variants: vec![],
             explosives: None,
+            turn: None,
         });
         let res = play(req).await;
         assert!(res.is_ok());
@@ -889,14 +918,17 @@ mod tests {
             board_size: 7,
             variants: vec!["Explosions".to_string()],
             explosives: None,
+            turn: None,
         });
         let first = play(req).await.expect("play should succeed").0;
         assert!(first.explosives.is_some(), "bomb positions should be returned");
         assert!(first.variants.iter().any(|v| v == "Explosions"));
         assert_eq!(first.yen_state.split('/').count(), 7);
+        // Response must carry the authoritative turn.
+        assert!(first.turn == 0 || first.turn == 1, "turn must be 0 or 1");
 
-        // Now send the state back to the server and confirm the bombs are still
-        // there after the second bot move.
+        // Now send the state back to the server — echoing the `turn` field —
+        // and confirm both bombs and the correct turn survive the round-trip.
         let req2 = axum::Json(PlayRequest {
             yen_state: Some(first.yen_state.clone()),
             strategy: Some("random".to_string()),
@@ -904,11 +936,126 @@ mod tests {
             board_size: 7,
             variants: first.variants.clone(),
             explosives: first.explosives.clone(),
+            turn: Some(first.turn), // ← echo authoritative turn back
         });
         let second = play(req2).await.expect("second play should succeed").0;
         assert_eq!(
             second.explosives, first.explosives,
             "bomb positions must survive a /play round-trip"
+        );
+        assert!(second.turn == 0 || second.turn == 1);
+    }
+
+    /// Regression test: after a bomb explosion that removes more of the *mover's*
+    /// pieces than the opponent's, the piece-count heuristic gives the wrong turn.
+    ///
+    /// The fix embeds the authoritative turn as a "t{n}|" prefix inside every
+    /// `yen_state` response.  When the client echoes `yen_state` back (without
+    /// any `turn` field), the server decodes the prefix and uses the correct turn.
+    ///
+    /// Three branches are tested:
+    ///   1. **Prefix round-trip** — `yen_state = "t1|R/BR/..."`, no `turn` field
+    ///      → server decodes prefix, bot moves as R.
+    ///   2. **Explicit turn field** — `yen_state = "R/BR/..."`, `turn = Some(1)`
+    ///      → explicit field takes priority, bot moves as R.
+    ///   3. **Heuristic fires** — `yen_state = "R/BR/..."`, no `turn`, no prefix
+    ///      → heuristic picks B (wrong), bot moves as B (demonstrates the bug
+    ///         this fix resolves).
+    #[tokio::test]
+    async fn test_turn_survives_explosion_round_trip() {
+        // "R/BR/..." — size-3 board with B=1, R=2.
+        //   Row 0 (1 cell): "R"
+        //   Row 1 (2 cells): "BR"
+        //   Row 2 (3 cells): "..."
+        // Piece-count heuristic: b_count(1) > r_count(2) → false → turn=0 (B). ← WRONG
+        let bare_layout = "R/BR/...";
+        let b_count = bare_layout.chars().filter(|c| *c == 'B').count(); // 1
+        let r_count = bare_layout.chars().filter(|c| *c == 'R').count(); // 2
+
+        // Sanity-check: heuristic IS wrong for this layout.
+        let heuristic_turn = if b_count > r_count { 1u32 } else { 0u32 };
+        assert_eq!(heuristic_turn, 0, "heuristic must give the wrong turn for this state");
+
+        // ── Branch 1: prefix in yen_state, no turn field ─────────────────────
+        // Simulate client echoing back the "t1|…" yen_state it received from
+        // the server — without including the separate `turn` field.
+        let req_prefix = axum::Json(PlayRequest {
+            yen_state: Some(format!("t1|{}", bare_layout)), // ← embedded prefix
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: None, // ← no explicit field — server must use prefix
+        });
+        let resp_prefix = play(req_prefix)
+            .await
+            .expect("play should succeed with prefix-encoded turn")
+            .0;
+
+        // Response yen_state must carry a fresh "t{n}|" prefix.
+        assert!(
+            resp_prefix.yen_state.starts_with("t0|") || resp_prefix.yen_state.starts_with("t1|"),
+            "response yen_state must carry a 't{{n}}|' prefix, got: {}",
+            resp_prefix.yen_state
+        );
+        let new_r_prefix = resp_prefix.yen_state.chars().filter(|c| *c == 'R').count();
+        let r_won_prefix  = resp_prefix.winner == Some("R".to_string());
+        assert!(
+            new_r_prefix > r_count || r_won_prefix,
+            "with prefix turn=1, bot should move as R; \
+             r_count: {} → {} (winner={:?})",
+            r_count, new_r_prefix, resp_prefix.winner
+        );
+
+        // ── Branch 2: explicit turn field (no prefix) ────────────────────────
+        let req_explicit = axum::Json(PlayRequest {
+            yen_state: Some(bare_layout.to_string()),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: Some(1), // ← explicit field overrides heuristic
+        });
+        let resp_explicit = play(req_explicit)
+            .await
+            .expect("play should succeed with explicit turn")
+            .0;
+        let new_r_explicit = resp_explicit.yen_state.chars().filter(|c| *c == 'R').count();
+        let r_won_explicit  = resp_explicit.winner == Some("R".to_string());
+        assert!(
+            new_r_explicit > r_count || r_won_explicit,
+            "with explicit turn=1, bot should move as R; \
+             r_count: {} → {} (winner={:?})",
+            r_count, new_r_explicit, resp_explicit.winner
+        );
+
+        // ── Branch 3: heuristic fallback (no prefix, no turn field) ──────────
+        // Without either source of authoritative turn info the heuristic fires
+        // and picks B (turn=0). This branch documents the original bug and
+        // confirms the fallback still works (even if it gives the wrong answer
+        // in this specific post-explosion layout).
+        let req_heuristic = axum::Json(PlayRequest {
+            yen_state: Some(bare_layout.to_string()),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: None,
+        });
+        let resp_heuristic = play(req_heuristic)
+            .await
+            .expect("play should succeed with heuristic turn")
+            .0;
+        let new_b_heuristic = resp_heuristic.yen_state.chars().filter(|c| *c == 'B').count();
+        let b_won_heuristic  = resp_heuristic.winner == Some("B".to_string());
+        assert!(
+            new_b_heuristic > b_count || b_won_heuristic,
+            "without authoritative turn info, heuristic picks B and bot moves as B; \
+             b_count: {} → {} (winner={:?})",
+            b_count, new_b_heuristic, resp_heuristic.winner
         );
     }
 

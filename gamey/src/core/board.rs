@@ -109,7 +109,9 @@ impl Board {
     /// Use `is_empty_at()` first.
     ///
     /// If the cell is a bomb, the bomb detonates after placement: all occupied
-    /// neighbor cells are cleared and the bomb is consumed.
+    /// neighbour cells are cleared, the bomb is consumed, and any adjacent
+    /// bombs chain-detonate via BFS — so a cluster of adjacent bombs all
+    /// explode together when the first one is triggered.
     pub fn place_piece(&mut self, player: PlayerId, coords: Coordinates) -> bool {
         let is_bomb = self.bombs.remove(&coords);
 
@@ -126,27 +128,54 @@ impl Board {
         self.sets.push(new_set);
         self.board_map.insert(coords, (set_idx, player));
 
-        // If bomb, detonate: clear all occupied neighbors
+        // ── Bomb path ──────────────────────────────────────────────────────────
+        // BFS chain detonation: start from the triggered cell and propagate to
+        // every adjacent bomb, consuming them all before rebuilding.
+        //
+        // `visited` tracks every explosion centre we have already queued so we
+        // never process the same cell twice — important both for termination
+        // and to avoid double-removing entries from `board_map`.
         if is_bomb {
-            let neighbors = coords.neighbors(self.board_size);
-            for neighbor in &neighbors {
-                if self.board_map.remove(neighbor).is_some() {
-                    let neighbor_idx = neighbor.to_index(self.board_size);
-                    if !self.available_cells.contains(&neighbor_idx) {
-                        self.available_cells.push(neighbor_idx);
+            let mut pending: Vec<Coordinates> = vec![coords];
+            let mut visited: HashSet<Coordinates> = HashSet::new();
+            visited.insert(coords);
+
+            while let Some(explosion) = pending.pop() {
+                for neighbour in explosion.neighbors(self.board_size) {
+                    // Clear any piece sitting on the neighbouring cell.
+                    if self.board_map.remove(&neighbour).is_some() {
+                        let idx = neighbour.to_index(self.board_size);
+                        if !self.available_cells.contains(&idx) {
+                            self.available_cells.push(idx);
+                        }
+                    }
+                    // Chain-react: queue unvisited adjacent bombs.
+                    // `bombs.remove` returns true only if the value was present,
+                    // so we consume the bomb atomically with the visited-check.
+                    if !visited.contains(&neighbour) && self.bombs.remove(&neighbour) {
+                        visited.insert(neighbour);
+                        pending.push(neighbour);
                     }
                 }
             }
+
             // Rebuild Union-Find from scratch so that detonated cells don't
             // leave orphaned sets whose `touches_side_*` flags could later be
-            // merged into a live component and trigger a phantom win. The set
-            // indices in `board_map` are only meaningful relative to `sets`,
-            // so rebuilding both together is safe.
+            // merged into a live component and trigger a phantom win.
             self.rebuild_union_find();
-            // The winning flags after rebuild are on the remaining cells'
-            // fresh sets; look up the placed cell's new set index and check.
-            let (new_set_idx, _) = self.board_map[&coords];
-            return self.sets[new_set_idx].is_winning_configuration();
+
+            // ── Critical: use find() to reach the canonical root ──────────────
+            // After rebuild, the set index stored in `board_map` for `coords`
+            // may be a *non-root* node — if it was merged into a neighbour's
+            // component during the rebuild loop, its parent was updated but the
+            // stored index was not.  Calling `find` with path-compression gives
+            // us the root whose `touches_side_*` flags reflect the *entire*
+            // connected component, not just the single cell.
+            // Without this fix a winning bomb move would return `false`, the
+            // game would continue, and the turn would switch to the wrong player.
+            let raw_idx = self.board_map[&coords].0;
+            let root = self.find(raw_idx);
+            return self.sets[root].is_winning_configuration();
         }
 
         // Edge case: on a size-1 board, the single cell touches all 3 sides
@@ -411,33 +440,129 @@ mod tests {
         let mut bombs = std::collections::HashSet::new();
         let bomb_coord = Coordinates::new(1, 1, 0); // center-ish of size 3 board
         bombs.insert(bomb_coord);
-        
+
         let mut board = Board::new_with_bombs(3, bombs);
-        
+
         // Place some pieces around the bomb
         let neighbor_1 = Coordinates::new(1, 0, 1);
         let neighbor_2 = Coordinates::new(2, 0, 0);
-        
+
         board.place_piece(PlayerId::new(0), neighbor_1);
         board.place_piece(PlayerId::new(1), neighbor_2);
-        
+
         // Both pieces should exist
         assert_eq!(board.get_cell(&neighbor_1), Some(PlayerId::new(0)));
         assert_eq!(board.get_cell(&neighbor_2), Some(PlayerId::new(1)));
-        
+
         // Place piece on bomb!
         let won = board.place_piece(PlayerId::new(0), bomb_coord);
         assert!(!won);
-        
+
         // The piece placed on the bomb stays
         assert_eq!(board.get_cell(&bomb_coord), Some(PlayerId::new(0)));
-        
+
         // The neighbors are cleared
         assert_eq!(board.get_cell(&neighbor_1), None);
         assert_eq!(board.get_cell(&neighbor_2), None);
-        
+
         // The bomb is consumed
         assert!(!board.is_bomb(&bomb_coord));
         assert_eq!(board.bombs().len(), 0);
+    }
+
+    /// Two adjacent bombs: triggering the first must chain-detonate the second.
+    /// Both bombs must be consumed and the combined blast radius must clear all
+    /// occupied neighbours of both explosion centres.
+    #[test]
+    fn test_chain_detonation_adjacent_bombs() {
+        use std::collections::HashSet;
+
+        // Size-5 board. Place two adjacent bombs.
+        //   bomb_a = (2,1,1)  (interior — 6 neighbours)
+        //   bomb_b = (1,2,1)  (adjacent to bomb_a)
+        let bomb_a = Coordinates::new(2, 1, 1);
+        let bomb_b = Coordinates::new(1, 2, 1);
+        assert!(
+            bomb_a.neighbors(5).contains(&bomb_b),
+            "test assumption: bomb_b must be a neighbour of bomb_a"
+        );
+        let mut bombs: HashSet<Coordinates> = HashSet::new();
+        bombs.insert(bomb_a);
+        bombs.insert(bomb_b);
+        let mut board = Board::new_with_bombs(5, bombs);
+
+        // Scatter some pieces near both bombs.
+        let piece_near_a = Coordinates::new(2, 0, 2); // neighbour of bomb_a only
+        let piece_near_b = Coordinates::new(0, 3, 1); // neighbour of bomb_b only
+        board.place_piece(PlayerId::new(0), piece_near_a);
+        board.place_piece(PlayerId::new(1), piece_near_b);
+        // One far piece that should survive the blast.
+        let far_piece = Coordinates::new(0, 0, 4);
+        board.place_piece(PlayerId::new(0), far_piece);
+
+        // Trigger bomb_a.
+        let won = board.place_piece(PlayerId::new(1), bomb_a);
+        assert!(!won);
+
+        // Both bombs consumed.
+        assert!(!board.is_bomb(&bomb_a), "bomb_a must be consumed");
+        assert!(!board.is_bomb(&bomb_b), "bomb_b must chain-detonate and be consumed");
+        assert_eq!(board.bombs().len(), 0, "no bombs should remain");
+
+        // The triggering piece survives.
+        assert_eq!(board.get_cell(&bomb_a), Some(PlayerId::new(1)));
+
+        // Neighbours of the blast radii are cleared.
+        assert_eq!(board.get_cell(&piece_near_a), None, "piece near bomb_a must be cleared");
+        assert_eq!(board.get_cell(&piece_near_b), None, "piece near bomb_b must be cleared");
+
+        // The far piece is untouched.
+        assert_eq!(board.get_cell(&far_piece), Some(PlayerId::new(0)));
+    }
+
+    /// Regression test for the non-root set_idx win-detection bug.
+    ///
+    /// When a bomb explodes and the rebuild merges the placed piece into a
+    /// component that touches all three sides, `place_piece` must return `true`
+    /// even when the raw set index stored in `board_map` is no longer the
+    /// Union-Find root (i.e. its parent was updated by `union` during rebuild).
+    #[test]
+    fn test_explosion_win_detected_via_find() {
+        use std::collections::HashSet;
+
+        // Size-3 board. We arrange so that after the blast the placed piece
+        // joins a component that spans all three sides.
+        //
+        // Board sides (size 3):
+        //   Side A: x = 0  → row (0,0,2), (0,1,1), (0,2,0)
+        //   Side B: y = 0  → col (0,0,2), (1,0,1), (2,0,0)
+        //   Side C: z = 0  → col (0,2,0), (1,1,0), (2,0,0)
+        //
+        // Strategy: P0 controls (0,0,2)—touches A+B—and (0,2,0)—touches A+C.
+        // Bomb is at (1,1,0) which touches B+C and is adjacent to both P0 pieces.
+        // After the blast, P0's placed piece at the bomb connects A+B to A+C via itself → win.
+        // However, the rebuild processes cells in index order.  (0,0,2) has index 0
+        // and is processed first; (0,2,0) has a higher index.  When (1,1,0) is
+        // processed it merges with whichever of the two P0 pieces was processed
+        // first, and the *other* merge makes the placed piece a non-root.  The
+        // old code would check `sets[non_root]` and miss the win.
+
+        let bomb_coord = Coordinates::new(1, 1, 0); // touches B (y=0) and C (z=0)
+        let mut bombs: HashSet<Coordinates> = HashSet::new();
+        bombs.insert(bomb_coord);
+        let mut board = Board::new_with_bombs(3, bombs);
+
+        // Pre-place P0 pieces that touch sides A+B and A+C respectively.
+        board.place_piece(PlayerId::new(0), Coordinates::new(0, 0, 2)); // A+B
+        board.place_piece(PlayerId::new(0), Coordinates::new(0, 2, 0)); // A+C
+
+        // P0 places on the bomb. After explosion the placed piece (1,1,0)
+        // should connect the two existing P0 cells into a single A+B+C chain.
+        let won = board.place_piece(PlayerId::new(0), bomb_coord);
+        assert!(
+            won,
+            "bomb placement that completes a winning chain must return true; \
+             non-root set_idx bug would return false"
+        );
     }
 }
