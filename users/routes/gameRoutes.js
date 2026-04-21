@@ -79,7 +79,8 @@ async function computeYenState(yen_state_prev, coordinates, variants = []) {
         throw err;
     }
 
-    return await gameyResponse.json(); // { yen_state, winner, variants, explosives }
+    const body = await gameyResponse.json();
+    return body; // Result contains yen_state, winner, variants, and explosives
 }
 
 module.exports = function gameRoutes(repository) {

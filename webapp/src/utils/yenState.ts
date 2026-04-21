@@ -70,7 +70,12 @@ export function parseYenState(size: number, yenState: string | null | undefined)
     return board;
   }
 
-  const rows = yenState.split('/');
+  let normalizedState = yenState;
+  if (yenState?.startsWith('t0|') || yenState?.startsWith('t1|')) {
+    normalizedState = yenState.slice(3);
+  }
+
+  const rows = normalizedState.split('/');
 
   for (let row = 0; row < size; row += 1) {
     const rowState = rows[row] ?? '';
