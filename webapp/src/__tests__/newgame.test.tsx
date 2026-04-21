@@ -53,14 +53,9 @@ describe('NewGamePage — rendering', () => {
     expect(screen.getByText('Variants')).toBeInTheDocument();
   });
 
-  test('shows only strategy-allowed variants for BOT games', async () => {
+  test('shows available variants for BOT games', async () => {
     renderNewGamePage();
 
-    // Random is selected by default in mocks; Explosions allows only AI.
-    expect(screen.queryByLabelText(/explosions/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/double turn/i)).not.toBeInTheDocument();
-
-    await userEvent.click(await screen.findByLabelText(/ai/i));
     expect(await screen.findByLabelText(/explosions/i)).toBeInTheDocument();
   });
 
@@ -95,7 +90,7 @@ describe('NewGamePage — validation', () => {
       )
     );
     renderNewGamePage();
-    await userEvent.click(await screen.findByLabelText(/ai/i));
+    await userEvent.click(await screen.findByLabelText(/random/i));
     await screen.findByLabelText(/explosions/i);
     await userEvent.click(screen.getByLabelText(/explosions/i));
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
@@ -118,10 +113,9 @@ describe('NewGamePage — game creation', () => {
           game_type: 'BOT',
           name_of_enemy: null,
           board_size: 5,
-          strategy: 'ai',
+          strategy: 'defensive',
           variants: receivedBody?.variants ?? [],
           difficulty_level: 'medium',
-          rule_set: 'normal',
           current_turn: 'B',
           status: 'IN_PROGRESS',
           result: null,
@@ -133,7 +127,7 @@ describe('NewGamePage — game creation', () => {
     );
 
     renderNewGamePage();
-    await userEvent.click(await screen.findByLabelText(/ai/i));
+    await userEvent.click(await screen.findByLabelText(/defensive/i));
     await screen.findByLabelText(/explosions/i);
     await userEvent.click(screen.getByLabelText(/explosions/i));
     await userEvent.click(screen.getByRole('button', { name: /start game/i }));
@@ -153,7 +147,7 @@ describe('NewGamePage — game creation', () => {
         return HttpResponse.json({
           _id: NEW_GAME_TEST_DATA.gameIdTwo, player_id: NEW_GAME_TEST_DATA.userId, game_type: 'PLAYER',
           name_of_enemy: receivedBody.name_of_enemy, board_size: 5,
-          strategy: 'random', variants: receivedBody.variants ?? [], difficulty_level: 'medium', rule_set: 'normal',
+          strategy: 'random', variants: receivedBody.variants ?? [], difficulty_level: 'medium',
           current_turn: 'B', status: 'IN_PROGRESS', result: null,
           duration_seconds: 0, created_at: new Date().toISOString(), moves: []
         }, { status: 201 });

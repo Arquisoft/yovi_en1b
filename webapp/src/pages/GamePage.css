@@ -391,7 +391,7 @@
   border: 2px solid #f87171;
 }
 
-.game-result-box--canceled {
+.game-result-box--purple {
   background: linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%);
   border: 2px solid #c4b5fd;
 }

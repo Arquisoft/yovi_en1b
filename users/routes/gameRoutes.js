@@ -16,7 +16,7 @@ const VALID_VARIANTS = {
     explosions: {
         name:               'Explosions',
         description:        'A bomb appears randomly on the board at game start. Playing on the bomb captures that cell and clears all neighbouring cells.',
-        allowed_strategies: ['random', 'ai'],
+        allowed_strategies: ['random'],
         min_board_size:     7
     }
 };
@@ -68,7 +68,7 @@ module.exports = function gameRoutes(repository) {
                 { name: 'NCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
-                { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }
+                { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: ['Random'] }
             ]
         });
     });
@@ -83,19 +83,24 @@ module.exports = function gameRoutes(repository) {
             return res.status(400).json({ error: 'name_of_enemy is required for PLAYER games' });
         }
 
-        // Validate variants
+        const resolvedStrategy = (strategy || 'random').toLowerCase();
         const resolvedVariants = variants ?? [];
+
+        // Validate variants
         for (const v of resolvedVariants) {
             const config = VALID_VARIANTS[v.toLowerCase()];
             if (!config) return res.status(400).json({ error: `Unknown variant: ${v}` });
             if (config.min_board_size && board_size < config.min_board_size) {
                 return res.status(400).json({ error: `Variant '${v}' requires board_size >= ${config.min_board_size}` });
             }
+
+            if (config.allowed_strategies?.length && !config.allowed_strategies.includes(resolvedStrategy)) {
+                return res.status(400).json({ error: `Variant '${v}' is not allowed for strategy '${strategy || 'random'}'` });
+            }
         }
 
         try {
             const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
-            const resolvedStrategy = strategy || 'random';
 
             const game = await repository.createGame({
                 player_id:        req.user.userId,
@@ -103,7 +108,7 @@ module.exports = function gameRoutes(repository) {
                 name_of_enemy:    name_of_enemy || null,
                 board_size,
                 strategy:         resolvedStrategy,
-                difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
+                difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy] || 'easy',
                 variants:         resolvedVariants,
                 current_turn
             });
@@ -220,11 +225,11 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Finish a game manually (UNFINISHED when user quits — does not affect statistics)
+    // Finish a game manually (SURRENDERED when user quits — does not affect statistics)
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state } = req.body || {};
 
-        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or UNFINISHED)' });
+        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or SURRENDERED)' });
 
         try {
             const game = await repository.findGameById(req.params.id);
@@ -239,7 +244,7 @@ module.exports = function gameRoutes(repository) {
                 duration_seconds
             });
 
-            if (result !== 'UNFINISHED') {
+            if (result !== 'SURRENDERED') {
                 await repository.updateStats(game.player_id, {
                     result,
                     type:     game.game_type,

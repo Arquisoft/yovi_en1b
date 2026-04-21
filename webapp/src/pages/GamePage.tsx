@@ -460,7 +460,7 @@ export function GamePage() {
     setError(null);
 
     try {
-      const next = await finishGame(id, { result: 'CANCELED', duration_seconds: elapsed });
+      const next = await finishGame(id, { result: 'SURRENDERED', duration_seconds: elapsed });
       setGame(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finish game');
@@ -496,13 +496,15 @@ export function GamePage() {
   const getResultBoxClass = (): string => {
     if (game.result === 'WIN') return 'blue';
     if (game.result === 'LOSS') return 'red';
-    return 'canceled';
+    if (game.result === 'SURRENDERED') return 'surrendered';
+    return 'gray';
   };
 
   const getResultText = (): string => {
     if (game.result === 'WIN') return 'YOU WIN';
     if (game.result === 'LOSS') return 'YOU LOSE';
-    return 'CANCELED';
+    if (game.result === 'SURRENDERED') return 'YOU SURRENDERED';
+    return 'FINISHED';
   };
 
   return (
@@ -534,8 +536,8 @@ export function GamePage() {
                     className="icon-btn icon-btn--danger"
                     onClick={handleFinish}
                     disabled={actionLoading || !inProgress}
-                    title="Finish game as canceled"
-                    aria-label="Finish game as canceled"
+                    title="Finish game as surrendered"
+                    aria-label="Finish game as surrendered"
                   >
                     ⏹
                   </button>

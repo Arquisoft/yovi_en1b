@@ -30,7 +30,6 @@ const BASE_GAME: GameRecord = {
   strategy: 'random',
   variants: [],
   difficulty_level: 'medium',
-  rule_set: 'normal',
   current_turn: 'B',
   status: 'IN_PROGRESS',
   result: null,
@@ -230,17 +229,17 @@ describe('GamePage — undo', () => {
 // ─── finish ───────────────────────────────────────────────────────────────────
 
 describe('GamePage — finish', () => {
-  test('finish button sends CANCELED result and shows canceled status in UI', async () => {
+  test('finish button sends SURRENDERED result and shows surrendered status in UI', async () => {
     server.use(
       http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)),
       http.put(`*/games/${GAME_TEST_DATA.gameId}/finish`, () =>
-        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'CANCELED' })
+        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'SURRENDERED' })
       )
     );
     renderGamePage();
     await screen.findByLabelText('game board');
     await userEvent.click(screen.getByRole('button', { name: /finish/i }));
-    await screen.findByText(/^canceled$/i);
+    await screen.findByText(/you surrendered/i);
   });
 
   test('finish action is not available after game is already finished', async () => {
@@ -273,7 +272,7 @@ describe('GamePage — bot metadata', () => {
       name_of_enemy: null,
       current_turn: 'B',
       difficulty_level: 'hard',
-      strategy: 'dijkstra'
+      strategy: 'ncts'
     };
 
     server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(botGame)));
@@ -283,7 +282,7 @@ describe('GamePage — bot metadata', () => {
     await screen.findByLabelText('game board');
     expect(screen.getByLabelText('Bot settings')).toBeInTheDocument();
     expect(screen.getByText('Difficulty: Hard')).toBeInTheDocument();
-    expect(screen.getByText('Strategy: Dijkstra')).toBeInTheDocument();
+    expect(screen.getByText('Strategy: Ncts')).toBeInTheDocument();
   });
 
   test('does not show bot metadata tags for PLAYER games', async () => {
@@ -346,7 +345,7 @@ describe('GamePage — explosions variant', () => {
       game_type: 'BOT',
       variants: ['Explosions'],
       name_of_enemy: null,
-      strategy: 'ai',
+      strategy: 'defensive',
       yen_final_state: 'e/../...'
     };
 
@@ -366,7 +365,7 @@ describe('GamePage — explosions variant', () => {
       game_type: 'BOT',
       variants: ['Explosions'],
       name_of_enemy: null,
-      strategy: 'ai',
+      strategy: 'defensive',
       current_turn: 'B',
       yen_final_state: 'e/../...'
     };

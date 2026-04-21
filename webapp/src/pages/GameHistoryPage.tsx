@@ -24,11 +24,11 @@ function formatDuration(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
-function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'canceled' | 'pending' {
+function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'surrendered' | 'pending' {
   if (game.status !== 'FINISHED') return 'pending';
   if (game.result === 'WIN') return 'win';
   if (game.result === 'LOSS') return 'loss';
-  if (game.result === 'CANCELED') return 'canceled';
+  if (game.result === 'SURRENDERED') return 'surrendered';
   return 'pending';
 }
 
@@ -135,7 +135,9 @@ export function GameHistoryPage() {
           <ul className="history-list" aria-label="Played games history">
             {sortedGames.map((game) => {
               const enemy = getEnemyLabel(game, username);
-              const resultLabel = game.status === 'FINISHED' ? (game.result ?? 'FINISHED') : 'IN PROGRESS';
+              const resultLabel = game.status === 'FINISHED'
+                ? (game.result === 'SURRENDERED' ? 'SURRENDERED' : (game.result ?? 'FINISHED'))
+                : 'IN PROGRESS';
               const outcome = getOutcome(game);
 
               return (

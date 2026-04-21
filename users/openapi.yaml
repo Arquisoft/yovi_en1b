@@ -120,7 +120,15 @@ components:
       properties:
         name:
           type: string
-          example: "Classic Y"
+          example: "Explosions"
+        description:
+          type: string
+          example: "A variant where certain moves cause explosions that affect surrounding pieces."
+        allowed_strategies:
+          type: array
+          items:
+            type: string
+          example: ["Random"]
 
     GameOptions:
       type: object
@@ -138,9 +146,7 @@ components:
           items:
             $ref: '#/components/schemas/VariantOption'
           example:
-            - { name: 'Classic Y' }
-            - { name: 'Master Y (coming soon)' }
-            - { name: 'Pie Rule (coming soon)' }
+            - { name: "Explosions", description: "A variant where certain moves cause explosions that affect surrounding pieces.", allowed_strategies: ["Random"] }
 
     LeaderboardEntry:
       type: object
@@ -223,7 +229,7 @@ components:
           example: IN_PROGRESS
         result:
           type: string
-          enum: [WIN, LOSS, UNFINISHED]
+          enum: [WIN, LOSS, SURRENDERED]
           nullable: true
           example: null
         duration_seconds:
@@ -723,7 +729,7 @@ paths:
   /games/{id}/finish:
     put:
       summary: Finish a game
-      description: Marks a game as FINISHED manually — used when a user quits (UNFINISHED). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Statistics are only updated for WIN/LOSS. Requires authentication.
+      description: Marks a game as FINISHED manually — used when a user quits (SURRENDERED). WIN/LOSS are handled automatically by the backend when Gamey returns a winner. Statistics are only updated for WIN/LOSS. Requires authentication.
       security:
         - bearerAuth: []
       parameters:
@@ -743,8 +749,8 @@ paths:
               properties:
                 result:
                   type: string
-                  enum: [WIN, LOSS, UNFINISHED]
-                  example: "UNFINISHED"
+                  enum: [WIN, LOSS, SURRENDERED]
+                  example: "SURRENDERED"
                 yen_final_state:
                   type: string
                   nullable: true

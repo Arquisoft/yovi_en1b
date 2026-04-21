@@ -2,8 +2,6 @@ export type GameType = 'BOT' | 'PLAYER';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 
-export type RuleSet = 'normal' | 'extended' | 'custom';
-
 export type VariantOption = {
   name: string;
   description: string;
@@ -33,10 +31,9 @@ export type GameRecord = {
   strategy: string;
   variants: string[];
   difficulty_level: DifficultyLevel;
-  rule_set: RuleSet;
   current_turn: 'B' | 'R';
   status: 'IN_PROGRESS' | 'FINISHED';
-  result: 'WIN' | 'LOSS' | 'CANCELED' | null;
+  result: 'WIN' | 'LOSS' | 'SURRENDERED' | null;
   duration_seconds: number;
   created_at: string;
   yen_final_state?: string | null;
@@ -52,7 +49,6 @@ export type CreateGamePayload = {
   strategy?: string;
   variants?: string[];
   difficulty_level?: DifficultyLevel;
-  rule_set?: RuleSet;
 };
 
 export type SubmitMovePayload = {
@@ -60,7 +56,7 @@ export type SubmitMovePayload = {
 };
 
 export type FinishGamePayload = {
-  result: 'WIN' | 'LOSS' | 'CANCELED';
+  result: 'WIN' | 'LOSS' | 'SURRENDERED';
   duration_seconds?: number;
 };
 

@@ -1,9 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
 import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
-import type { UserProfile, UserStatistics, WinLossStats, Leaderboard, BotLeaderboardEntry } from '../types/users';
+import type { UserProfile, UserStatistics, GameSplitStats, Leaderboard, BotLeaderboardEntry, BotStat } from '../types/users';
 import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
 import { buildEmptyYenState, getNeighborCoordinates, parseYenState, serializeYenState } from '../utils/yenState';
+
+type BoardEdge = 'x' | 'y' | 'z';
 
 const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
@@ -14,22 +16,18 @@ const mockGames = new Map<string, GameRecord>(
 let gameCounter = 1;
 
 const DEFAULT_STRATEGY_OPTIONS = [
-  { name: 'random', difficulty: 'easy' },
-  { name: 'ai', difficulty: 'medium' },
-  { name: 'dijkstra', difficulty: 'hard' }
+  { id: 'random', name: 'Random', difficulty: 'Easy 😄', difficulty_level: 'easy' },
+  { id: 'defensive', name: 'Defensive', difficulty: 'Medium 😐', difficulty_level: 'medium' },
+  { id: 'ncts', name: 'NCTS', difficulty: 'Hard 😈', difficulty_level: 'hard' }
 ] as const;
 
 const DEFAULT_VARIANTS = [
-  { name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }
-] as const;
-
-function formatLabel(value: string): string {
-  if (value.toLowerCase() === 'ai') {
-    return 'AI';
+  {
+    name: 'Explosions',
+    description: 'A variant where certain moves cause explosions that affect surrounding pieces.',
+    allowed_strategies: ['Random']
   }
-
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
+] as const;
 
 function coordinateKey(c: Coordinates): string {
   return `${c.x}:${c.y}:${c.z}`;
@@ -94,6 +92,8 @@ function extractUserId(request: Request): string | null {
 function createGameRecord(userId: string, payload: CreateGamePayload): GameRecord {
   const gameId = `game-${gameCounter++}`;
   const variants = payload.variants ?? [];
+  const strategyId = (payload.strategy ?? 'random').toLowerCase();
+  const strategyOption = DEFAULT_STRATEGY_OPTIONS.find((item) => item.id === strategyId) ?? DEFAULT_STRATEGY_OPTIONS[0];
 
   return {
     _id: gameId,
@@ -101,10 +101,9 @@ function createGameRecord(userId: string, payload: CreateGamePayload): GameRecor
     game_type: payload.game_type,
     name_of_enemy: payload.name_of_enemy ?? null,
     board_size: payload.board_size,
-    strategy: payload.strategy ?? 'random',
+    strategy: strategyOption.id,
     variants,
-    difficulty_level: payload.difficulty_level ?? 'medium',
-    rule_set: payload.rule_set ?? 'normal',
+    difficulty_level: payload.difficulty_level ?? strategyOption.difficulty_level,
     current_turn: 'B',
     status: 'IN_PROGRESS',
     result: null,
@@ -117,13 +116,13 @@ function createGameRecord(userId: string, payload: CreateGamePayload): GameRecor
 
 function getGameForUser(gameId: string, userId: string): GameRecord | null {
   const game = mockGames.get(gameId);
-  if (!game || game.player_id !== userId) {
+  if (game?.player_id !== userId) {
     return null;
   }
   return game;
 }
 
-function hasWinningConnection(state: ReturnType<typeof parseYenState>, boardSize: number, player: 'B' | 'R'): boolean {
+function getOwnedKeys(state: ReturnType<typeof parseYenState>, player: 'B' | 'R'): Set<string> {
   const owned = new Set<string>();
 
   for (const [key, cell] of state.entries()) {
@@ -132,46 +131,45 @@ function hasWinningConnection(state: ReturnType<typeof parseYenState>, boardSize
     }
   }
 
-  const visited = new Set<string>();
+  return owned;
+}
 
-  for (const start of owned) {
-    if (visited.has(start)) {
+function touchBoardEdges(coordinates: Coordinates, touched: Set<BoardEdge>): void {
+  if (coordinates.x === 0) touched.add('x');
+  if (coordinates.y === 0) touched.add('y');
+  if (coordinates.z === 0) touched.add('z');
+}
+
+function getOwnedConnections(state: ReturnType<typeof parseYenState>, boardSize: number, startKey: string): Set<BoardEdge> {
+  const [x, y, z] = startKey.split(':').map(Number);
+  const queue: Coordinates[] = [{ x, y, z }];
+  const visited = new Set<string>();
+  const touched = new Set<BoardEdge>();
+  const owned = getOwnedKeys(state, 'B');
+  const redOwned = getOwnedKeys(state, 'R');
+  const startOwner = redOwned.has(startKey) ? 'R' : 'B';
+  const ownedCells = startOwner === 'B' ? owned : redOwned;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentKey = coordinateKey(current);
+
+    if (visited.has(currentKey)) {
       continue;
     }
 
-    const [x, y, z] = start.split(':').map(Number);
-    const queue: Coordinates[] = [{ x, y, z }];
-    const touched = new Set<'x' | 'y' | 'z'>();
+    visited.add(currentKey);
+    touchBoardEdges(current, touched);
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const key = coordinateKey(current);
-
-      if (visited.has(key)) {
-        continue;
+    for (const neighbor of getNeighborCoordinates(boardSize, current)) {
+      const neighborKey = coordinateKey(neighbor);
+      if (!visited.has(neighborKey) && ownedCells.has(neighborKey)) {
+        queue.push(neighbor);
       }
-
-      visited.add(key);
-
-      if (current.x === 0) touched.add('x');
-      if (current.y === 0) touched.add('y');
-      if (current.z === 0) touched.add('z');
-
-      for (const neighbor of getNeighborCoordinates(boardSize, current)) {
-        const neighborKey = coordinateKey(neighbor);
-
-        if (!visited.has(neighborKey) && owned.has(neighborKey)) {
-          queue.push(neighbor);
-        }
-      }
-    }
-
-    if (touched.size === 3) {
-      return true;
     }
   }
 
-  return false;
+  return touched;
 }
 
 function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R'): GameRecord {
@@ -209,11 +207,11 @@ function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R
     current_turn: player === 'B' ? 'R' : 'B'
   };
 
-  if (hasWinningConnection(nextMap, game.board_size, 'B')) {
+  if (getOwnedConnections(nextMap, game.board_size, targetKey).size === 3 && player === 'B') {
     return { ...nextGame, status: 'FINISHED', result: 'WIN' };
   }
 
-  if (hasWinningConnection(nextMap, game.board_size, 'R')) {
+  if (getOwnedConnections(nextMap, game.board_size, targetKey).size === 3 && player === 'R') {
     return { ...nextGame, status: 'FINISHED', result: 'LOSS' };
   }
 
@@ -221,26 +219,45 @@ function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R
   return {
     ...nextGame,
     status: free.length === 0 ? 'FINISHED' : 'IN_PROGRESS',
-    result: free.length === 0 ? 'CANCELED' : null
+    result: free.length === 0 ? 'SURRENDERED' : null
   };
 }
 
-function emptyWinLoss(): WinLossStats {
-  return { wins: 0, losses: 0, draws: 0 };
+function applyResultToSplit(stats: GameSplitStats, result: GameRecord['result']): void {
+  if (result === 'WIN') {
+    stats.wins += 1;
+  } else if (result === 'LOSS') {
+    stats.losses += 1;
+  } else if (result === 'SURRENDERED') {
+    stats.surrendered += 1;
+  }
+}
+
+function applyResultToTotals(stats: Pick<UserStatistics, 'total_wins' | 'total_losses' | 'total_surrendered'>, result: GameRecord['result']): void {
+  if (result === 'WIN') {
+    stats.total_wins += 1;
+  } else if (result === 'LOSS') {
+    stats.total_losses += 1;
+  } else if (result === 'SURRENDERED') {
+    stats.total_surrendered += 1;
+  }
+}
+
+function emptyOutcomeStats(): GameSplitStats {
+  return { wins: 0, losses: 0, surrendered: 0 };
 }
 
 function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
-  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
+  const botBuckets = new Map<string, BotStat>();
 
-  // Initialize all strategies
   for (const option of DEFAULT_STRATEGY_OPTIONS) {
-    botBuckets.set(option.name, {
-      name: option.name,
+    botBuckets.set(option.id, {
+      name: option.id,
       difficulty: option.difficulty,
       wins: 0,
       losses: 0,
-      draws: 0
+      surrendered: 0
     });
   }
 
@@ -248,32 +265,24 @@ function getUserStatistics(userId: string): UserStatistics {
     total_games: userGames.length,
     total_wins: 0,
     total_losses: 0,
-    total_canceled: 0,
-    vs_player: emptyWinLoss(),
+    total_surrendered: 0,
+    vs_player: emptyOutcomeStats(),
     vs_bots: []
   };
 
   for (const game of userGames) {
-    if (game.result === 'WIN') stats.total_wins += 1;
-    if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'CANCELED') stats.total_canceled += 1;
+    applyResultToSplit(stats.vs_player, game.result);
+    applyResultToTotals(stats, game.result);
 
-    if (game.game_type === 'PLAYER') {
-      if (game.result === 'WIN') stats.vs_player.wins += 1;
-      if (game.result === 'LOSS') stats.vs_player.losses += 1;
-      if (game.result === 'CANCELED') stats.vs_player.draws += 1;
-      continue;
-    }
-
-    const existing = botBuckets.get(game.strategy);
-    if (existing) {
-      if (game.result === 'WIN') existing.wins += 1;
-      if (game.result === 'LOSS') existing.losses += 1;
-      if (game.result === 'CANCELED') existing.draws += 1;
+    if (game.game_type !== 'PLAYER') {
+      const existing = botBuckets.get(game.strategy);
+      if (existing) {
+        applyResultToSplit(existing, game.result);
+      }
     }
   }
 
-  stats.vs_bots = Array.from(botBuckets.values());
+  stats.vs_bots = Array.from(botBuckets.values()).map((bot) => ({ ...bot }));
   return stats;
 }
 
@@ -289,7 +298,7 @@ function buildLeaderboard(): Leaderboard {
     userStats.set(user.userId, {
       total_wins: stats.total_wins,
       total_games: stats.total_games,
-      botWins: new Map(stats.vs_bots.map((bot) => [bot.name, bot.wins]))
+      botWins: new Map((stats.vs_bots ?? []).map((bot) => [bot.name, bot.wins]))
     });
   }
 
@@ -309,7 +318,7 @@ function buildLeaderboard(): Leaderboard {
   // Build per-bot leaderboards (top 10 per strategy)
   const vs_bots: Record<string, BotLeaderboardEntry[]> = {};
 
-  for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.name)) {
+  for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.id)) {
     vs_bots[strategy] = Array.from(mockUsers.entries())
       .map(([username, user]) => {
         const stats = userStats.get(user.userId);
@@ -346,7 +355,7 @@ export const handlers = [
     }
 
     const user = mockUsers.get(username);
-    if (!user || user.password !== password) {
+    if (!user?.password || user.password !== password) {
       return HttpResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
@@ -449,10 +458,14 @@ export const handlers = [
   http.get('*/games/options', () =>
     HttpResponse.json({
       strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
-        name: formatLabel(item.name),
-        difficulty: formatLabel(item.difficulty)
+        name: item.name,
+        difficulty: item.difficulty
       })),
-      variants: DEFAULT_VARIANTS
+      variants: DEFAULT_VARIANTS.map((v) => ({
+        name: v.name,
+        description: v.description,
+        allowed_strategies: v.allowed_strategies
+      }))
     })
   ),
 
@@ -538,7 +551,7 @@ export const handlers = [
 
     const free = getFreeCoordinates(game);
     if (free.length === 0) {
-      const finished = { ...game, status: 'FINISHED' as const, result: 'CANCELED' as const };
+      const finished = { ...game, status: 'FINISHED' as const, result: 'SURRENDERED' as const };
       mockGames.set(finished._id, finished);
       return HttpResponse.json(finished);
     }
@@ -565,7 +578,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'No move to undo' }, { status: 400 });
     }
 
-    const nextMoves = game.moves.slice(0, game.moves.length - 1);
+    const nextMoves = game.moves.slice(0, -1);
     const nextGame: GameRecord = {
       ...game,
       moves: nextMoves,
@@ -590,7 +603,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'CANCELED'; duration_seconds?: number };
+    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'SURRENDERED'; duration_seconds?: number };
     if (!body.result) {
       return HttpResponse.json({ error: 'result is required' }, { status: 400 });
     }

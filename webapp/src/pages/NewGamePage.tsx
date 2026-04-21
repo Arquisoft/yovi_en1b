@@ -66,7 +66,7 @@ export function NewGamePage() {
         return true;
       }
 
-      return variant.allowed_strategies.includes(normalizedStrategyName);
+      return variant.allowed_strategies.some((allowed) => allowed.toLowerCase() === normalizedStrategyName);
     });
   }, [gameType, variants, normalizedStrategyName]);
 

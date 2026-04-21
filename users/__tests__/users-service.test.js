@@ -870,7 +870,7 @@ describe('POST /games/:id/undo', () => {
 
         await request(app)
             .put(`/games/${finishedId}/finish`)
-            .send({ result: 'UNFINISHED' })
+            .send({ result: 'SURRENDERED' })
             .set('Authorization', `Bearer ${token}`)
 
         const res = await request(app)
@@ -952,7 +952,7 @@ describe('PUT /games/:id/finish', () => {
         }
     })
 
-    it('does NOT update stats when result is UNFINISHED (user quit)', async () => {
+    it('does NOT update stats when result is SURRENDERED (user quit)', async () => {
         const statsBefore = (await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)).body.statistics
@@ -963,7 +963,7 @@ describe('PUT /games/:id/finish', () => {
             .set('Authorization', `Bearer ${token}`)
         await request(app)
             .put(`/games/${createRes.body._id}/finish`)
-            .send({ result: 'UNFINISHED' })
+            .send({ result: 'SURRENDERED' })
             .set('Authorization', `Bearer ${token}`)
 
         const statsAfter = (await request(app)
@@ -1243,3 +1243,4 @@ describe('MongoUserRepository direct unit tests', () => {
         }
     })
 })
+

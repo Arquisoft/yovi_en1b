@@ -51,7 +51,7 @@ describe('gamesApi', () => {
   it('getGameOptions calls the options endpoint', async () => {
     requestJsonMock.mockResolvedValueOnce({
       strategies: [],
-      variants: [{ name: 'Explosions', description: 'TODO', allowed_strategies: ['ai'] }],
+      variants: [{ name: 'Explosions', description: 'A variant where certain moves cause explosions that affect surrounding pieces.' }],
     });
 
     await getGameOptions();
@@ -98,12 +98,12 @@ describe('gamesApi', () => {
   it('finishGame sends PUT with result payload', async () => {
     requestJsonMock.mockResolvedValueOnce({ _id: GAMES_API_TEST_DATA.gameId });
 
-    await finishGame(GAMES_API_TEST_DATA.gameId, { result: 'CANCELED', duration_seconds: 123 });
+    await finishGame(GAMES_API_TEST_DATA.gameId, { result: 'SURRENDERED', duration_seconds: 123 });
 
     expect(requestJsonMock).toHaveBeenCalledWith(`/games/${GAMES_API_TEST_DATA.gameId}/finish`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ result: 'CANCELED', duration_seconds: 123 }),
+      body: JSON.stringify({ result: 'SURRENDERED', duration_seconds: 123 }),
     });
   });
 });
