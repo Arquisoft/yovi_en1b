@@ -32,7 +32,7 @@ module.exports = function playRoute() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    yen_state:        parsedPosition,
+                    yen_state:        parsedPosition.layout,
                     strategy:         resolvedStrategy,
                     difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'hard',
                     board_size:       board_size !== undefined ? Number(board_size) : (parsedPosition.size ?? 5)
