@@ -8,7 +8,7 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 const STRATEGY_DIFFICULTY = {
     random:    'easy',
     defensive: 'medium',
-    ncts:      'hard'
+    mcts:      'hard'
 };
 
 // Valid variants and their constraints
@@ -65,7 +65,7 @@ module.exports = function gameRoutes(repository) {
             strategies: [
                 { name: 'Random',    difficulty: 'Easy 😄'   },
                 { name: 'Defensive', difficulty: 'Medium 😐' },
-                { name: 'NCTS',      difficulty: 'Hard 😈'   }
+                { name: 'MCTS',      difficulty: 'Hard 😈'   }
             ],
             variants: [
                 { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }

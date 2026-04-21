@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
         vs_bot: {
             random:    strategyStatsSchema,
             defensive: strategyStatsSchema,
-            ncts:      strategyStatsSchema
+            mcts:      strategyStatsSchema
         }
     }
 });
