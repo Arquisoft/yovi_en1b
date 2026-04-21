@@ -39,12 +39,38 @@ async function autoFinishIfWinner(game, winner, repository) {
     });
 }
 
-// Helper: call Gamey to compute new yen_state after a move
-async function computeYenState(yen_state_prev, coordinates) {
+// Helper: ask Gamey for a fresh initial game state. Used at game creation
+// time to pre-place bombs for the Explosions variant so the player can see
+// the mine on the board *before* they make their first move.
+//
+// Returns the layout string (yen.layout) or null on failure — a null return
+// means "skip the pre-placement, the game will still work without it".
+async function fetchInitialYenState(board_size, variants) {
+    try {
+        const response = await fetch(`${GAMEY_URL}/v1/game/new`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ board_size, variants })
+        });
+        if (!response.ok) return null;
+        const body = await response.json();
+        return body?.yen?.layout ?? null;
+    } catch {
+        return null;
+    }
+}
+
+// Helper: call Gamey to compute new yen_state after a move.
+//
+// Passes `variants` through so Gamey can place bombs on the very first move of
+// an Explosions game (when yen_state_prev is null) and so subsequent parses
+// keep the Explosions variant active. Without this, bombs would never be
+// placed and the frontend never saw a mine (issue #203, frontend visibility).
+async function computeYenState(yen_state_prev, coordinates, variants = []) {
     const gameyResponse = await fetch(`${GAMEY_URL}/compute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yen_state_prev, coordinates })
+        body: JSON.stringify({ yen_state_prev, coordinates, variants })
     });
 
     if (!gameyResponse.ok) {
@@ -53,7 +79,7 @@ async function computeYenState(yen_state_prev, coordinates) {
         throw err;
     }
 
-    return await gameyResponse.json(); // { yen_state, winner }
+    return await gameyResponse.json(); // { yen_state, winner, variants, explosives }
 }
 
 module.exports = function gameRoutes(repository) {
@@ -98,6 +124,16 @@ module.exports = function gameRoutes(repository) {
             const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
             const resolvedStrategy = strategy || 'random';
 
+            // For variants that pre-place pieces (currently just Explosions
+            // with its random bomb), fetch the initial board state from Gamey
+            // so the frontend can render the bomb before the first move. If
+            // the call fails we fall back silently to an empty board — the
+            // bomb will still be placed on the first /compute round-trip.
+            let initial_yen_state = null;
+            if (resolvedVariants.length > 0) {
+                initial_yen_state = await fetchInitialYenState(board_size, resolvedVariants);
+            }
+
             const game = await repository.createGame({
                 player_id:        req.user.userId,
                 game_type:        game_type || 'BOT',
@@ -106,6 +142,7 @@ module.exports = function gameRoutes(repository) {
                 strategy:         resolvedStrategy,
                 difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
                 variants:         resolvedVariants,
+                initial_yen_state,
                 current_turn
             });
             res.status(201).json(game);
@@ -143,11 +180,17 @@ module.exports = function gameRoutes(repository) {
         if (!game) return res.status(404).json({ error: 'Game not found' });
         if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-        const yen_state_prev = game.moves.at(-1)?.yen_state ?? null;
+        // Use last move's yen_state if any moves have been made; otherwise fall
+        // back to the pre-placed initial state (needed for Explosions so the
+        // bomb positions chosen at game creation survive into the first move).
+        const yen_state_prev =
+            game.moves.at(-1)?.yen_state ??
+            game.initial_yen_state ??
+            null;
 
         let gameyResult;
         try {
-            gameyResult = await computeYenState(yen_state_prev, coordinates);
+            gameyResult = await computeYenState(yen_state_prev, coordinates, game.variants ?? []);
         } catch (err) {
             return res.status(err.status || 503).json({ error: err.message });
         }
@@ -179,7 +222,12 @@ module.exports = function gameRoutes(repository) {
         if (!game) return res.status(404).json({ error: 'Game not found' });
         if (game.status === 'FINISHED') return res.status(400).json({ error: 'Game is already finished' });
 
-        const yen_state = game.moves.at(-1)?.yen_state ?? null;
+        // Same fallback chain as for human moves: last move → initial state
+        // (from game creation, carries pre-placed bombs) → null (empty board).
+        const yen_state =
+            game.moves.at(-1)?.yen_state ??
+            game.initial_yen_state ??
+            null;
 
         let gameyResponse;
         try {

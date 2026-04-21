@@ -19,7 +19,12 @@ const gameSchema = new mongoose.Schema({
     board_size:         { type: Number, required: true },
     strategy:           { type: String, default: 'random' },
     difficulty_level:   { type: String, default: 'easy' },
-    variants:           { type: [String], default: [] },  // e.g. ['explosions']
+    variants:           { type: [String], default: [] },  // e.g. ['Explosions']
+    // Initial YEN layout string — populated at game creation time for variants
+    // that need pre-placed pieces (Explosions puts one bomb on the board at
+    // random before the first move so the player can see it). Empty for plain
+    // games.
+    initial_yen_state:  { type: String, default: null },
     current_turn:       { type: String, enum: ['B', 'R'], required: true },
     status:             { type: String, enum: ['IN_PROGRESS', 'FINISHED'], default: 'IN_PROGRESS' },
     result:             { type: String, enum: ['WIN', 'LOSS', 'UNFINISHED', null], default: null },
