@@ -143,6 +143,12 @@ pub struct PlayRequest {
     /// of the game would be lost on every subsequent /play call (issue #203).
     #[serde(default)]
     pub explosives: Option<String>,
+    /// Whose turn it is (0 = Blue, 1 = Red). Must be echoed back from the
+    /// previous response's `turn` field when the Explosions variant is active;
+    /// bomb detonations can shift piece counts so the server can no longer
+    /// infer the correct turn by counting pieces alone.
+    #[serde(default)]
+    pub turn: Option<u32>,
 }
 
 /// Response format for the /play endpoint.
@@ -161,6 +167,10 @@ pub struct PlayResponse {
     /// variant is active.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explosives: Option<String>,
+    /// Whose turn it is next (0 = Blue, 1 = Red). Clients MUST echo this back
+    /// in the subsequent request's `turn` field so the server can restore the
+    /// correct turn even after bomb explosions altered the piece counts.
+    pub turn: u32,
 }
 
 /// Request format for the /compute endpoint where a human move is processed.
@@ -176,6 +186,12 @@ pub struct ComputeRequest {
     /// Explosive (bomb) positions as comma-separated flat indices.
     #[serde(default)]
     pub explosives: Option<String>,
+    /// Whose turn it is before this move (0 = Blue, 1 = Red). Must be echoed
+    /// back from the previous response's `turn` field when the Explosions
+    /// variant is active; bomb detonations can shift piece counts so the
+    /// server can no longer infer the correct turn by counting pieces alone.
+    #[serde(default)]
+    pub turn: Option<u32>,
 }
 
 /// Response format for the /compute endpoint.
@@ -192,6 +208,10 @@ pub struct ComputeResponse {
     /// variant is active.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explosives: Option<String>,
+    /// Whose turn it is next (0 = Blue, 1 = Red). Clients MUST echo this back
+    /// in the subsequent request's `turn` field so the server can restore the
+    /// correct turn even after bomb explosions altered the piece counts.
+    pub turn: u32,
 }
 
 // ============================================================================
