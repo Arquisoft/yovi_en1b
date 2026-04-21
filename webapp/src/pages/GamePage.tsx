@@ -525,7 +525,7 @@ export function GamePage() {
   const getResultBoxClass = (): string => {
     if (game.result === 'WIN') return 'blue';
     if (game.result === 'LOSS') return 'red';
-    if (game.result === 'SURRENDERED') return 'surrendered';
+    if (game.result === 'SURRENDERED') return 'purple';
     return 'gray';
   };
 
