@@ -12,8 +12,8 @@
 
 🌐 **Play now:** [http://4.233.184.98](http://4.233.184.98)  
 📝 **Documentation:** [https://arquisoft.github.io/yovi_en1b/](https://arquisoft.github.io/yovi_en1b/)  
-⛓ **API documentation:** TODO  
-💻 **Presentation:** TODO
+⛓ **API documentation:** [http://4.233.184.98:3000/api-docs/](http://4.233.184.98:3000/api-docs/)  
+💻 **Presentation:** [TODO](TODO)
 
 </div>
 

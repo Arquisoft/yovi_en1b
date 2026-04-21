@@ -34,6 +34,12 @@ pub struct YEN {
     /// Rows are separated by '/', with cells represented by player symbols
     /// or '.' for empty cells. Example: "B/..R/.B.R"
     layout: String,
+    /// Active game variants (e.g., ["Explosions", "DoubleTurn"]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    variants: Vec<String>,
+    /// Explosive (bomb) positions as comma-separated flat indices (e.g., "3,14").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    e: Option<String>,
 }
 
 impl YEN {
@@ -50,6 +56,27 @@ impl YEN {
             turn,
             players,
             layout,
+            variants: Vec::new(),
+            e: None,
+        }
+    }
+
+    /// Creates a new YEN representation with variant and explosives info.
+    pub fn new_with_variants(
+        size: u32,
+        turn: u32,
+        players: Vec<char>,
+        layout: String,
+        variants: Vec<String>,
+        e: Option<String>,
+    ) -> Self {
+        YEN {
+            size,
+            turn,
+            players,
+            layout,
+            variants,
+            e,
         }
     }
 
@@ -71,6 +98,16 @@ impl YEN {
     /// Returns the player symbols.
     pub fn players(&self) -> &[char] {
         &self.players
+    }
+
+    /// Returns the active variant names.
+    pub fn variants(&self) -> &[String] {
+        &self.variants
+    }
+
+    /// Returns the explosives/bomb positions string (comma-separated indices).
+    pub fn explosives(&self) -> Option<&str> {
+        self.e.as_deref()
     }
 }
 
