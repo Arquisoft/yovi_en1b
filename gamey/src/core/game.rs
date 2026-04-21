@@ -60,24 +60,75 @@ impl GameY {
         }
     }
 
+    /// Returns the number of bombs to place for a given board size in the
+    /// Explosions variant.
+    ///
+    /// - Size 0 : 0 bombs (degenerate; handled gracefully).
+    /// - Sizes 1–7 : exactly **1** bomb — small boards stay playable.
+    /// - Sizes 8+   : a **random** value in \[1, 4\] inclusive — bigger boards
+    ///   get a variable number of hazards for added unpredictability.
+    ///
+    /// ```
+    /// use gamey::GameY;
+    /// assert_eq!(GameY::bomb_count_for_size(1), 1);
+    /// assert_eq!(GameY::bomb_count_for_size(7), 1);
+    /// let c = GameY::bomb_count_for_size(10);
+    /// assert!(c >= 1 && c <= 4);
+    /// ```
+    pub fn bomb_count_for_size(board_size: u32) -> u32 {
+        match board_size {
+            0 => 0,
+            1..=7 => 1,
+            // [1u32, 2, 3, 4].choose reuses the IndexedRandom import already
+            // in scope and avoids a separate Rng::gen_range import.
+            _ => *[1u32, 2, 3, 4].choose(&mut rand::rng()).unwrap(),
+        }
+    }
+
     /// Creates a new game with the specified variants.
     ///
-    /// Variants (Explosions, DoubleTurn) require a board size of at least 7x7.
+    /// **Size restriction changes:**
+    /// - `Explosions` now works on **any** board size; the number of bombs is
+    ///   determined by [`GameY::bomb_count_for_size`].
+    /// - `DoubleTurn` still requires a board of at least 7 cells per side for
+    ///   meaningful two-move turns.
     pub fn new_with_variants(board_size: u32, mut variants: Vec<GameVariant>) -> Self {
-        // Enforce 7x7 minimum for variants
+        // DoubleTurn still requires a reasonably large board; Explosions no
+        // longer has a minimum size restriction.
         if board_size < 7 {
-            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+            variants.retain(|v| !matches!(v, GameVariant::DoubleTurn));
         }
 
-        let board = if variants.contains(&GameVariant::Explosions) && board_size >= 7 {
+        let board = if variants.contains(&GameVariant::Explosions) {
             let total_cells = Coordinates::total_cells(board_size);
-            let bomb_idx = *(0..total_cells)
-                .collect::<Vec<_>>()
-                .choose(&mut rand::rng())
-                .unwrap();
-            let bomb_coords = Coordinates::from_index(bomb_idx, board_size);
-            let mut bombs = HashSet::new();
-            bombs.insert(bomb_coords);
+            let bomb_count = Self::bomb_count_for_size(board_size) as usize;
+
+            let mut rng = rand::rng();
+            // Place bombs one-by-one, removing each chosen cell and all its
+            // neighbours from the candidate pool after each placement.  This
+            // guarantees that no two bombs are adjacent — they can never
+            // chain-detonate at game-start and every bomb blast affects only
+            // its own neighbourhood.
+            let mut candidates: Vec<Coordinates> = (0..total_cells)
+                .map(|idx| Coordinates::from_index(idx, board_size))
+                .collect();
+
+            let mut bombs: HashSet<Coordinates> = HashSet::new();
+            for _ in 0..bomb_count {
+                if candidates.is_empty() {
+                    break; // board too small to fit more non-adjacent bombs
+                }
+                // Pick a random cell from the remaining candidates.
+                let chosen = *candidates.choose(&mut rng).unwrap();
+                bombs.insert(chosen);
+                // Exclude the chosen cell and all its neighbours so the next
+                // bomb cannot land adjacent to this one.
+                let forbidden: HashSet<Coordinates> = std::iter::once(chosen)
+                    .chain(chosen.neighbors(board_size))
+                    .collect();
+                candidates.retain(|c| !forbidden.contains(c));
+            }
+
             Board::new_with_bombs(board_size, bombs)
         } else {
             Board::new(board_size)
@@ -213,30 +264,49 @@ impl GameY {
     fn handle_placement(&mut self, player: PlayerId, coords: Coordinates) -> Result<()> {
         self.validate_placement(player, coords)?;
 
+        // Check whether this cell carries a bomb *before* placing — the board
+        // consumes the bomb on placement, so we must snapshot this now.
+        let bomb_detonated = self.board.is_bomb(&coords);
+
         // Delegate to Board — it handles set creation, neighbor merging, win check
         let won = self.board.place_piece(player, coords);
 
-        self.update_status_after_placement(player, won);
+        self.update_status_after_placement(player, won, bomb_detonated);
         Ok(())
     }
 
     /// Updates the game status (Finished vs Ongoing).
-    fn update_status_after_placement(&mut self, player: PlayerId, won: bool) {
+    ///
+    /// `bomb_detonated` is true when the placement triggered a bomb explosion.
+    /// In DoubleTurn mode a bomb explosion always ends the current player's
+    /// turn — the chaotic explosion forfeits the extra move — so we reset the
+    /// counter and switch immediately rather than letting the player take a
+    /// second placement this turn.
+    fn update_status_after_placement(&mut self, player: PlayerId, won: bool, bomb_detonated: bool) {
         if self.check_game_over() {
             tracing::info!("Game was already over. Move ignored for status update.");
         } else if won {
             tracing::debug!("Player {} wins the game!", player);
             self.status = GameStatus::Finished { winner: player };
         } else if self.variants.contains(&GameVariant::DoubleTurn) {
-            self.moves_this_turn += 1;
-            if self.moves_this_turn >= 2 {
-                // Player used both moves, switch to opponent
+            if bomb_detonated {
+                // Bomb explosion always forfeits the remainder of the turn,
+                // even when the player still had moves left (DoubleTurn).
                 self.moves_this_turn = 0;
                 self.status = GameStatus::Ongoing {
                     next_player: other_player(player),
                 };
+            } else {
+                self.moves_this_turn += 1;
+                if self.moves_this_turn >= 2 {
+                    // Player used both moves, switch to opponent
+                    self.moves_this_turn = 0;
+                    self.status = GameStatus::Ongoing {
+                        next_player: other_player(player),
+                    };
+                }
+                // else: stay on same player for second move
             }
-            // else: stay on same player for second move
         } else {
             self.status = GameStatus::Ongoing {
                 next_player: other_player(player),
@@ -360,13 +430,17 @@ impl TryFrom<YEN> for GameY {
             .filter_map(|v| GameVariant::from_name(v))
             .collect();
 
-        // Enforce 7x7 minimum for variants
+        // DoubleTurn still requires a large board; Explosions has no minimum.
         if game.size() < 7 {
-            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+            variants.retain(|v| !matches!(v, GameVariant::DoubleTurn));
         }
 
-        // Parse bomb positions from the "e" field
-        let bombs: HashSet<Coordinates> = match game.explosives() {
+        // Parse bomb positions from the "e" field *and* from any 'e' characters
+        // in the layout string. Both sources are unioned — historically bombs
+        // were only in the `explosives` field, but we now also emit them as 'e'
+        // inside `layout` so the frontend can render them directly from
+        // `yen_state` without a separate field (issue #203).
+        let mut bombs: HashSet<Coordinates> = match game.explosives() {
             Some(e_str) if !e_str.is_empty() => e_str
                 .split(',')
                 .filter_map(|s| s.trim().parse::<u32>().ok())
@@ -374,6 +448,19 @@ impl TryFrom<YEN> for GameY {
                 .collect(),
             _ => HashSet::new(),
         };
+
+        // Also scan the layout string for 'e' (empty cells containing a bomb).
+        // We parse row-by-row so we can compute (x, y, z) for each 'e' found.
+        for (row, row_str) in game.layout().split('/').enumerate() {
+            for (col, cell) in row_str.chars().enumerate() {
+                if cell == 'e' {
+                    let x = col as u32;
+                    let y = (row as u32).saturating_sub(col as u32);
+                    let z = game.size().saturating_sub(1).saturating_sub(row as u32);
+                    bombs.insert(Coordinates::new(x, y, z));
+                }
+            }
+        }
 
         let board = if bombs.is_empty() {
             Board::new(game.size())
@@ -425,7 +512,10 @@ impl TryFrom<YEN> for GameY {
                             coords,
                         })?;
                     }
-                    '.' => {}
+                    // '.' is an empty cell; 'e' is an empty cell that also has
+                    // a bomb on it — the bomb bookkeeping was done above when
+                    // we scanned the layout, so here we just treat 'e' as '.'.
+                    '.' | 'e' => {}
                     _ => {
                         return Err(GameYError::InvalidCharInLayout {
                             char: *cell,
@@ -464,9 +554,15 @@ impl From<&GameY> for YEN {
                 let z = size - 1 - row;
                 let coords = Coordinates::new(x, y, z);
 
+                // Empty + bomb cells are encoded as 'e' so the frontend can
+                // render the mine without needing a separate `explosives`
+                // field. Occupied bomb cells stay as the owner — the bomb will
+                // have been consumed on placement, so an occupied bomb cell is
+                // not possible in practice.
                 let cell_char = match game.board.board_map().get(&coords) {
                     Some((_, player)) if player.id() == 0 => 'B',
                     Some((_, player)) if player.id() == 1 => 'R',
+                    _ if game.board.bombs().contains(&coords) => 'e',
                     _ => '.',
                 };
                 layout.push(cell_char);
@@ -759,17 +855,142 @@ mod tests {
     }
 
     #[test]
+    fn test_bomb_count_for_size() {
+        // Size 0: edge case
+        assert_eq!(GameY::bomb_count_for_size(0), 0);
+        // Sizes 1-7: always exactly 1 bomb
+        for size in 1..=7u32 {
+            assert_eq!(
+                GameY::bomb_count_for_size(size),
+                1,
+                "size {size} should always yield 1 bomb"
+            );
+        }
+        // Sizes >= 8: random value in [1, 4] — run many times to verify range
+        for _ in 0..50 {
+            let c = GameY::bomb_count_for_size(8);
+            assert!(c >= 1 && c <= 4, "size 8 bomb count {c} out of [1,4]");
+            let c = GameY::bomb_count_for_size(15);
+            assert!(c >= 1 && c <= 4, "size 15 bomb count {c} out of [1,4]");
+        }
+    }
+
+    #[test]
     fn test_gamey_variants_initialization() {
-        // Size < 7 does not place a bomb and ignores variants
+        // Size < 7: DoubleTurn is filtered out, but Explosions is now allowed.
         let variants = vec![GameVariant::Explosions, GameVariant::DoubleTurn];
         let game1 = GameY::new_with_variants(5, variants.clone());
-        assert_eq!(game1.variants().len(), 0); // Both filtered out
-        assert_eq!(game1.bomb_positions().len(), 0);
+        assert!(
+            game1.variants().contains(&GameVariant::Explosions),
+            "Explosions should be active on size-5 boards"
+        );
+        assert!(
+            !game1.variants().contains(&GameVariant::DoubleTurn),
+            "DoubleTurn should still be restricted to size >= 7"
+        );
+        // Size <= 7 → exactly 1 bomb
+        assert_eq!(game1.bomb_positions().len(), 1);
 
-        // Size >= 7 does place a bomb and keeps variants
+        // Size 7: both variants active, 1 bomb (size <= 7 rule)
         let game2 = GameY::new_with_variants(7, variants);
         assert_eq!(game2.variants().len(), 2);
         assert_eq!(game2.bomb_positions().len(), 1);
+
+        // Size >= 8: both active, bomb count in [1,4]
+        let game3 = GameY::new_with_variants(9, vec![GameVariant::Explosions]);
+        let bc = game3.bomb_positions().len() as u32;
+        assert!(bc >= 1 && bc <= 4, "size-9 bomb count {bc} out of [1,4]");
+    }
+
+    /// Randomly-placed bombs must never be adjacent to each other.
+    ///
+    /// Adjacent bombs would chain-detonate on the very first trigger, wiping
+    /// out huge sections of the board instantly. The placement algorithm should
+    /// exclude each chosen cell's neighbours from the candidate pool after
+    /// every placement.
+    #[test]
+    fn test_bombs_not_adjacent_to_each_other() {
+        // Run many times to catch non-deterministic failures.
+        for _ in 0..100 {
+            // Use a large board so we reliably get multiple bombs.
+            let game = GameY::new_with_variants(10, vec![GameVariant::Explosions]);
+            let bombs = game.bomb_positions();
+
+            for &bomb in &bombs {
+                let neighbours = bomb.neighbors(10);
+                for neighbour in &neighbours {
+                    assert!(
+                        !bombs.contains(neighbour),
+                        "bombs {bomb:?} and {neighbour:?} are adjacent — \
+                         placement must guarantee no two bombs touch"
+                    );
+                }
+            }
+        }
+    }
+
+    /// In DoubleTurn mode, detonating a bomb on the *first* of the two moves
+    /// must switch the turn to the opponent immediately — the explosion forfeits
+    /// the remaining move(s). Previously, `moves_this_turn` was simply
+    /// incremented, leaving the same player at the controls for another move.
+    #[test]
+    fn test_explosion_forfeits_double_turn() {
+        use std::collections::HashSet;
+
+        // Build a size-7 game with DoubleTurn only (we place the bomb manually
+        // so we know exactly where it is).
+        let bomb_coord = Coordinates::new(3, 2, 1); // interior cell, far from edges
+        let mut bombs = HashSet::new();
+        bombs.insert(bomb_coord);
+
+        let mut game = GameY {
+            board: Board::new_with_bombs(7, bombs),
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants: vec![GameVariant::DoubleTurn],
+            moves_this_turn: 0,
+        };
+
+        // Sanity: Player 0 starts, moves_this_turn is 0.
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+
+        // Player 0 detonates the bomb on their *first* DoubleTurn move.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: bomb_coord,
+        })
+        .unwrap();
+
+        // The explosion must have switched the turn to Player 1, not kept
+        // Player 0 for a second move.
+        assert_eq!(
+            game.next_player(),
+            Some(PlayerId::new(1)),
+            "bomb explosion must forfeit the remaining DoubleTurn move and switch to Player 1"
+        );
+    }
+
+    /// Confirm that a normal (non-bomb) move in DoubleTurn still keeps the
+    /// same player for their second move.
+    #[test]
+    fn test_normal_move_does_not_forfeit_double_turn() {
+        let mut game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+
+        // First normal move — player 0 should keep the turn.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 6),
+        })
+        .unwrap();
+
+        assert_eq!(
+            game.next_player(),
+            Some(PlayerId::new(0)),
+            "first normal move in DoubleTurn must not switch the turn"
+        );
     }
 
     #[test]
@@ -811,19 +1032,104 @@ mod tests {
     fn test_gamey_yen_with_variants_and_bombs() {
         let mut yen = YEN::new(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string());
         yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
-        
+
         let game = GameY::try_from(yen).unwrap();
         assert_eq!(game.variants().len(), 2);
         assert!(game.variants().contains(&GameVariant::DoubleTurn));
         assert!(game.variants().contains(&GameVariant::Explosions));
-        
+
         let bombs = game.bomb_positions();
         assert_eq!(bombs.len(), 1);
         assert_eq!(bombs[0], Coordinates::from_index(4, 7));
-        
+
         // Round trip test
         let yen_back = YEN::from(&game);
         assert_eq!(yen_back.variants().len(), 2);
         assert_eq!(yen_back.explosives(), Some("4"));
+    }
+
+    /// Bombs on empty cells must round-trip through the layout string as 'e' —
+    /// that's what lets the frontend render the mine without an auxiliary
+    /// field. Regression test for issue #203 (part 2: frontend visibility).
+    #[test]
+    fn test_bomb_emitted_as_e_in_layout() {
+        // Build a size-7 game with a bomb at flat index 4 (row 2, col 1 →
+        // coords (1, 1, 4)).
+        let mut bombs = HashSet::new();
+        let bomb_coords = Coordinates::from_index(4, 7);
+        bombs.insert(bomb_coords);
+
+        let mut game = GameY {
+            board: Board::new_with_bombs(7, bombs),
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants: vec![GameVariant::Explosions],
+            moves_this_turn: 0,
+        };
+
+        // Place a B piece somewhere non-bomb so the layout has both a player
+        // piece and an 'e' — exercises both branches of the cell matcher.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 6),
+        })
+        .unwrap();
+
+        let yen: YEN = (&game).into();
+        let layout = yen.layout();
+
+        // Layout should contain 'e' exactly once (the one bomb) and one 'B'
+        // (the piece we placed).
+        assert_eq!(layout.chars().filter(|c| *c == 'e').count(), 1, "layout missing 'e' marker: {}", layout);
+        assert_eq!(layout.chars().filter(|c| *c == 'B').count(), 1);
+
+        // And round-tripping the YEN back into a GameY must recover the bomb.
+        let reloaded = GameY::try_from(yen).unwrap();
+        assert_eq!(reloaded.bomb_positions().len(), 1);
+        assert!(reloaded.bomb_positions().contains(&bomb_coords));
+    }
+
+    /// Parsing a layout that carries 'e' characters (and no explosives field)
+    /// must still populate the bombs set. This is the inbound side of the
+    /// round-trip: the users service stores `yen_state` (just the layout) and
+    /// sends it back without the `explosives` field, so layout alone must be
+    /// enough.
+    #[test]
+    fn test_bomb_parsed_from_e_in_layout_only() {
+        // Row 0: top (1 cell); Row 1: middle (2 cells); Row 2: bottom (3 cells)
+        // The 'e' is at row 2, col 0 → coords (0, 2, 0).
+        let yen = YEN::new_with_variants(
+            3,
+            0,
+            vec!['B', 'R'],
+            "./../e..".to_string(),
+            vec!["Explosions".to_string()],
+            None, // no explosives field — bomb only in layout
+        );
+        let game = GameY::try_from(yen).unwrap();
+        let bombs = game.bomb_positions();
+        assert_eq!(bombs.len(), 1);
+        assert!(bombs.contains(&Coordinates::new(0, 2, 0)));
+    }
+
+    /// When *both* the `explosives` field and inline 'e' markers are present
+    /// they should union (duplicates dedup since bombs is a HashSet).
+    #[test]
+    fn test_bomb_layout_and_explosives_union() {
+        // 'e' at row 1, col 1 → (1, 0, 1). explosives "0" = flat index 0
+        // which is row 0, col 0 → (0, 0, 2).
+        let yen = YEN::new_with_variants(
+            3,
+            0,
+            vec!['B', 'R'],
+            "./.e/...".to_string(),
+            vec!["Explosions".to_string()],
+            Some("0".to_string()),
+        );
+        let game = GameY::try_from(yen).unwrap();
+        let bombs = game.bomb_positions();
+        assert_eq!(bombs.len(), 2, "should union layout bomb + explosives bomb");
     }
 }
