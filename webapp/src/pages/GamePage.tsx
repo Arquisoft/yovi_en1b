@@ -97,6 +97,26 @@ function getOwnerClass(owner: Move['player'] | null | undefined): string {
   return '';
 }
 
+function oppositePlayer(player: 'B' | 'R'): 'B' | 'R' {
+  return player === 'B' ? 'R' : 'B';
+}
+
+function getLegacyCellStateFromMoves(game: GameRecord): Map<string, YenCellState> {
+  const map = new Map<string, YenCellState>();
+  const startingPlayer: 'B' | 'R' = game.moves.length % 2 === 0 ? game.current_turn : oppositePlayer(game.current_turn);
+  let nextPlayer: 'B' | 'R' = startingPlayer;
+
+  for (const move of game.moves) {
+    map.set(coordinateKey(move.coordinates), {
+      owner: nextPlayer,
+      hasMine: false
+    });
+    nextPlayer = oppositePlayer(nextPlayer);
+  }
+
+  return map;
+}
+
 function getCellAriaLabel(coordinates: Coordinates, cellState: YenCellState | undefined): string {
   const owner = cellState?.owner;
 
@@ -225,19 +245,6 @@ function MoveHistory({ moves, bluePlayerName, redPlayerName, onMoveHover }: Move
   );
 }
 
-function getLegacyCellStateFromMoves(moves: Move[]): Map<string, YenCellState> {
-  const map = new Map<string, YenCellState>();
-
-  for (const move of moves) {
-    map.set(coordinateKey(move.coordinates), {
-      owner: move.player,
-      hasMine: false
-    });
-  }
-
-  return map;
-}
-
 export function GamePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -347,15 +354,10 @@ export function GamePage() {
     setHighlightedCellKey(null);
   }, [game?.moves]);
 
-  // Prefer the latest move's state; before any move is made, fall back to the
-  // initial state Gamey produced at game creation (so pre-placed bombs for the
-  // Explosions variant are visible immediately). After the game finishes we
-  // display the final state.
-  const latestYenState =
-    game?.moves.at(-1)?.yen_state
-    ?? game?.yen_final_state
-    ?? game?.initial_yen_state
-    ?? null;
+  // Prefer the latest move state when available; otherwise fall back to the last
+  // known final state from the API. If neither exists yet, reconstruct the board
+  // from move order so legacy BOT games keep a stable color mapping.
+  const latestYenState = game?.moves.at(-1)?.yen_state ?? game?.yen_final_state ?? null;
 
   const cellStateByKey = useMemo(() => {
     if (!game) {
@@ -366,8 +368,36 @@ export function GamePage() {
       return parseYenState(game.board_size, latestYenState);
     }
 
-    return getLegacyCellStateFromMoves(game.moves);
+    return getLegacyCellStateFromMoves(game);
   }, [game, latestYenState]);
+
+  const displayMoves = useMemo(() => {
+    if (!game) {
+      return [] as Move[];
+    }
+
+    if (latestYenState) {
+      return game.moves;
+    }
+
+    const startingPlayer: 'B' | 'R' = game.moves.length % 2 === 0 ? game.current_turn : oppositePlayer(game.current_turn);
+    let nextPlayer: 'B' | 'R' = startingPlayer;
+
+    return game.moves.map((move) => {
+      const displayMove = { ...move, player: nextPlayer };
+      nextPlayer = oppositePlayer(nextPlayer);
+      return displayMove;
+    });
+  }, [game, latestYenState]);
+
+  const blueMoves = displayMoves.filter((move) => move.player === 'B').length;
+  const redMoves = displayMoves.filter((move) => move.player === 'R').length;
+  const inProgress = game?.status === 'IN_PROGRESS';
+  const canPlay = inProgress
+    && !actionLoading
+    && !botThinking
+    && (game.game_type === 'PLAYER' || game.current_turn === 'B');
+  const visualTurn: 'B' | 'R' = botThinking ? 'R' : (game?.current_turn ?? 'B');
 
   const minePreviewNeighbors = useMemo(() => {
     if (!game || !hoveredCellKey) {
@@ -388,15 +418,6 @@ export function GamePage() {
       getNeighborCoordinates(game.board_size, { x, y, z }).map((coordinates) => coordinateKey(coordinates))
     );
   }, [game, hoveredCellKey, cellStateByKey]);
-
-  const blueMoves = (game?.moves ?? []).filter((move) => move.player === 'B').length;
-  const redMoves = (game?.moves ?? []).filter((move) => move.player === 'R').length;
-  const inProgress = game?.status === 'IN_PROGRESS';
-  const canPlay = inProgress
-    && !actionLoading
-    && !botThinking
-    && (game.game_type === 'PLAYER' || game.current_turn === 'B');
-  const visualTurn: 'B' | 'R' = botThinking ? 'R' : (game?.current_turn ?? 'B');
 
   const playMoveAt = async (coordinates: Coordinates) => {
     if (!id || !canPlay) {
@@ -589,7 +610,7 @@ export function GamePage() {
         />
 
         <MoveHistory
-          moves={game.moves}
+          moves={displayMoves}
           bluePlayerName="You"
           redPlayerName={enemyTitle}
           onMoveHover={(coordinates) => setHighlightedCellKey(coordinates ? coordinateKey(coordinates) : null)}
@@ -598,3 +619,4 @@ export function GamePage() {
     </Panel>
   );
 }
+
