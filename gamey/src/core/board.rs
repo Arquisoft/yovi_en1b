@@ -128,55 +128,10 @@ impl Board {
         self.sets.push(new_set);
         self.board_map.insert(coords, (set_idx, player));
 
-        // ── Bomb path ──────────────────────────────────────────────────────────
-        // BFS chain detonation: start from the triggered cell and propagate to
-        // every adjacent bomb, consuming them all before rebuilding.
-        //
-        // `visited` tracks every explosion centre we have already queued so we
-        // never process the same cell twice — important both for termination
-        // and to avoid double-removing entries from `board_map`.
         if is_bomb {
-            let mut pending: Vec<Coordinates> = vec![coords];
-            let mut visited: HashSet<Coordinates> = HashSet::new();
-            visited.insert(coords);
-
-            while let Some(explosion) = pending.pop() {
-                for neighbour in explosion.neighbors(self.board_size) {
-                    // Clear any piece sitting on the neighbouring cell.
-                    // CRITICAL: we must NOT remove the stone we just placed (`coords`),
-                    // even if it is a neighbor of another detonating bomb in the chain.
-                    // Doing so would cause us to lose the winner-tracking set_idx
-                    // and panic at line 176.
-                    if neighbour != coords && self.board_map.remove(&neighbour).is_some() {
-                        let idx = neighbour.to_index(self.board_size);
-                        if !self.available_cells.contains(&idx) {
-                            self.available_cells.push(idx);
-                        }
-                    }
-                    // Chain-react: queue unvisited adjacent bombs.
-                    // `bombs.remove` returns true only if the value was present,
-                    // so we consume the bomb atomically with the visited-check.
-                    if !visited.contains(&neighbour) && self.bombs.remove(&neighbour) {
-                        visited.insert(neighbour);
-                        pending.push(neighbour);
-                    }
-                }
-            }
-
-            // Rebuild Union-Find from scratch so that detonated cells don't
-            // leave orphaned sets whose `touches_side_*` flags could later be
-            // merged into a live component and trigger a phantom win.
+            self.detonate_at(coords);
             self.rebuild_union_find();
 
-            // ── Critical: use find() to reach the canonical root ──────────────
-            // After rebuild, the set index stored in `board_map` for `coords`
-            // may be a *non-root* node — if it was merged into a neighbour's
-            // component during the rebuild loop, its parent was updated but the
-            // stored index was not.  Calling `find` with path-compression gives
-            // us the root whose `touches_side_*` flags reflect the *entire*
-            // connected component, not just the single cell.
-            // Without this fix a winning bomb move would return `false`, the
-            // game would continue, and the turn would switch to the wrong player.
             let raw_idx = self.board_map[&coords].0;
             let root = self.find(raw_idx);
             return self.sets[root].is_winning_configuration();
@@ -197,6 +152,38 @@ impl Board {
         }
 
         won
+    }
+
+    /// Internal detonator for explosive moves. Uses BFS to chain-react all
+    /// adjacent bombs, clearing their occupants and returning them to the
+    /// `available_cells` pool.
+    fn detonate_at(&mut self, origin: Coordinates) {
+        let mut pending: Vec<Coordinates> = vec![origin];
+        let mut visited: HashSet<Coordinates> = HashSet::new();
+        visited.insert(origin);
+
+        while let Some(explosion) = pending.pop() {
+            for neighbour in explosion.neighbors(self.board_size) {
+                // Clear any piece sitting on the neighbouring cell.
+                // CRITICAL: we must NOT remove the stone we just placed (`origin`),
+                // even if it is a neighbor of another detonating bomb in the chain.
+                // Doing so would cause us to lose the winner-tracking set_idx
+                // and panic later in place_piece.
+                if neighbour != origin && self.board_map.remove(&neighbour).is_some() {
+                    let idx = neighbour.to_index(self.board_size);
+                    if !self.available_cells.contains(&idx) {
+                        self.available_cells.push(idx);
+                    }
+                }
+                // Chain-react: queue unvisited adjacent bombs.
+                // `bombs.remove` returns true only if the value was present,
+                // so we consume the bomb atomically with the visited-check.
+                if !visited.contains(&neighbour) && self.bombs.remove(&neighbour) {
+                    visited.insert(neighbour);
+                    pending.push(neighbour);
+                }
+            }
+        }
     }
 
     /// Find with path compression.
