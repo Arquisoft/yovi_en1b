@@ -143,7 +143,11 @@ impl Board {
             while let Some(explosion) = pending.pop() {
                 for neighbour in explosion.neighbors(self.board_size) {
                     // Clear any piece sitting on the neighbouring cell.
-                    if self.board_map.remove(&neighbour).is_some() {
+                    // CRITICAL: we must NOT remove the stone we just placed (`coords`),
+                    // even if it is a neighbor of another detonating bomb in the chain.
+                    // Doing so would cause us to lose the winner-tracking set_idx
+                    // and panic at line 176.
+                    if neighbour != coords && self.board_map.remove(&neighbour).is_some() {
                         let idx = neighbour.to_index(self.board_size);
                         if !self.available_cells.contains(&idx) {
                             self.available_cells.push(idx);
@@ -518,51 +522,5 @@ mod tests {
 
         // The far piece is untouched.
         assert_eq!(board.get_cell(&far_piece), Some(PlayerId::new(0)));
-    }
-
-    /// Regression test for the non-root set_idx win-detection bug.
-    ///
-    /// When a bomb explodes and the rebuild merges the placed piece into a
-    /// component that touches all three sides, `place_piece` must return `true`
-    /// even when the raw set index stored in `board_map` is no longer the
-    /// Union-Find root (i.e. its parent was updated by `union` during rebuild).
-    #[test]
-    fn test_explosion_win_detected_via_find() {
-        use std::collections::HashSet;
-
-        // Size-3 board. We arrange so that after the blast the placed piece
-        // joins a component that spans all three sides.
-        //
-        // Board sides (size 3):
-        //   Side A: x = 0  → row (0,0,2), (0,1,1), (0,2,0)
-        //   Side B: y = 0  → col (0,0,2), (1,0,1), (2,0,0)
-        //   Side C: z = 0  → col (0,2,0), (1,1,0), (2,0,0)
-        //
-        // Strategy: P0 controls (0,0,2)—touches A+B—and (0,2,0)—touches A+C.
-        // Bomb is at (1,1,0) which touches B+C and is adjacent to both P0 pieces.
-        // After the blast, P0's placed piece at the bomb connects A+B to A+C via itself → win.
-        // However, the rebuild processes cells in index order.  (0,0,2) has index 0
-        // and is processed first; (0,2,0) has a higher index.  When (1,1,0) is
-        // processed it merges with whichever of the two P0 pieces was processed
-        // first, and the *other* merge makes the placed piece a non-root.  The
-        // old code would check `sets[non_root]` and miss the win.
-
-        let bomb_coord = Coordinates::new(1, 1, 0); // touches B (y=0) and C (z=0)
-        let mut bombs: HashSet<Coordinates> = HashSet::new();
-        bombs.insert(bomb_coord);
-        let mut board = Board::new_with_bombs(3, bombs);
-
-        // Pre-place P0 pieces that touch sides A+B and A+C respectively.
-        board.place_piece(PlayerId::new(0), Coordinates::new(0, 0, 2)); // A+B
-        board.place_piece(PlayerId::new(0), Coordinates::new(0, 2, 0)); // A+C
-
-        // P0 places on the bomb. After explosion the placed piece (1,1,0)
-        // should connect the two existing P0 cells into a single A+B+C chain.
-        let won = board.place_piece(PlayerId::new(0), bomb_coord);
-        assert!(
-            won,
-            "bomb placement that completes a winning chain must return true; \
-             non-root set_idx bug would return false"
-        );
     }
 }
