@@ -330,7 +330,13 @@ fn do_http_request(api_key: &str, prompt: &str) -> Result<String, String> {
         .json()
         .map_err(|e| format!("Failed to parse Gemini JSON response: {e}"))?;
 
-    // Navigate: candidates[0].content.parts[0].text
+    extract_text_from_json(json)
+}
+
+/// Helper: extracts the model's text response from the Gemini JSON structure.
+///
+/// Expected structure: `candidates[0].content.parts[0].text`
+fn extract_text_from_json(json: serde_json::Value) -> Result<String, String> {
     json["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
         .map(|s| s.trim().to_string())
@@ -433,12 +439,56 @@ mod tests {
     }
 
     #[test]
-    fn test_build_prompt_contains_rules() {
-        let game = GameY::new(5);
+    fn test_parse_coords_illegal_move() {
+        // (0,0,1) is valid but if we pretend it's occupied, parse_coords should return None.
+        let mut game = GameY::new(2);
+        use crate::{Movement, PlayerId};
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 1),
+        })
+        .unwrap();
+
+        let text = "x=0,y=0,z=1";
+        assert!(parse_coords(text, &game).is_none());
+    }
+
+    #[test]
+    fn test_extract_text_from_json_valid() {
+        let json = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{ "text": " x=1,y=2,z=1 " }]
+                }
+            }]
+        });
+        let result = extract_text_from_json(json).unwrap();
+        assert_eq!(result, "x=1,y=2,z=1");
+    }
+
+    #[test]
+    fn test_extract_text_from_json_invalid_structure() {
+        let cases = vec![
+            serde_json::json!({}),
+            serde_json::json!({"candidates": []}),
+            serde_json::json!({"candidates": [{}]}),
+            serde_json::json!({"candidates": [{"content": {}}]}),
+            serde_json::json!({"candidates": [{"content": {"parts": []}}]}),
+            serde_json::json!({"candidates": [{"content": {"parts": [{"text": 123}]}}]}),
+        ];
+
+        for case in cases {
+            assert!(extract_text_from_json(case).is_err());
+        }
+    }
+
+    #[test]
+    fn test_build_prompt_basic() {
+        let game = GameY::new(3);
         let prompt = build_prompt(&game);
-        assert!(prompt.contains("Side A"), "prompt must mention sides");
-        assert!(prompt.contains("x="), "prompt must list moves as x=N,y=N,z=N");
-        assert!(prompt.contains("Blue"), "prompt must state the player's colour");
+        assert!(prompt.contains("size 3"));
+        assert!(prompt.contains("Blue (B)"));
+        assert!(prompt.contains("x=0,y=0,z=2")); // apex
     }
 
     #[test]
@@ -463,6 +513,52 @@ mod tests {
             !prompt.contains("Explosions variant is ACTIVE"),
             "explosion section must be absent when variant is not active"
         );
+    }
+
+    #[test]
+    fn test_build_prompt_double_turn() {
+        // DoubleTurn requires board_size >= 7.
+        let game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("DoubleTurn variant is ACTIVE"));
+        assert!(prompt.contains("You make TWO placements per turn"));
+    }
+
+    #[test]
+    fn test_build_prompt_both_variants() {
+        // DoubleTurn requires board_size >= 7.
+        let game = GameY::new_with_variants(
+            7,
+            vec![GameVariant::Explosions, GameVariant::DoubleTurn],
+        );
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("Explosions variant is ACTIVE"));
+        assert!(prompt.contains("DoubleTurn variant is ACTIVE"));
+    }
+
+    #[test]
+    fn test_build_prompt_next_player_red() {
+        let mut game = GameY::new(2);
+        use crate::{Movement, PlayerId};
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 1),
+        })
+        .unwrap();
+
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("You are playing as: Red (R)"));
+        assert!(prompt.contains("Opponent is:        Blue (B)"));
+    }
+
+    #[test]
+    fn test_build_prompt_finished() {
+        // Size 2 board. B/BB is a win for Blue (B).
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/BB".to_string());
+        let game = GameY::try_from(yen).unwrap();
+        
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("The game is already finished."));
     }
 
     #[test]

@@ -1171,5 +1171,14 @@ mod tests {
         assert_eq!(pick_bot(Some("random"), Some("easy")).name(), "random_bot");
         assert_eq!(pick_bot(Some("balanced"), Some("medium")).name(), "medium");
         assert_eq!(pick_bot(Some("aggressive"), Some("hard")).name(), "hard");
+
+        // Gemini / Generative AI bot aliases.
+        // We set a mock key temporarily so the bot is successfully created
+        // rather than falling back to RandomBot (which would have the wrong name).
+        unsafe { std::env::set_var("GEMINI_API_KEY", "mock_key") };
+        assert_eq!(pick_bot(Some("gemini"), None).name(), "gemini");
+        assert_eq!(pick_bot(Some("generative"), None).name(), "gemini");
+        assert_eq!(pick_bot(Some("generative_ai"), None).name(), "gemini");
+        unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
 }
