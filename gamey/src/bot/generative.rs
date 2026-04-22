@@ -144,7 +144,7 @@ fn build_prompt(game: &GameY) -> String {
 
             // Symbol
             let sym = if has_explosions && game.board().is_bomb(&coords) {
-                '*'
+                'O'
             } else {
                 match game.board().get_cell(&coords) {
                     Some(p) if p.id() == 0 => 'B',
@@ -188,10 +188,10 @@ fn build_prompt(game: &GameY) -> String {
 
         format!(
             "\n## Explosions variant is ACTIVE\n\
-             Bombs on the board (marked * in the visual): {bomb_coords_str}\n\
+             Bombs on the board (marked O in the visual): {bomb_coords_str}\n\
              \n\
              Explosion rules:\n\
-             1. If you place your piece ON a bomb cell (*), the bomb detonates.\n\
+             1. If you place your piece ON a bomb cell (O), the bomb detonates.\n\
              2. Your piece STAYS on that cell.\n\
              3. Every piece (yours or your opponent's) on any cell DIRECTLY \
                 ADJACENT to the bomb cell is REMOVED from the board.\n\
@@ -269,12 +269,12 @@ No words, no explanation, no punctuation before or after. Just coordinates."#,
         max_coord = size - 1,
         size = size,
         bottom = size - 1,
-        bomb_legend = if has_explosions { "  * = bomb" } else { "" },
+        bomb_legend = if has_explosions { "  O = bomb" } else { "" },
         board_visual = board_visual,
         coord_index = coord_index,
         available = available_list.join("  |  "),
         bomb_advice = if has_explosions {
-            "\n4. BOMB CONSIDERATION: placing on a * cell detonates it — \
+            "\n4. BOMB CONSIDERATION: placing on a O cell detonates it — \
              weigh whether removing the adjacent pieces helps or hurts you \
              before choosing a bomb cell."
         } else {

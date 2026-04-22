@@ -389,7 +389,15 @@ impl GameY {
         // 1. Base symbol
         let mut symbol = match player {
             Some(p) => format!("{}", p),
-            None => ".".to_string(),
+            None => {
+                if self.variants().contains(&crate::GameVariant::Explosions)
+                    && self.board.is_bomb(&coords)
+                {
+                    "O".to_string()
+                } else {
+                    ".".to_string()
+                }
+            }
         };
 
         // 2. Append metadata (3D Coords / Index)
