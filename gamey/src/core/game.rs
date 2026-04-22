@@ -389,7 +389,15 @@ impl GameY {
         // 1. Base symbol
         let mut symbol = match player {
             Some(p) => format!("{}", p),
-            None => ".".to_string(),
+            None => {
+                if self.variants().contains(&crate::GameVariant::Explosions)
+                    && self.board.is_bomb(&coords)
+                {
+                    "O".to_string()
+                } else {
+                    ".".to_string()
+                }
+            }
         };
 
         // 2. Append metadata (3D Coords / Index)
@@ -1030,8 +1038,7 @@ mod tests {
 
     #[test]
     fn test_gamey_yen_with_variants_and_bombs() {
-        let mut yen = YEN::new(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string());
-        yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
+        let yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
 
         let game = GameY::try_from(yen).unwrap();
         assert_eq!(game.variants().len(), 2);

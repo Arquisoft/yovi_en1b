@@ -6,14 +6,19 @@
 //! - [`YBot`] - A trait that defines the interface for all bots
 //! - [`YBotRegistry`] - A registry for managing multiple bot implementations
 //! - [`RandomBot`] - A simple bot that makes random valid moves
+//! - [`DefensiveBot`] - A bot that blocks the opponent's last move
+//! - [`HardBot`] - A strong MCTS-based bot
+//! - [`GenerativeAIBot`] - A bot powered by Google Gemini (key via `GEMINI_API_KEY`)
 
 pub mod defensive;
+pub mod generative;
 pub mod hard;
 pub mod random;
 pub mod ybot;
 pub mod ybot_registry;
 
 pub use defensive::DefensiveBot;
+pub use generative::GenerativeAIBot;
 pub use hard::HardBot;
 pub use random::RandomBot;
 pub use ybot::YBot;

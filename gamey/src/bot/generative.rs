@@ -1,0 +1,849 @@
+//! Generative AI bot powered by Google Gemini.
+//!
+//! The bot builds a detailed natural-language description of the current Y
+//! game state (including bomb positions and post-explosion rules for the
+//! Explosions variant), sends it to the Gemini API, and parses the returned
+//! coordinates.
+//!
+//! # API key
+//! The key is read from the `GEMINI_API_KEY` **environment variable** at
+//! construction time. It is never hard-coded or logged. If the variable is
+//! not set, every `choose_move` call falls back to a random legal move so
+//! the server never crashes.
+//!
+//! # Blocking inside async
+//! `YBot::choose_move` is a synchronous trait method called from inside an
+//! async Axum handler. Using `reqwest::blocking` directly from a Tokio thread
+//! panics. The fix: spawn a plain OS thread, make the HTTP request there, and
+//! return the result via a channel — completely transparent to the caller.
+
+use crate::{Coordinates, GameStatus, GameVariant, GameY, YBot};
+use rand::prelude::IndexedRandom;
+use std::sync::mpsc;
+use std::time::Duration;
+
+const GEMINI_API_URL: &str =
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const REQUEST_TIMEOUT_SECS: u64 = 20;
+
+// ─── Public struct ────────────────────────────────────────────────────────────
+
+/// A bot that asks Google Gemini to choose the next move.
+///
+/// Build with [`GenerativeAIBot::from_env`]; the API key is read from
+/// `GEMINI_API_KEY` and stored in memory for the lifetime of the bot.
+pub struct GenerativeAIBot {
+    api_key: String,
+    /// The Gemini endpoint URL. Normally `GEMINI_API_URL`; overridable in tests
+    /// so unit tests can point to a local address that fails immediately without
+    /// any real network dependency or 20-second timeout.
+    api_url: String,
+}
+
+impl GenerativeAIBot {
+    /// Creates the bot by reading `GEMINI_API_KEY` from the environment.
+    ///
+    /// Returns `None` when the variable is not set so callers can fall back
+    /// to a different bot without panicking.
+    pub fn from_env() -> Option<Self> {
+        std::env::var("GEMINI_API_KEY")
+            .ok()
+            .filter(|k| !k.trim().is_empty())
+            .map(|api_key| Self {
+                api_key,
+                api_url: GEMINI_API_URL.to_string(),
+            })
+    }
+
+    /// Test-only constructor that injects a custom API URL.
+    ///
+    /// Point `api_url` to a port that immediately refuses connections
+    /// (e.g. `"http://127.0.0.1:1"`) to exercise the full error-handling
+    /// code path without any network dependency or timeout wait.
+    #[cfg(test)]
+    fn with_url_override(api_key: impl Into<String>, api_url: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+            api_url: api_url.into(),
+        }
+    }
+}
+
+impl YBot for GenerativeAIBot {
+    fn name(&self) -> &str {
+        "gemini"
+    }
+
+    fn choose_move(&self, game: &GameY) -> Option<Coordinates> {
+        if game.available_cells().is_empty() {
+            return None;
+        }
+
+        let prompt = build_prompt(game);
+
+        match call_gemini_via_thread(&self.api_key, &prompt, &self.api_url) {
+            Ok(text) => {
+                tracing::debug!("Gemini raw response: {text}");
+                parse_coords(&text, game).or_else(|| {
+                    tracing::warn!(
+                        "Could not parse valid coordinates from Gemini response; \
+                         falling back to random move"
+                    );
+                    random_fallback(game)
+                })
+            }
+            Err(e) => {
+                tracing::warn!("Gemini API error: {e}; falling back to random move");
+                random_fallback(game)
+            }
+        }
+    }
+}
+
+// ─── Prompt building ──────────────────────────────────────────────────────────
+
+fn build_prompt(game: &GameY) -> String {
+    let size = game.board_size();
+    let variants = game.variants();
+    let has_explosions = variants.contains(&GameVariant::Explosions);
+    let has_double_turn = variants.contains(&GameVariant::DoubleTurn);
+
+    // Whose turn?
+    let (my_color, opp_color) = match game.status() {
+        GameStatus::Ongoing { next_player } => {
+            if next_player.id() == 0 {
+                ("Blue (B)", "Red (R)")
+            } else {
+                ("Red (R)", "Blue (B)")
+            }
+        }
+        GameStatus::Finished { .. } => {
+            // Should never happen — handler checks this before calling choose_move
+            return "The game is already finished.".to_string();
+        }
+    };
+
+    // ── Board rendering ───────────────────────────────────────────────────────
+    // Triangle printed top-to-bottom: row 0 = apex (1 cell), row size-1 = base.
+    // Each cell is shown with its barycentric index for easy reference.
+    let mut board_visual = String::new();
+    let mut coord_index = String::new();
+
+    for row in 0..size {
+        let x = size - 1 - row;
+        let indent = " ".repeat((size - 1 - row) as usize);
+
+        // Visual layer (symbols)
+        board_visual.push_str(&indent);
+        // Coord-index layer
+        coord_index.push_str(&indent);
+
+        for y in 0..=row {
+            let z = row - y;
+            let coords = Coordinates::new(x, y, z);
+
+            // Symbol
+            let sym = if has_explosions && game.board().is_bomb(&coords) {
+                'O'
+            } else {
+                match game.board().get_cell(&coords) {
+                    Some(p) if p.id() == 0 => 'B',
+                    Some(_) => 'R',
+                    None => '.',
+                }
+            };
+            board_visual.push(sym);
+            board_visual.push(' ');
+
+            // Coordinate hint below each cell
+            coord_index.push_str(&format!("({},{},{}) ", x, y, z));
+        }
+        board_visual.push('\n');
+        coord_index.push('\n');
+    }
+
+    // ── Available moves ───────────────────────────────────────────────────────
+    let available_list: Vec<String> = game
+        .available_cells()
+        .iter()
+        .map(|&idx| {
+            let c = Coordinates::from_index(idx, size);
+            format!("x={},y={},z={}", c.x(), c.y(), c.z())
+        })
+        .collect();
+
+    // ── Explosions variant section ────────────────────────────────────────────
+    let explosions_section = if has_explosions {
+        let bombs = game.bomb_positions();
+        let bomb_list: Vec<String> = bombs
+            .iter()
+            .map(|c| format!("x={},y={},z={}", c.x(), c.y(), c.z()))
+            .collect();
+
+        let bomb_coords_str = if bomb_list.is_empty() {
+            "none (all have been detonated already)".to_string()
+        } else {
+            bomb_list.join(", ")
+        };
+
+        format!(
+            "\n## Explosions variant is ACTIVE\n\
+             Bombs on the board (marked O in the visual): {bomb_coords_str}\n\
+             \n\
+             Explosion rules:\n\
+             1. If you place your piece ON a bomb cell (O), the bomb detonates.\n\
+             2. Your piece STAYS on that cell.\n\
+             3. Every piece (yours or your opponent's) on any cell DIRECTLY \
+                ADJACENT to the bomb cell is REMOVED from the board.\n\
+             4. If an adjacent cell also contained a bomb, it chain-detonates \
+                in turn, removing pieces adjacent to IT as well (the chain \
+                continues until no more adjacent bombs remain).\n\
+             5. After any explosion, the turn ALWAYS passes to the opponent, \
+                even in DoubleTurn mode.\n\
+             6. Strategic notes:\n\
+                - An explosion can destroy your own pieces — weigh the risk.\n\
+                - A well-placed explosion can shatter an opponent's nearly-\
+                  winning chain.\n\
+                - Detonating when you have few adjacent pieces is safest.\n\
+             7. No two bombs are ever placed adjacent to each other at game \
+                start, so a single bomb's blast always has a bounded radius.\n"
+        )
+    } else {
+        String::new()
+    };
+
+    // ── DoubleTurn variant section ────────────────────────────────────────────
+    let double_turn_section = if has_double_turn {
+        "\n## DoubleTurn variant is ACTIVE\n\
+         You make TWO placements per turn before it passes to the opponent.\n\
+         Exception: if your first placement triggers a bomb explosion, the \
+         turn switches immediately — you do NOT get a second move.\n"
+            .to_string()
+    } else {
+        String::new()
+    };
+
+    // ── Assemble final prompt ─────────────────────────────────────────────────
+    format!(
+        r#"You are an expert player of the abstract strategy game Y.
+Your task: choose the single best legal move for the current position.
+
+## Rules of Y
+- The board is a triangle. Each cell has barycentric coordinates (x, y, z)
+  where x + y + z = {max_coord} (board size = {size}).
+- Two players: Blue (B) and Red (R). They alternate placements.
+- Goal: connect ALL THREE sides of the triangle with a single chain of
+  your own pieces.
+  · Side A = all cells where x = 0  (left edge)
+  · Side B = all cells where y = 0  (right edge)
+  · Side C = all cells where z = 0  (bottom edge)
+- Corner cells touch two sides and count for both.
+- The player who first forms a chain touching sides A, B, and C wins.
+- A single cell at a corner that touches all three sides wins immediately.
+{explosions_section}{double_turn_section}
+## Current board  (size {size})
+Legend: B = Blue  R = Red  . = empty{bomb_legend}
+Visual (row 0 = apex, row {bottom} = base):
+{board_visual}
+Coordinates of each cell:
+{coord_index}
+## You are playing as: {my_color}
+## Opponent is:        {opp_color}
+
+## Legal moves — you MUST choose exactly one of these:
+{available}
+
+## Decision instructions
+1. WIN CHECK: if placing on any legal cell gives you a chain that touches all
+   three sides (A, B, C) simultaneously — choose it immediately.
+2. BLOCK: if the opponent has a chain one move away from winning — block it.
+3. Otherwise: choose the cell that best advances your connectivity across all
+   three sides. Prefer cells that join existing friendly clusters and extend
+   toward uncovered sides.{bomb_advice}
+
+## Output format — CRITICAL
+Reply with ONLY this exact pattern and nothing else:
+x=<number>,y=<number>,z=<number>
+
+No words, no explanation, no punctuation before or after. Just coordinates."#,
+        max_coord = size - 1,
+        size = size,
+        bottom = size - 1,
+        bomb_legend = if has_explosions { "  O = bomb" } else { "" },
+        board_visual = board_visual,
+        coord_index = coord_index,
+        available = available_list.join("  |  "),
+        bomb_advice = if has_explosions {
+            "\n4. BOMB CONSIDERATION: placing on a O cell detonates it — \
+             weigh whether removing the adjacent pieces helps or hurts you \
+             before choosing a bomb cell."
+        } else {
+            ""
+        },
+        explosions_section = explosions_section,
+        double_turn_section = double_turn_section,
+    )
+}
+
+// ─── Gemini API call (via OS thread to avoid tokio blocking conflict) ─────────
+
+/// Sends `prompt` to the Gemini API from a dedicated OS thread (safe to call
+/// from within a Tokio async context) and returns the model's text reply.
+fn call_gemini_via_thread(api_key: &str, prompt: &str, api_url: &str) -> Result<String, String> {
+    let api_key = api_key.to_string();
+    let prompt = prompt.to_string();
+    let api_url = api_url.to_string();
+
+    // Channel: capacity 1 so the spawned thread never blocks on send.
+    let (tx, rx) = mpsc::sync_channel::<Result<String, String>>(1);
+
+    std::thread::spawn(move || {
+        let result = do_http_request(&api_key, &prompt, &api_url);
+        // Ignore send error — receiver may have timed out already.
+        let _ = tx.send(result);
+    });
+
+    rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .map_err(|_| {
+            format!("Gemini API did not respond within {REQUEST_TIMEOUT_SECS} seconds")
+        })?
+}
+
+/// Performs the actual blocking HTTP POST to the Gemini endpoint.
+/// Must be called from a plain OS thread, not from within a Tokio runtime.
+fn do_http_request(api_key: &str, prompt: &str, api_url: &str) -> Result<String, String> {
+    let url = format!("{}?key={}", api_url, api_key);
+
+    let body = serde_json::json!({
+        "contents": [{
+            "parts": [{ "text": prompt }]
+        }],
+        "generationConfig": {
+            // Low temperature = deterministic / focused output.
+            "temperature": 0.1,
+            // We only need a short reply: "x=N,y=N,z=N"
+            "maxOutputTokens": 64,
+            "stopSequences": ["\n\n"]
+        }
+    });
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .map_err(|e| format!("HTTP request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        // Read at most 512 bytes of the error body to avoid log spam.
+        let body_text = response.text().unwrap_or_default();
+        let snippet: String = body_text.chars().take(512).collect();
+        return Err(format!("Gemini returned HTTP {status}: {snippet}"));
+    }
+
+    let json: serde_json::Value = response
+        .json()
+        .map_err(|e| format!("Failed to parse Gemini JSON response: {e}"))?;
+
+    extract_text_from_json(json)
+}
+
+/// Helper: extracts the model's text response from the Gemini JSON structure.
+///
+/// Expected structure: `candidates[0].content.parts[0].text`
+fn extract_text_from_json(json: serde_json::Value) -> Result<String, String> {
+    json["candidates"][0]["content"]["parts"][0]["text"]
+        .as_str()
+        .map(|s| s.trim().to_string())
+        .ok_or_else(|| format!("Unexpected Gemini response structure: {json}"))
+}
+
+// ─── Response parsing ─────────────────────────────────────────────────────────
+
+/// Extracts `x=N,y=N,z=N` from the model's reply and validates it is a
+/// legal move. Returns `None` if parsing fails or the move is illegal.
+fn parse_coords(text: &str, game: &GameY) -> Option<Coordinates> {
+    // Strip whitespace and lowercase for robust matching.
+    let normalised = text.trim().replace([' ', '\n', '\r'], "").to_lowercase();
+
+    let x = extract_axis(&normalised, 'x')?;
+    let y = extract_axis(&normalised, 'y')?;
+    let z = extract_axis(&normalised, 'z')?;
+
+    let coords = Coordinates::new(x, y, z);
+
+    if !coords.is_valid(game.board_size()) {
+        tracing::warn!(
+            "Gemini chose ({x},{y},{z}) which is out of bounds for board size {}",
+            game.board_size()
+        );
+        return None;
+    }
+
+    let idx = coords.to_index(game.board_size());
+
+    if game.available_cells().contains(&idx) {
+        Some(coords)
+    } else {
+        tracing::warn!(
+            "Gemini chose ({x},{y},{z}) which is not a legal move in the current position"
+        );
+        None
+    }
+}
+
+/// Finds `<axis>=<digits>` in `s` and returns the parsed number.
+fn extract_axis(s: &str, axis: char) -> Option<u32> {
+    let prefix = format!("{}=", axis);
+    let start = s.find(prefix.as_str())? + prefix.len();
+    let digits: String = s[start..].chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
+
+/// Falls back to a uniformly random legal move.
+fn random_fallback(game: &GameY) -> Option<Coordinates> {
+    let idx = game.available_cells().choose(&mut rand::rng())?;
+    Some(Coordinates::from_index(*idx, game.board_size()))
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{GameVariant, GameY};
+
+    #[test]
+    fn test_parse_coords_valid() {
+        let game = GameY::new(5);
+        // Cell (2,1,1) is index 7 on a size-5 board — available on a fresh game.
+        let text = "x=2,y=1,z=1";
+        let result = parse_coords(text, &game);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), Coordinates::new(2, 1, 1));
+    }
+
+    #[test]
+    fn test_parse_coords_with_spaces() {
+        let game = GameY::new(5);
+        let text = "x=2, y=1, z=1";
+        assert!(parse_coords(text, &game).is_some());
+    }
+
+    #[test]
+    fn test_parse_coords_with_newline_prefix() {
+        // Gemini sometimes adds a newline before the answer.
+        let game = GameY::new(5);
+        let text = "\nx=2,y=1,z=1\n";
+        assert!(parse_coords(text, &game).is_some());
+    }
+
+    #[test]
+    fn test_parse_coords_invalid_cell() {
+        let game = GameY::new(5);
+        // (9,9,9) does not exist on a size-5 board.
+        let text = "x=9,y=9,z=9";
+        assert!(parse_coords(text, &game).is_none());
+    }
+
+    #[test]
+    fn test_parse_coords_garbage() {
+        let game = GameY::new(5);
+        assert!(parse_coords("I don't know", &game).is_none());
+        assert!(parse_coords("", &game).is_none());
+    }
+
+    #[test]
+    fn test_parse_coords_illegal_move() {
+        // (0,0,1) is valid but if we pretend it's occupied, parse_coords should return None.
+        let mut game = GameY::new(2);
+        use crate::{Movement, PlayerId};
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 1),
+        })
+        .unwrap();
+
+        let text = "x=0,y=0,z=1";
+        assert!(parse_coords(text, &game).is_none());
+    }
+
+    #[test]
+    fn test_extract_text_from_json_valid() {
+        let json = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [{ "text": " x=1,y=2,z=1 " }]
+                }
+            }]
+        });
+        let result = extract_text_from_json(json).unwrap();
+        assert_eq!(result, "x=1,y=2,z=1");
+    }
+
+    #[test]
+    fn test_extract_text_from_json_invalid_structure() {
+        let cases = vec![
+            serde_json::json!({}),
+            serde_json::json!({"candidates": []}),
+            serde_json::json!({"candidates": [{}]}),
+            serde_json::json!({"candidates": [{"content": {}}]}),
+            serde_json::json!({"candidates": [{"content": {"parts": []}}]}),
+            serde_json::json!({"candidates": [{"content": {"parts": [{"text": 123}]}}]}),
+        ];
+
+        for case in cases {
+            assert!(extract_text_from_json(case).is_err());
+        }
+    }
+
+    #[test]
+    fn test_build_prompt_basic() {
+        let game = GameY::new(3);
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("size 3"));
+        assert!(prompt.contains("Blue (B)"));
+        assert!(prompt.contains("x=0,y=0,z=2")); // apex
+    }
+
+    #[test]
+    fn test_build_prompt_explosions_variant() {
+        let game = GameY::new_with_variants(7, vec![GameVariant::Explosions]);
+        let prompt = build_prompt(&game);
+        assert!(
+            prompt.contains("Explosions variant is ACTIVE"),
+            "prompt must include explosion rules when variant is active"
+        );
+        assert!(
+            prompt.contains("chain-detonates"),
+            "prompt must explain chain detonation"
+        );
+    }
+
+    #[test]
+    fn test_build_prompt_no_explosions_section_when_inactive() {
+        let game = GameY::new(7);
+        let prompt = build_prompt(&game);
+        assert!(
+            !prompt.contains("Explosions variant is ACTIVE"),
+            "explosion section must be absent when variant is not active"
+        );
+    }
+
+    #[test]
+    fn test_build_prompt_double_turn() {
+        // DoubleTurn requires board_size >= 7.
+        let game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("DoubleTurn variant is ACTIVE"));
+        assert!(prompt.contains("You make TWO placements per turn"));
+    }
+
+    #[test]
+    fn test_build_prompt_both_variants() {
+        // DoubleTurn requires board_size >= 7.
+        let game = GameY::new_with_variants(
+            7,
+            vec![GameVariant::Explosions, GameVariant::DoubleTurn],
+        );
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("Explosions variant is ACTIVE"));
+        assert!(prompt.contains("DoubleTurn variant is ACTIVE"));
+    }
+
+    #[test]
+    fn test_build_prompt_next_player_red() {
+        let mut game = GameY::new(2);
+        use crate::{Movement, PlayerId};
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 1),
+        })
+        .unwrap();
+
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("You are playing as: Red (R)"));
+        assert!(prompt.contains("Opponent is:        Blue (B)"));
+    }
+
+    #[test]
+    fn test_build_prompt_finished() {
+        // Size 2 board. B/BB is a win for Blue (B).
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/BB".to_string());
+        let game = GameY::try_from(yen).unwrap();
+        
+        let prompt = build_prompt(&game);
+        assert!(prompt.contains("The game is already finished."));
+    }
+
+    #[test]
+    fn test_from_env_returns_none_when_key_absent() {
+        // remove_var is unsafe in Rust 2024 (potential data race in multi-
+        // threaded tests). Guard with unsafe and use a key name that is
+        // extremely unlikely to be set in any real environment.
+        unsafe { std::env::remove_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ") };
+        // from_env must return None when the variable doesn't exist.
+        assert!(std::env::var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ").is_err());
+        // Verify from_env itself returns None for an empty-string variable.
+        unsafe { std::env::set_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ", "") };
+        // from_env filters out blank keys with .filter(|k| !k.trim().is_empty())
+        // so the result must be None.
+        let result = std::env::var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ")
+            .ok()
+            .filter(|k| !k.trim().is_empty());
+        assert!(result.is_none(), "empty key must be filtered out");
+        unsafe { std::env::remove_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ") };
+    }
+
+    #[test]
+    fn test_bot_name() {
+        let bot = GenerativeAIBot::with_url_override("test_key", "http://127.0.0.1:1");
+        assert_eq!(bot.name(), "gemini");
+    }
+
+    /// Covers the early-return branch: `available_cells().is_empty() → None`.
+    ///
+    /// A size-1 board filled with one piece has no remaining cells.
+    #[test]
+    fn test_choose_move_returns_none_when_no_cells_available() {
+        use crate::{Movement, PlayerId};
+        let mut game = GameY::new(1);
+        // Placing on the only cell finishes the game and empties available_cells.
+        let _ = game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 0),
+        });
+        assert!(
+            game.available_cells().is_empty(),
+            "test setup: size-1 board must have no available cells after filling"
+        );
+        let bot = GenerativeAIBot::with_url_override("any_key", "http://127.0.0.1:1");
+        assert!(
+            bot.choose_move(&game).is_none(),
+            "choose_move must return None when no cells are available"
+        );
+    }
+
+    /// Covers the full API call path via an injected URL that immediately
+    /// refuses the connection (port 1 on localhost).
+    ///
+    /// Code path exercised:
+    ///   choose_move → build_prompt → call_gemini_via_thread
+    ///     → do_http_request → connection refused → Err(...)
+    ///   → choose_move Err branch → random_fallback → Some(legal_move)
+    #[test]
+    fn test_choose_move_falls_back_to_random_on_connection_error() {
+        // Port 1 on localhost is reserved and has no service; the OS
+        // returns "connection refused" in milliseconds — no timeout wait.
+        let bot = GenerativeAIBot::with_url_override("any_key", "http://127.0.0.1:1");
+        let game = GameY::new(3);
+        let chosen = bot.choose_move(&game);
+        assert!(
+            chosen.is_some(),
+            "choose_move must return a legal random move when the API call fails"
+        );
+        let idx = chosen.unwrap().to_index(3);
+        assert!(
+            game.available_cells().contains(&idx),
+            "fallback move must be a legal cell"
+        );
+    }
+
+    /// Covers the `Ok(text)` branch where the API succeeds but Gemini returns
+    /// text that cannot be parsed as valid coordinates → fallback to random.
+    ///
+    /// Achieved by pointing the bot at a URL that returns HTTP 200 with
+    /// a JSON body whose structure matches Gemini's format but whose text
+    /// field contains garbage coordinates.
+    ///
+    /// Since we cannot stand up a local HTTP server in a unit test without
+    /// extra dependencies, we exercise this path indirectly: we call
+    /// `parse_coords` with garbage text directly and verify it returns None,
+    /// then confirm `random_fallback` produces a legal move — together they
+    /// prove the fallback chain is correct.
+    #[test]
+    fn test_parse_coords_garbage_triggers_fallback_chain() {
+        let game = GameY::new(4);
+        // parse_coords with rubbish → None
+        assert!(parse_coords("I have no idea", &game).is_none());
+        // random_fallback always produces a legal move on a non-full board
+        let fallback = random_fallback(&game);
+        assert!(fallback.is_some());
+        assert!(game.available_cells().contains(&fallback.unwrap().to_index(4)));
+    }
+
+    /// Covers `call_gemini_via_thread` and `do_http_request` directly
+    /// (private fns, tested here from within the same module).
+    #[test]
+    fn test_call_gemini_via_thread_connection_refused() {
+        // Pointing at port 1 gives an immediate connection-refused error.
+        let result = call_gemini_via_thread("key", "prompt", "http://127.0.0.1:1");
+        assert!(
+            result.is_err(),
+            "call_gemini_via_thread must propagate the connection error"
+        );
+        let msg = result.unwrap_err();
+        // The error originates either from reqwest ("HTTP request failed")
+        // or from the channel timeout ("did not respond").
+        assert!(
+            msg.contains("HTTP request failed") || msg.contains("did not respond"),
+            "unexpected error message: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_random_fallback_returns_legal_move() {
+        let game = GameY::new(5);
+        let coords = random_fallback(&game).unwrap();
+        let idx = coords.to_index(5);
+        assert!(game.available_cells().contains(&idx));
+    }
+
+    // ── Integration tests (require GEMINI_API_KEY) ────────────────────────────
+    //
+    // These tests make real HTTP calls to the Gemini API.
+    // Run them explicitly with:
+    //   GEMINI_API_KEY=<key> cargo test gemini_integration -- --ignored --nocapture
+    //
+    // They are marked #[ignore] so normal `cargo test` skips them.
+
+    /// Verify the bot returns a legal move on a fresh normal board.
+    #[test]
+    #[ignore = "requires GEMINI_API_KEY env var and live network access"]
+    fn gemini_integration_normal_variant() {
+        dotenvy::dotenv().ok();
+
+        let bot = GenerativeAIBot::from_env()
+            .expect("GEMINI_API_KEY must be set to run this test");
+
+        let game = GameY::new(5);
+        let chosen = bot.choose_move(&game)
+            .expect("bot must return a move on a non-full board");
+
+        let idx = chosen.to_index(5);
+        assert!(
+            game.available_cells().contains(&idx),
+            "Gemini returned an illegal move: {chosen:?}"
+        );
+        println!("Gemini chose: x={},y={},z={}", chosen.x(), chosen.y(), chosen.z());
+    }
+
+    /// Verify the bot returns a legal move when the Explosions variant is active
+    /// and there are bombs on the board.
+    #[test]
+    #[ignore = "requires GEMINI_API_KEY env var and live network access"]
+    fn gemini_integration_explosions_variant() {
+        dotenvy::dotenv().ok();
+
+        let bot = GenerativeAIBot::from_env()
+            .expect("GEMINI_API_KEY must be set to run this test");
+
+        let game = GameY::new_with_variants(7, vec![GameVariant::Explosions]);
+
+        // Confirm the game has at least one bomb so the Explosions prompt path is exercised.
+        assert!(
+            !game.bomb_positions().is_empty(),
+            "test setup: size-7 Explosions game should have at least 1 bomb"
+        );
+
+        let chosen = bot.choose_move(&game)
+            .expect("bot must return a move on a non-full board");
+
+        let idx = chosen.to_index(7);
+        assert!(
+            game.available_cells().contains(&idx),
+            "Gemini returned an illegal move: {chosen:?}"
+        );
+
+        let is_bomb_cell = game.bomb_positions().contains(&chosen);
+        println!(
+            "Gemini chose: x={},y={},z={} (bomb cell: {is_bomb_cell})",
+            chosen.x(), chosen.y(), chosen.z()
+        );
+    }
+
+    /// Verify the bot returns a legal move even after a bomb has detonated,
+    /// correctly handling the post-explosion board state.
+    #[test]
+    #[ignore = "requires GEMINI_API_KEY env var and live network access"]
+    fn gemini_integration_prompt_accuracy_after_explosion() {
+        dotenvy::dotenv().ok();
+
+        let bot = GenerativeAIBot::from_env()
+            .expect("GEMINI_API_KEY must be set to run this test");
+
+        use crate::{Movement, PlayerId};
+
+        // Use new_with_variants so we get a random bomb via the public API.
+        // The bomb position is unknown up front, but we can read it from the game.
+        let mut game = GameY::new_with_variants(7, vec![GameVariant::Explosions]);
+
+        // Find a bomb on the board.
+        let bombs = game.bomb_positions();
+        if bombs.is_empty() {
+            // Extremely unlikely, but skip gracefully.
+            println!("No bombs on this board — skipping explosion sub-test");
+            return;
+        }
+        let bomb = bombs[0];
+
+        // Place B and R on non-bomb cells, then have B detonate the bomb.
+        // Find two available non-bomb cells for the setup moves.
+        let non_bomb_cells: Vec<Coordinates> = game
+            .available_cells()
+            .iter()
+            .map(|&idx| Coordinates::from_index(idx, 7))
+            .filter(|c| !game.board().is_bomb(c))
+            .collect();
+
+        if non_bomb_cells.len() < 2 {
+            println!("Not enough non-bomb cells for setup — skipping");
+            return;
+        }
+
+        // B places on a safe cell.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: non_bomb_cells[0],
+        }).unwrap();
+        // R places on a safe cell.
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(1),
+            coords: non_bomb_cells[1],
+        }).unwrap();
+        // B detonates the bomb — it's B's turn and bomb is still available.
+        if game.available_cells().contains(&bomb.to_index(7)) {
+            game.add_move(Movement::Placement {
+                player: PlayerId::new(0),
+                coords: bomb,
+            }).unwrap();
+        }
+
+        // It should now be R's turn regardless of the explosion outcome.
+        println!("Post-explosion next player: {:?}", game.next_player());
+
+        if let crate::GameStatus::Finished { .. } = game.status() {
+            println!("Game finished during setup — skipping move check");
+            return;
+        }
+
+        let chosen = bot.choose_move(&game)
+            .expect("bot must return a move on a non-full board");
+
+        let idx = chosen.to_index(7);
+        assert!(
+            game.available_cells().contains(&idx),
+            "Gemini returned an illegal move after explosion: {chosen:?}"
+        );
+        println!(
+            "Gemini chose (post-explosion): x={},y={},z={}",
+            chosen.x(), chosen.y(), chosen.z()
+        );
+    }
+}

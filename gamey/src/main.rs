@@ -29,6 +29,11 @@ use tracing_subscriber::prelude::*;
 /// depending on the selected mode.
 #[tokio::main]
 async fn main() {
+    // Load .env file if present (silently ignored when absent).
+    // This makes GEMINI_API_KEY and other secrets available via std::env::var
+    // without embedding them in the binary or the source tree.
+    dotenvy::dotenv().ok();
+
     tracing_subscriber::registry().init();
     let args = CliArgs::parse();
 

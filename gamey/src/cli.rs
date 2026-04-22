@@ -37,6 +37,11 @@ pub struct CliArgs {
     /// Port to run the server on (only used with --mode=server)
     #[arg(short, long, default_value_t = 3000)]
     pub port: u16,
+
+    /// Active game variants (e.g., explosions, doubleturn). 
+    /// Can be specified multiple times or as a comma-separated list.
+    #[arg(short, long, value_delimiter = ',')]
+    pub variants: Vec<String>,
 }
 
 /// The game mode determining how the game is played.
@@ -69,7 +74,14 @@ pub fn run_cli_game() -> Result<()> {
     let args = CliArgs::parse();
     let mut render_options = crate::RenderOptions::default();
     let mut rl = DefaultEditor::new()?;
-    let bots_registry = YBotRegistry::new().with_bot(Arc::new(RandomBot));
+    let mut bots_registry = YBotRegistry::new()
+        .with_bot(Arc::new(RandomBot))
+        .with_bot(Arc::new(crate::DefensiveBot))
+        .with_bot(Arc::new(crate::HardBot::default()));
+
+    if let Some(bot) = crate::GenerativeAIBot::from_env() {
+        bots_registry = bots_registry.with_bot(Arc::new(bot));
+    }
     let bot: Arc<dyn YBot> = match bots_registry.find(&args.bot) {
         Some(b) => b,
         None => {
@@ -81,7 +93,17 @@ pub fn run_cli_game() -> Result<()> {
             return Ok(());
         }
     };
-    let mut game = game::GameY::new(args.size);
+
+    let mut selected_variants = Vec::new();
+    for v_name in &args.variants {
+        if let Some(v) = crate::GameVariant::from_name(v_name) {
+            selected_variants.push(v);
+        } else {
+            println!("Warning: Unknown variant '{}'. Ignored.", v_name);
+        }
+    }
+
+    let mut game = game::GameY::new_with_variants(args.size, selected_variants);
     loop {
         println!("{}", game.render(&render_options));
         let status = game.status();
@@ -501,6 +523,12 @@ mod tests {
             }
             _ => panic!("Expected Error command"),
         }
+    }
+
+    #[test]
+    fn test_parse_variants() {
+        let args = CliArgs::parse_from(&["gamey", "--variants", "explosions,doubleturn"]);
+        assert_eq!(args.variants, vec!["explosions".to_string(), "doubleturn".to_string()]);
     }
 
     #[test]
