@@ -14,10 +14,11 @@ RUN cargo build --release
 # Use a minimal image for the final stage
 FROM debian:bookworm-slim
 
-# reqwest links against OpenSSL at runtime; ca-certificates is needed for
-# HTTPS calls (Gemini API). Both are absent in the slim base image.
+# reqwest uses rustls (pure-Rust TLS) so no libssl3 is needed at runtime.
+# ca-certificates is still required so rustls can verify HTTPS server certs
+# (e.g. the Gemini API endpoint).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/gamey
