@@ -14,6 +14,12 @@ RUN cargo build --release
 # Use a minimal image for the final stage
 FROM debian:bookworm-slim
 
+# reqwest links against OpenSSL at runtime; ca-certificates is needed for
+# HTTPS calls (Gemini API). Both are absent in the slim base image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libssl3 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app/gamey
 
 # Copy the compiled binary from the builder stage

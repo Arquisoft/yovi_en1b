@@ -55,6 +55,7 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/app_database
       - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - mongodb
     networks:

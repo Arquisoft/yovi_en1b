@@ -69,7 +69,14 @@ pub fn run_cli_game() -> Result<()> {
     let args = CliArgs::parse();
     let mut render_options = crate::RenderOptions::default();
     let mut rl = DefaultEditor::new()?;
-    let bots_registry = YBotRegistry::new().with_bot(Arc::new(RandomBot));
+    let mut bots_registry = YBotRegistry::new()
+        .with_bot(Arc::new(RandomBot))
+        .with_bot(Arc::new(crate::DefensiveBot))
+        .with_bot(Arc::new(crate::HardBot::default()));
+
+    if let Some(bot) = crate::GenerativeAIBot::from_env() {
+        bots_registry = bots_registry.with_bot(Arc::new(bot));
+    }
     let bot: Arc<dyn YBot> = match bots_registry.find(&args.bot) {
         Some(b) => b,
         None => {

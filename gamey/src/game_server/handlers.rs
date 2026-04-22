@@ -8,8 +8,8 @@ use crate::game_server::dto::{
     NewGameRequest, PlayRequest, PlayResponse,
 };
 use crate::{
-    DefensiveBot, GameAction, GameVariant, GameY, HardBot, Movement, PlayerId, RandomBot, YBot, YEN,
-    check_api_version,
+    DefensiveBot, GameAction, GameVariant, GameY, GenerativeAIBot, HardBot, Movement, PlayerId,
+    RandomBot, YBot, YEN, check_api_version,
 };
 use axum::extract::Path;
 use axum::Json;
@@ -364,6 +364,18 @@ fn match_bot(name: &str) -> Option<Box<dyn YBot>> {
         "hard" | "ai" | "mcts" | "ncts" | "aggressive" => Some(Box::new(HardBot::default())),
         "medium" | "defensive" | "balanced" => Some(Box::new(DefensiveBot)),
         "random" | "random_bot" | "easy" => Some(Box::new(RandomBot)),
+        // Generative AI bot (Google Gemini). Requires GEMINI_API_KEY env var.
+        // Falls back to a random move if the key is not set or the API call fails.
+        "gemini" | "generative" | "generativeai" | "generative_ai" => {
+            GenerativeAIBot::from_env()
+                .map(|b| Box::new(b) as Box<dyn YBot>)
+                .or_else(|| {
+                    tracing::warn!(
+                        "GEMINI_API_KEY is not set; 'gemini' strategy falls back to RandomBot"
+                    );
+                    Some(Box::new(RandomBot))
+                })
+        }
         _ => None,
     }
 }

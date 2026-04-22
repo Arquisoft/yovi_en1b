@@ -87,11 +87,16 @@ pub fn create_router(state: AppState) -> axum::Router {
 ///
 /// The default state includes the `RandomBot` which selects moves randomly.
 pub fn create_default_state() -> AppState {
-    let bots = YBotRegistry::new()
+    let mut registry = YBotRegistry::new()
         .with_bot(Arc::new(RandomBot))
         .with_bot(Arc::new(crate::DefensiveBot))
         .with_bot(Arc::new(crate::HardBot::default()));
-    AppState::new(bots)
+
+    if let Some(bot) = crate::GenerativeAIBot::from_env() {
+        registry = registry.with_bot(Arc::new(bot));
+    }
+
+    AppState::new(registry)
 }
 
 /// Starts the bot server on the specified port.
