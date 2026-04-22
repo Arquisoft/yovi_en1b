@@ -1,6 +1,10 @@
 use crate::core::Board;
-use crate::{Coordinates, GameAction, GameYError, Movement, PlayerId, RenderOptions, YEN};
+use crate::{
+    Coordinates, GameAction, GameVariant, GameYError, Movement, PlayerId, RenderOptions, YEN,
+};
+use rand::prelude::IndexedRandom;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Write;
 use std::path::Path;
 
@@ -25,6 +29,12 @@ pub struct GameY {
 
     /// History of moves made in the game.
     history: Vec<Movement>,
+
+    /// Active game variants.
+    variants: Vec<GameVariant>,
+
+    /// Number of moves made by the current player this turn (for DoubleTurn).
+    moves_this_turn: u32,
 }
 
 /// Represents the state of a single cell on the board.
@@ -45,6 +55,42 @@ impl GameY {
             status: GameStatus::Ongoing {
                 next_player: PlayerId::new(0),
             },
+            variants: Vec::new(),
+            moves_this_turn: 0,
+        }
+    }
+
+    /// Creates a new game with the specified variants.
+    ///
+    /// Variants (Explosions, DoubleTurn) require a board size of at least 7x7.
+    pub fn new_with_variants(board_size: u32, mut variants: Vec<GameVariant>) -> Self {
+        // Enforce 7x7 minimum for variants
+        if board_size < 7 {
+            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+        }
+
+        let board = if variants.contains(&GameVariant::Explosions) && board_size >= 7 {
+            let total_cells = Coordinates::total_cells(board_size);
+            let bomb_idx = *(0..total_cells)
+                .collect::<Vec<_>>()
+                .choose(&mut rand::rng())
+                .unwrap();
+            let bomb_coords = Coordinates::from_index(bomb_idx, board_size);
+            let mut bombs = HashSet::new();
+            bombs.insert(bomb_coords);
+            Board::new_with_bombs(board_size, bombs)
+        } else {
+            Board::new(board_size)
+        };
+
+        Self {
+            board,
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants,
+            moves_this_turn: 0,
         }
     }
 
@@ -61,6 +107,16 @@ impl GameY {
     /// Returns the history of moves made in the game.
     pub fn history(&self) -> &Vec<Movement> {
         &self.history
+    }
+
+    /// Returns the active game variants.
+    pub fn variants(&self) -> &[GameVariant] {
+        &self.variants
+    }
+
+    /// Returns the bomb positions on the board (may be empty).
+    pub fn bomb_positions(&self) -> Vec<Coordinates> {
+        self.board.bombs().iter().copied().collect()
     }
 
     /// Returns true if the game has ended (has a winner).
@@ -171,6 +227,16 @@ impl GameY {
         } else if won {
             tracing::debug!("Player {} wins the game!", player);
             self.status = GameStatus::Finished { winner: player };
+        } else if self.variants.contains(&GameVariant::DoubleTurn) {
+            self.moves_this_turn += 1;
+            if self.moves_this_turn >= 2 {
+                // Player used both moves, switch to opponent
+                self.moves_this_turn = 0;
+                self.status = GameStatus::Ongoing {
+                    next_player: other_player(player),
+                };
+            }
+            // else: stay on same player for second move
         } else {
             self.status = GameStatus::Ongoing {
                 next_player: other_player(player),
@@ -288,7 +354,43 @@ impl TryFrom<YEN> for GameY {
     type Error = GameYError;
 
     fn try_from(game: YEN) -> Result<Self> {
-        let mut ygame = GameY::new(game.size());
+        let mut variants: Vec<GameVariant> = game
+            .variants()
+            .iter()
+            .filter_map(|v| GameVariant::from_name(v))
+            .collect();
+
+        // Enforce 7x7 minimum for variants
+        if game.size() < 7 {
+            variants.retain(|v| !matches!(v, GameVariant::Explosions | GameVariant::DoubleTurn));
+        }
+
+        // Parse bomb positions from the "e" field
+        let bombs: HashSet<Coordinates> = match game.explosives() {
+            Some(e_str) if !e_str.is_empty() => e_str
+                .split(',')
+                .filter_map(|s| s.trim().parse::<u32>().ok())
+                .map(|idx| Coordinates::from_index(idx, game.size()))
+                .collect(),
+            _ => HashSet::new(),
+        };
+
+        let board = if bombs.is_empty() {
+            Board::new(game.size())
+        } else {
+            Board::new_with_bombs(game.size(), bombs)
+        };
+
+        let mut ygame = GameY {
+            board,
+            history: Vec::new(),
+            status: GameStatus::Ongoing {
+                next_player: PlayerId::new(0),
+            },
+            variants,
+            moves_this_turn: 0,
+        };
+
         let rows: Vec<&str> = game.layout().split('/').collect();
         if rows.len() as u32 != game.size() {
             return Err(GameYError::InvalidYENLayout {
@@ -369,12 +471,32 @@ impl From<&GameY> for YEN {
                 };
                 layout.push(cell_char);
             }
-            // Añadir el separador de fila, excepto en la última
             if row < size - 1 {
                 layout.push('/');
             }
         }
-        YEN::new(size, turn, players, layout)
+
+        // Serialize variants
+        let variant_names: Vec<String> = game
+            .variants
+            .iter()
+            .map(|v| format!("{:?}", v)) // Uses Debug repr: "Explosions", "DoubleTurn"
+            .collect();
+
+        // Serialize bomb positions as comma-separated flat indices
+        let explosives = if game.board.bombs().is_empty() {
+            None
+        } else {
+            let indices: Vec<String> = game
+                .board
+                .bombs()
+                .iter()
+                .map(|c| c.to_index(size).to_string())
+                .collect();
+            Some(indices.join(","))
+        };
+
+        YEN::new_with_variants(size, turn, players, layout, variant_names, explosives)
     }
 }
 
@@ -634,5 +756,74 @@ mod tests {
         // Since B and R count is equal (1 each), blue should be next.
         // The last parsed piece was B. Without our fix, GameY would toggle the turn to R (1).
         assert_eq!(game.next_player(), Some(crate::PlayerId::new(0)), "Should be Blue's turn according to YEN!");
+    }
+
+    #[test]
+    fn test_gamey_variants_initialization() {
+        // Size < 7 does not place a bomb and ignores variants
+        let variants = vec![GameVariant::Explosions, GameVariant::DoubleTurn];
+        let game1 = GameY::new_with_variants(5, variants.clone());
+        assert_eq!(game1.variants().len(), 0); // Both filtered out
+        assert_eq!(game1.bomb_positions().len(), 0);
+
+        // Size >= 7 does place a bomb and keeps variants
+        let game2 = GameY::new_with_variants(7, variants);
+        assert_eq!(game2.variants().len(), 2);
+        assert_eq!(game2.bomb_positions().len(), 1);
+    }
+
+    #[test]
+    fn test_gamey_double_turn_logic() {
+        let mut game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn]);
+        
+        // Starts with Player 0
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+        
+        // Move 1
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 2),
+        }).unwrap();
+        
+        // Still Player 0's turn!
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+        
+        // Move 2
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(1, 0, 1),
+        }).unwrap();
+        
+        // Now it's Player 1's turn
+        assert_eq!(game.next_player(), Some(PlayerId::new(1)));
+        
+        // Player 1 Move 1
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(1),
+            coords: Coordinates::new(0, 1, 1),
+        }).unwrap();
+        
+        // Still Player 1
+        assert_eq!(game.next_player(), Some(PlayerId::new(1)));
+    }
+
+    #[test]
+    fn test_gamey_yen_with_variants_and_bombs() {
+        let mut yen = YEN::new(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string());
+        yen = YEN::new_with_variants(7, 0, vec!['B', 'R'], "./../.../..../...../....../.......".to_string(), vec!["DoubleTurn".to_string(), "Explosions".to_string()], Some("4".to_string()));
+        
+        let game = GameY::try_from(yen).unwrap();
+        assert_eq!(game.variants().len(), 2);
+        assert!(game.variants().contains(&GameVariant::DoubleTurn));
+        assert!(game.variants().contains(&GameVariant::Explosions));
+        
+        let bombs = game.bomb_positions();
+        assert_eq!(bombs.len(), 1);
+        assert_eq!(bombs[0], Coordinates::from_index(4, 7));
+        
+        // Round trip test
+        let yen_back = YEN::from(&game);
+        assert_eq!(yen_back.variants().len(), 2);
+        assert_eq!(yen_back.explosives(), Some("4"));
     }
 }

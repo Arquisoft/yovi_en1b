@@ -4,20 +4,19 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 module.exports = function playRoute() {
     const router = express.Router();
 
-    const STRATEGY_DIFFICULTY = {
-        random:    'easy',
-        defensive: 'medium',
-        ncts:      'hard'
+    // Maps public bot_id names to the strategy strings Gamey (Rust) understands.
+    const STRATEGY_MAP = {
+        random:    'random',
+        defensive: 'defensive',
+        mcts:      'mcts'
     };
 
     // Public bot play — no auth, no game id needed
-    // position = yen_state, bot_id = strategy (public API naming)
+    // position = yen_state (full YEN JSON), bot_id = strategy (public API naming)
     router.get('/play', async function publicBotPlay(req, res) {
         const { position, bot_id, board_size } = req.query;
 
         if (position === undefined) return res.status(400).json({ error: 'position is required' });
-
-        const resolvedStrategy = bot_id || 'ncts';
 
         let parsedPosition;
         try {
@@ -26,16 +25,17 @@ module.exports = function playRoute() {
             return res.status(400).json({ error: 'position must be valid JSON in YEN format' });
         }
 
+        const resolvedStrategy = bot_id || 'mcts';
+
         let gameyResponse;
         try {
             gameyResponse = await fetch(`${GAMEY_URL}/play`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    yen_state:        parsedPosition.layout,
-                    strategy:         resolvedStrategy,
-                    difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'hard',
-                    board_size:       board_size !== undefined ? Number(board_size) : (parsedPosition.size ?? 5)
+                    yen_state:  parsedPosition.layout,
+                    strategy:   STRATEGY_MAP[resolvedStrategy.toLowerCase()] || 'mcts',
+                    board_size: board_size !== undefined ? Number(board_size) : (parsedPosition.size ?? 5)
                 })
             });
         } catch {
@@ -47,6 +47,15 @@ module.exports = function playRoute() {
         }
 
         const data = await gameyResponse.json();
+
+        // Map Gamey's response to the competition API format
+        if (data.coordinates) {
+            return res.json({ coords: data.coordinates });
+        }
+        if (data.action) {
+            return res.json({ action: data.action });
+        }
+
         res.json(data);
     });
 

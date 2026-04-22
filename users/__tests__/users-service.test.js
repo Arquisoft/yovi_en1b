@@ -169,18 +169,18 @@ describe('GET /leaderboard', () => {
         }
     })
 
-    it('vs_bots has random, defensive and ncts arrays', async () => {
+    it('vs_bots has random, defensive and mcts arrays', async () => {
         const res = await request(app).get('/leaderboard')
 
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
     })
 
     it('vs_bots entries have username and wins', async () => {
         const res = await request(app).get('/leaderboard')
 
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts']) {
             if (res.body.vs_bots[botKey].length > 0) {
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('username')
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('wins')
@@ -202,10 +202,10 @@ describe('GET /leaderboard', () => {
         expect(Array.isArray(res.body.overall)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
 
         // wins field must always be a number, never undefined
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts']) {
             res.body.vs_bots[botKey].forEach(entry => {
                 expect(typeof entry.wins).toBe('number')
             })
@@ -627,8 +627,7 @@ describe('GET /play', () => {
             .query({ position: YEN_POSITION, bot_id: 'random', board_size: 7 })
 
         expect(res.status).toBe(200)
-        expect(res.body).toHaveProperty('coordinates')
-        expect(res.body).toHaveProperty('yen_state')
+        expect(res.body).toHaveProperty('coords')
     })
 
     it('returns 400 if position is missing', async () => {
@@ -647,7 +646,7 @@ describe('GET /play', () => {
         expect(res.status).toBe(400)
     })
 
-    it('defaults to ncts bot when no bot_id is provided', async () => {
+    it('defaults to mcts bot when no bot_id is provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
@@ -660,7 +659,7 @@ describe('GET /play', () => {
 
         expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
-        expect(callBody.strategy).toBe('ncts')  // bot_id maps to strategy
+        expect(callBody.strategy).toBe('mcts')  // bot_id maps to strategy
     })
 
     it('derives board_size from position.size when board_size param is not provided', async () => {
@@ -758,14 +757,14 @@ describe('GET /games/options', () => {
         const names = res.body.strategies.map(s => s.name)
         expect(names).toContain('Random')
         expect(names).toContain('Defensive')
-        expect(names).toContain('NCTS')
+        expect(names).toContain('MCTS')
 
         const random = res.body.strategies.find(s => s.name === 'Random')
         const defensive = res.body.strategies.find(s => s.name === 'Defensive')
-        const ncts = res.body.strategies.find(s => s.name === 'NCTS')
+        const mcts = res.body.strategies.find(s => s.name === 'MCTS')
         expect(random.difficulty).toBe('Easy 😄')
         expect(defensive.difficulty).toBe('Medium 😐')
-        expect(ncts.difficulty).toBe('Hard 😈')
+        expect(mcts.difficulty).toBe('Hard 😈')
     })
 
     it('returns variants as objects with name, description and allowed_strategies', async () => {
@@ -940,7 +939,7 @@ describe('PUT /games/:id/finish', () => {
 
         expect(res.status).toBe(200)
 
-        const BOT_DIFFICULTY = { random: 'Easy 😄', defensive: 'Medium 😐', ncts: 'Hard 😈' }
+        const BOT_DIFFICULTY = { random: 'Easy 😄', defensive: 'Medium 😐', mcts: 'Hard 😈' }
 
         for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
             const entry = res.body.statistics.vs_bots.find(b => b.name === name)
@@ -1198,11 +1197,11 @@ describe('MongoUserRepository direct unit tests', () => {
 
     it('updateStats increments draws for a BOT game (covers drawIncr and findByIdAndUpdate)', async () => {
         const user = await User.create({ username: 'DrawStatsUser', password_hash: 'x' })
-        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'ncts' })
+        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'mcts' })
 
         const updated = await repo.findById(user._id)
         expect(updated.statistics.total_draws).toBe(1)
-        expect(updated.statistics.vs_bot.ncts.draws).toBe(1)
+        expect(updated.statistics.vs_bot.mcts.draws).toBe(1)
         // wins and losses stay 0
         expect(updated.statistics.total_wins).toBe(0)
         expect(updated.statistics.total_losses).toBe(0)
@@ -1225,7 +1224,7 @@ describe('MongoUserRepository direct unit tests', () => {
                 vs_bot: {
                     random:    { wins: 50, losses: 0, draws: 0 },
                     defensive: { wins: 50, losses: 0, draws: 0 },
-                    ncts:      { wins: 50, losses: 0, draws: 0 },
+                    mcts:      { wins: 50, losses: 0, draws: 0 },
                 }
             }
         })
@@ -1235,7 +1234,7 @@ describe('MongoUserRepository direct unit tests', () => {
 
         const leaderboard = await repo.getLeaderboard()
 
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts']) {
             const entry = leaderboard.vs_bots[botKey].find(e => e.username === 'NoBotDataUser')
             expect(entry).toBeDefined()           // user appears in results
             expect(entry.wins).toBe(0)            // ?? 0 fallback was hit

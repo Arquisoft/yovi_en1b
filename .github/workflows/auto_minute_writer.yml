@@ -1,0 +1,87 @@
+name: Auto Minute Writer
+
+on:
+  schedule:
+    - cron: '30 11 * * 1'
+  workflow_dispatch:
+    inputs:
+      meeting_number:
+        description: 'Meeting Number (e.g. 11)'
+        required: false
+      date:
+        description: 'Date (e.g. 13 04 2026)'
+        required: false
+      time:
+        description: 'Time (e.g. 12:25-13:00)'
+        required: false
+      writer:
+        description: 'Writer (e.g. [Ahmet Bilal Yazicioglu](https://github.com/bilalyazicioglu))'
+        required: false
+      decisions:
+        description: 'Taken decisions (or None)'
+        required: false
+        default: 'None'
+      priorities:
+        description: 'Priorities'
+        required: false
+        default: 'Finish high priority tasks'
+
+jobs:
+  create-minute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Minute Document
+        run: |
+          mkdir -p wiki
+          
+          if [ -z "${{ github.event.inputs.meeting_number }}" ]; then
+            touch wiki/.keep
+            MEETING_NUMBER=$(($(ls wiki | grep -c "Minute-") + 1))
+            DATE=$(date +"%d %m %Y")
+            TIME="11:30-12:00"
+            WRITER="Auto Minute Writer"
+            DECISIONS="None"
+            PRIORITIES="Finish high priority tasks"
+          else
+            MEETING_NUMBER="${{ github.event.inputs.meeting_number }}"
+            DATE="${{ github.event.inputs.date }}"
+            TIME="${{ github.event.inputs.time }}"
+            WRITER="${{ github.event.inputs.writer }}"
+            DECISIONS="${{ github.event.inputs.decisions }}"
+            PRIORITIES="${{ github.event.inputs.priorities }}"
+          fi
+          
+          FILE_PATH="wiki/Minute-${MEETING_NUMBER} ${DATE}.md"
+          
+          # Use printf to format the markdown document
+          printf "Minute‐${MEETING_NUMBER} ${DATE}               # ${MEETING_NUMBER}th Meeting\n" > "$FILE_PATH"
+          printf "${DATE// //}, ${TIME}, written by ${WRITER}\n\n" >> "$FILE_PATH"
+          
+          printf "## Participants\n" >> "$FILE_PATH"
+          printf "- [ ] [Ahmet Bilal Yazıcıoğlu](https://github.com/bilalyazicioglu)\n" >> "$FILE_PATH"
+          printf "- [ ] [Tobias Navrat](https://github.com/Th0be)\n" >> "$FILE_PATH"
+          printf "- [ ] [Ignacio Hoyos Diego](https://github.com/nacho50900)\n" >> "$FILE_PATH"
+          printf "- [ ] [Alejandro de San Claudio Mesa](https://github.com/UO300896)\n\n" >> "$FILE_PATH"
+          
+          printf "## Taken decisions\n\n" >> "$FILE_PATH"
+          printf "${DECISIONS}\n\n" >> "$FILE_PATH"
+          
+          printf "## Priorities\n\n" >> "$FILE_PATH"
+          printf "${PRIORITIES}\n\n" >> "$FILE_PATH"
+          
+          printf "## New tasks/issues\n" >> "$FILE_PATH"
+          printf "- Add tasks here...\n\n" >> "$FILE_PATH"
+          
+          printf "## Closed Tasks/Issues\n" >> "$FILE_PATH"
+          printf "- Add closed tasks here...\n" >> "$FILE_PATH"
+          
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add wiki/
+          git commit -m "docs: Add minute ${MEETING_NUMBER:-auto}" || echo "No changes to commit"
+          git push

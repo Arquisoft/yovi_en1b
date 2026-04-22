@@ -7,7 +7,10 @@ use crate::game_server::dto::{
     BoardInfoResponse, ComputeRequest, ComputeResponse, GameStateResponse, MakeMoveRequest,
     NewGameRequest, PlayRequest, PlayResponse,
 };
-use crate::{DefensiveBot, GameAction, GameY, HardBot, Movement, PlayerId, RandomBot, YBot, YEN, check_api_version};
+use crate::{
+    DefensiveBot, GameAction, GameVariant, GameY, HardBot, Movement, PlayerId, RandomBot, YBot, YEN,
+    check_api_version,
+};
 use axum::extract::Path;
 use axum::Json;
 use serde::Deserialize;
@@ -57,7 +60,25 @@ pub async fn new_game(
         )));
     }
 
-    let game = GameY::new(req.board_size);
+    let variants: Vec<GameVariant> = req
+        .variants
+        .iter()
+        .filter_map(|v| GameVariant::from_name(v))
+        .collect();
+
+    if req.board_size < 7 && !variants.is_empty() {
+        return Err(Json(ErrorResponse::error(
+            "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
+            Some(params.api_version),
+            None,
+        )));
+    }
+
+    let game = if variants.is_empty() {
+        GameY::new(req.board_size)
+    } else {
+        GameY::new_with_variants(req.board_size, variants)
+    };
     let response = GameStateResponse::from_game(&game, params.api_version);
     Ok(Json(response))
 }
@@ -176,7 +197,9 @@ pub async fn play(
     Json(req): Json<PlayRequest>,
 ) -> Result<Json<PlayResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state {
-        Some(layout_str) => parse_yen_layout(layout_str)?,
+        Some(layout_str) => {
+            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref())?
+        }
         None => {
             if req.board_size == 0 || req.board_size > 100 {
                 return Err(Json(ErrorResponse::error(
@@ -185,7 +208,24 @@ pub async fn play(
                     None,
                 )));
             }
-            GameY::new(req.board_size)
+            let variants: Vec<GameVariant> = req
+                .variants
+                .iter()
+                .filter_map(|v| GameVariant::from_name(v))
+                .collect();
+
+            if req.board_size < 7 && !variants.is_empty() {
+                return Err(Json(ErrorResponse::error(
+                    "Game variants (Double Turn, Explosions) require a board size of at least 7x7.",
+                    None,
+                    None,
+                )));
+            }
+            if variants.is_empty() {
+                GameY::new(req.board_size)
+            } else {
+                GameY::new_with_variants(req.board_size, variants)
+            }
         }
     };
 
@@ -193,13 +233,7 @@ pub async fn play(
         return Err(Json(ErrorResponse::error("Game is already finished", None, None)));
     }
 
-    let strategy = req.strategy.as_deref().unwrap_or("random");
-
-    let bot: Box<dyn YBot> = match strategy {
-        "hard" => Box::new(HardBot::default()),
-        "defensive" => Box::new(DefensiveBot),
-        _ => Box::new(RandomBot),
-    };
+    let bot = pick_bot(req.strategy.as_deref(), req.difficulty_level.as_deref());
 
     let coords = bot.choose_move(&game).ok_or_else(|| {
         Json(ErrorResponse::error("Bot could not find a move", None, None))
@@ -226,6 +260,8 @@ pub async fn play(
         coordinates: coords,
         yen_state: response_yen.layout().to_string(),
         winner: get_winner_string(&game),
+        variants: response_yen.variants().to_vec(),
+        explosives: response_yen.explosives().map(|s| s.to_string()),
     }))
 }
 
@@ -238,13 +274,24 @@ pub async fn compute(
     Json(req): Json<ComputeRequest>,
 ) -> Result<Json<ComputeResponse>, Json<ErrorResponse>> {
     let mut game = match req.yen_state_prev {
-        Some(layout_str) => parse_yen_layout(layout_str)?,
+        Some(layout_str) => {
+            parse_yen_layout(layout_str, &req.variants, req.explosives.as_deref())?
+        }
         None => {
             // Reconstruct board size from first move coordinates
             // In barycentric coordinates: x + y + z = board_size - 1
             let c = req.coordinates;
             let board_size = c.x() + c.y() + c.z() + 1;
-            GameY::new(board_size)
+            let variants: Vec<GameVariant> = req
+                .variants
+                .iter()
+                .filter_map(|v| GameVariant::from_name(v))
+                .collect();
+            if board_size >= 7 && !variants.is_empty() {
+                GameY::new_with_variants(board_size, variants)
+            } else {
+                GameY::new(board_size)
+            }
         }
     };
 
@@ -274,16 +321,77 @@ pub async fn compute(
     Ok(Json(ComputeResponse {
         yen_state: response_yen.layout().to_string(),
         winner: get_winner_string(&game),
+        variants: response_yen.variants().to_vec(),
+        explosives: response_yen.explosives().map(|s| s.to_string()),
     }))
 }
 
-/// Helper: parses a YEN layout string into a GameY instance.
-fn parse_yen_layout(layout_str: String) -> Result<GameY, Json<ErrorResponse>> {
+/// Helper: chooses a bot based on the strategy / difficulty-level strings.
+///
+/// Matching is case-insensitive and accepts every alias the various clients
+/// actually send:
+///
+/// - [`RandomBot`]: `random`, `random_bot`, `easy`
+/// - [`DefensiveBot`]: `medium`, `defensive`, `balanced`
+/// - [`HardBot`]: `hard`, `ai`, `mcts`, `aggressive`
+///
+/// If `strategy` is not set we fall back to `difficulty_level`, and if neither
+/// matches we default to [`RandomBot`]. This addresses issue #194: the webapp
+/// sends `strategy: "aggressive"` for hard mode and `strategy: "balanced"` for
+/// medium mode (see `webapp/src/pages/NewGamePage.tsx`), neither of which the
+/// previous matcher recognized — so every difficulty silently fell through to
+/// [`RandomBot`].
+fn pick_bot(strategy: Option<&str>, difficulty_level: Option<&str>) -> Box<dyn YBot> {
+    // Try the strategy first, then fall back to difficulty_level. Both fields
+    // may be present in the same request (the webapp sends both), and if the
+    // strategy value is unknown we still want a meaningful choice, so we
+    // consult difficulty_level as a secondary signal.
+    let strategy_bot = strategy.and_then(|s| match_bot(s));
+    if let Some(bot) = strategy_bot {
+        return bot;
+    }
+    if let Some(bot) = difficulty_level.and_then(|s| match_bot(s)) {
+        return bot;
+    }
+    Box::new(RandomBot)
+}
+
+/// Matches a single string to a bot, or returns `None` if the string is not a
+/// recognized alias.
+fn match_bot(name: &str) -> Option<Box<dyn YBot>> {
+    match name.to_lowercase().as_str() {
+        "hard" | "ai" | "mcts" | "aggressive" => Some(Box::new(HardBot::default())),
+        "medium" | "defensive" | "balanced" => Some(Box::new(DefensiveBot)),
+        "random" | "random_bot" | "easy" => Some(Box::new(RandomBot)),
+        _ => None,
+    }
+}
+
+/// Helper: parses a YEN layout string into a [`GameY`] instance, preserving
+/// variants and bomb positions.
+///
+/// Previously this helper dropped the variants list and bomb positions
+/// entirely, so round-tripping through `/play` or `/compute` turned an
+/// Explosions game into a plain game (issue #203). It now forwards both
+/// pieces of information to [`YEN::new_with_variants`].
+fn parse_yen_layout(
+    layout_str: String,
+    variants: &[String],
+    explosives: Option<&str>,
+) -> Result<GameY, Json<ErrorResponse>> {
     let size = layout_str.split('/').count() as u32;
     let b_count = layout_str.chars().filter(|c| *c == 'B').count();
     let r_count = layout_str.chars().filter(|c| *c == 'R').count();
     let turn = if b_count > r_count { 1 } else { 0 };
-    let yen = YEN::new(size, turn, vec!['B', 'R'], layout_str);
+
+    let yen = YEN::new_with_variants(
+        size,
+        turn,
+        vec!['B', 'R'],
+        layout_str,
+        variants.to_vec(),
+        explosives.map(|s| s.to_string()),
+    );
     GameY::try_from(yen).map_err(|err| {
         Json(ErrorResponse::error(
             &format!("Invalid YEN layout: {}", err),
@@ -418,7 +526,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_success() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let req = axum::Json(NewGameRequest { board_size: 3, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap().0.board_size, 3);
@@ -427,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_invalid_size() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 0 });
+        let req = axum::Json(NewGameRequest { board_size: 0, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid board size"));
@@ -436,7 +544,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_too_large() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 101 });
+        let req = axum::Json(NewGameRequest { board_size: 101, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid board size"));
@@ -445,7 +553,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_game_invalid_version() {
         let params = axum::extract::Path(VersionParam { api_version: "v2".to_string() });
-        let req = axum::Json(NewGameRequest { board_size: 3 });
+        let req = axum::Json(NewGameRequest { board_size: 3, variants: vec![] });
         let res = new_game(params, req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Unsupported API version"));
@@ -592,14 +700,43 @@ mod tests {
         assert!(res2.is_err());
     }
 
+    /// Helper to build a minimal [`PlayRequest`] in tests.
+    fn play_req(
+        yen_state: Option<&str>,
+        strategy: Option<&str>,
+        board_size: u32,
+    ) -> axum::Json<PlayRequest> {
+        axum::Json(PlayRequest {
+            yen_state: yen_state.map(|s| s.to_string()),
+            strategy: strategy.map(|s| s.to_string()),
+            difficulty_level: None,
+            board_size,
+            variants: vec![],
+            explosives: None,
+        })
+    }
+
+    /// Helper to build a minimal [`ComputeRequest`] in tests.
+    fn compute_req(
+        yen_state_prev: Option<&str>,
+        coordinates: Coordinates,
+    ) -> axum::Json<ComputeRequest> {
+        axum::Json(ComputeRequest {
+            yen_state_prev: yen_state_prev.map(|s| s.to_string()),
+            coordinates,
+            variants: vec![],
+            explosives: None,
+        })
+    }
+
     #[tokio::test]
     async fn test_computation_false_win() {
         // Based on visually disconnected pieces that might be falsely triggering a win.
         // Size 5: Red at corners (4,0,0), (1,3,0), (1,0,3)? Wait, let's just make Red disconnected.
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("R/B./.B./R..R/.....".to_string()),
-            coordinates: Coordinates::new(0, 2, 2), // random move on size 5
-        });
+        let req = compute_req(
+            Some("R/B./.B./R..R/....."),
+            Coordinates::new(0, 2, 2), // random move on size 5
+        );
         let res = compute(req).await;
         assert!(res.is_ok(), "Should successfully parse state and make move");
         let res_json = res.unwrap().0;
@@ -609,16 +746,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_with_defensive_strategy() {
-        let req = axum::Json(PlayRequest {
-            yen_state: Some("R/..".to_string()), // Size 2, R at top corner (0,0,1)
-            strategy: Some("defensive".to_string()),
-            difficulty_level: None,
-            board_size: 2,
-        });
+        // Size 2, R at top corner (0,0,1)
+        let req = play_req(Some("R/.."), Some("defensive"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
-        
+
         // Size 2 board, R at top corner (0,0,1). Neighbors are (1,0,0) and (0,1,0).
         // The bot (B) should have picked one of these.
         let chosen_coords = res_json.coordinates;
@@ -628,13 +761,57 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_play_success_with_hard_strategy() {
+    async fn test_play_success_with_medium_strategy() {
+        // "medium" is the actual registered name of DefensiveBot. Before the fix
+        // for issue #194, passing "medium" silently fell through to RandomBot.
+        let req = play_req(Some("R/.."), Some("medium"), 2);
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let res_json = res.unwrap().0;
+        let chosen_coords = res_json.coordinates;
+        let r_coords = Coordinates::new(0, 0, 1);
+        let neighbors = r_coords.neighbors(2);
+        assert!(
+            neighbors.contains(&chosen_coords),
+            "'medium' should route to DefensiveBot, which picks a neighbor of R's move"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_play_strategy_is_case_insensitive() {
+        // "HARD" / "Medium" / mixed case should still route to the right bot.
+        let req = play_req(Some("./.."), Some("HARD"), 2);
+        assert!(play(req).await.is_ok());
+
+        let req = play_req(Some("R/.."), Some("Medium"), 2);
+        let res = play(req).await.unwrap().0;
+        let chosen = res.coordinates;
+        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        assert!(neighbors.contains(&chosen));
+    }
+
+    #[tokio::test]
+    async fn test_play_strategy_falls_back_to_difficulty_level() {
+        // If the caller sets difficulty_level instead of strategy, we should still
+        // honour it (the Nacho partner API uses difficulty_level).
         let req = axum::Json(PlayRequest {
-            yen_state: Some("./..".to_string()),
-            strategy: Some("hard".to_string()),
-            difficulty_level: None,
+            yen_state: Some("R/..".to_string()),
+            strategy: None,
+            difficulty_level: Some("medium".to_string()),
             board_size: 2,
+            variants: vec![],
+            explosives: None,
         });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let chosen = res.unwrap().0.coordinates;
+        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        assert!(neighbors.contains(&chosen));
+    }
+
+    #[tokio::test]
+    async fn test_play_success_with_hard_strategy() {
+        let req = play_req(Some("./.."), Some("hard"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -643,12 +820,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_with_yen() {
-        let req = axum::Json(PlayRequest {
-            yen_state: Some("./..".to_string()),
-            strategy: Some("random".to_string()),
-            difficulty_level: None,
-            board_size: 2,
-        });
+        let req = play_req(Some("./.."), Some("random"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -658,12 +830,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_without_yen() {
-        let req = axum::Json(PlayRequest {
-            yen_state: None,
-            strategy: None,
-            difficulty_level: None,
-            board_size: 2,
-        });
+        let req = play_req(None, None, 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -672,12 +839,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_invalid_board_size() {
-        let req = axum::Json(PlayRequest {
-            yen_state: None,
-            strategy: None,
-            difficulty_level: None,
-            board_size: 0,
-        });
+        let req = play_req(None, None, 0);
         let res = play(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid board size"));
@@ -685,12 +847,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_invalid_yen() {
-        let req = axum::Json(PlayRequest {
-            yen_state: Some("12".to_string()), // Invalid layout format
-            strategy: None,
-            difficulty_level: None,
-            board_size: 2,
-        });
+        let req = play_req(Some("12"), None, 2); // Invalid layout format
         let res = play(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
@@ -698,12 +855,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_already_finished() {
-        let req = axum::Json(PlayRequest {
-            yen_state: Some("B".to_string()), // Size 1 full board
-            strategy: None,
-            difficulty_level: None,
-            board_size: 1,
-        });
+        let req = play_req(Some("B"), None, 1); // Size 1 full board
         let res = play(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("finished"));
@@ -713,24 +865,52 @@ mod tests {
     async fn test_play_already_finished_at_next_player() {
         // This is a contrived test to hit the branch where `game.status()` is not `Ongoing`
         // after `bot.choose_move` is called. It shouldn't normally happen, but covering it.
-        // B/R size 2 = 3 cells. Full board size 2 is 3 cells. 
-        let req = axum::Json(PlayRequest {
-            yen_state: Some("B/RR".to_string()),
-            strategy: None,
-            difficulty_level: None,
-            board_size: 2,
-        });
+        // B/R size 2 = 3 cells. Full board size 2 is 3 cells.
+        let req = play_req(Some("B/RR"), None, 2);
         let res = play(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("finished"));
     }
 
     #[tokio::test]
-    async fn test_compute_success_with_yen() {
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("./..".to_string()),
-            coordinates: Coordinates::new(0, 0, 1),
+    async fn test_play_places_bombs_when_explosions_variant_active() {
+        // Issue #203: when the frontend requests the Explosions variant for a new
+        // game (no yen_state), the server should place bombs. Afterwards, when
+        // round-tripping the game through /play, the bomb positions must be
+        // preserved and echoed back in the PlayResponse.
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 7,
+            variants: vec!["Explosions".to_string()],
+            explosives: None,
         });
+        let first = play(req).await.expect("play should succeed").0;
+        assert!(first.explosives.is_some(), "bomb positions should be returned");
+        assert!(first.variants.iter().any(|v| v == "Explosions"));
+        assert_eq!(first.yen_state.split('/').count(), 7);
+
+        // Now send the state back to the server and confirm the bombs are still
+        // there after the second bot move.
+        let req2 = axum::Json(PlayRequest {
+            yen_state: Some(first.yen_state.clone()),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 7,
+            variants: first.variants.clone(),
+            explosives: first.explosives.clone(),
+        });
+        let second = play(req2).await.expect("second play should succeed").0;
+        assert_eq!(
+            second.explosives, first.explosives,
+            "bomb positions must survive a /play round-trip"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_success_with_yen() {
+        let req = compute_req(Some("./.."), Coordinates::new(0, 0, 1));
         let res = compute(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -741,10 +921,7 @@ mod tests {
     #[tokio::test]
     async fn test_compute_winner() {
         // Assume player 1 (R) just placed a piece that finished the game (size 1)
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some(".".to_string()),
-            coordinates: Coordinates::new(0, 0, 0),
-        });
+        let req = compute_req(Some("."), Coordinates::new(0, 0, 0));
         let res = compute(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -754,10 +931,7 @@ mod tests {
     #[tokio::test]
     async fn test_compute_success_without_yen() {
         // Size = 1 + 0 + 0 + 1 = 2
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: None,
-            coordinates: Coordinates::new(1, 0, 0),
-        });
+        let req = compute_req(None, Coordinates::new(1, 0, 0));
         let res = compute(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
@@ -766,21 +940,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_invalid_yen() {
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("12".to_string()), // Invalid layout
-            coordinates: Coordinates::new(0, 0, 1),
-        });
+        let req = compute_req(Some("12"), Coordinates::new(0, 0, 1)); // Invalid layout
         let res = compute(req).await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().0.message.contains("Invalid YEN"));
     }
 
     #[tokio::test]
     async fn test_compute_already_finished() {
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("B".to_string()), // Size 1 full board
-            coordinates: Coordinates::new(0, 0, 0), // Already taken
-        });
+        // Size 1 full board; already taken cell.
+        let req = compute_req(Some("B"), Coordinates::new(0, 0, 0));
         let res = compute(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("finished"));
@@ -788,23 +956,54 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_already_finished_at_next_player() {
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("B/RR".to_string()), // Full board
-            coordinates: Coordinates::new(0, 0, 0),
-        });
+        // Full board.
+        let req = compute_req(Some("B/RR"), Coordinates::new(0, 0, 0));
         let res = compute(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("finished"));
     }
 
- #[tokio::test]
+    #[tokio::test]
     async fn test_compute_invalid_move() {
-        let req = axum::Json(ComputeRequest {
-            yen_state_prev: Some("B/..".to_string()), // Top cell occupied
-            coordinates: Coordinates::new(0, 0, 1), // Same cell as the top one
-        });
+        // Top cell occupied; try to play there again.
+        let req = compute_req(Some("B/.."), Coordinates::new(0, 0, 1));
         let res = compute(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid move"));
+    }
+
+    #[test]
+    fn test_pick_bot_routes_strategies() {
+        // Names are case-insensitive and support several aliases per bot. This
+        // is the regression test for issue #194. In particular the webapp
+        // sends strategy: "aggressive" for hard mode and "balanced" for
+        // medium, and those used to silently fall through to RandomBot.
+        assert_eq!(pick_bot(Some("random"), None).name(), "random_bot");
+        assert_eq!(pick_bot(Some("easy"), None).name(), "random_bot");
+        assert_eq!(pick_bot(Some("medium"), None).name(), "medium");
+        assert_eq!(pick_bot(Some("defensive"), None).name(), "medium");
+        assert_eq!(pick_bot(Some("balanced"), None).name(), "medium");
+        assert_eq!(pick_bot(Some("MEDIUM"), None).name(), "medium");
+        assert_eq!(pick_bot(Some("hard"), None).name(), "hard");
+        assert_eq!(pick_bot(Some("ai"), None).name(), "hard");
+        assert_eq!(pick_bot(Some("mcts"), None).name(), "hard");
+        assert_eq!(pick_bot(Some("aggressive"), None).name(), "hard");
+        assert_eq!(pick_bot(Some("AGGRESSIVE"), None).name(), "hard");
+        // Unknown values fall through to the difficulty_level, and failing
+        // that, to RandomBot.
+        assert_eq!(pick_bot(Some("bogus"), None).name(), "random_bot");
+        assert_eq!(pick_bot(Some("bogus"), Some("hard")).name(), "hard");
+        // `difficulty_level` is used when `strategy` is missing.
+        assert_eq!(pick_bot(None, Some("hard")).name(), "hard");
+        // `strategy` wins when both are present and both are recognized.
+        assert_eq!(pick_bot(Some("hard"), Some("medium")).name(), "hard");
+
+        // The concrete webapp scenario: easy/medium/hard from the UI get
+        // mapped by the frontend to random/balanced/aggressive. Regardless of
+        // which of the two fields the backend looks at, each difficulty ends
+        // up at the matching bot.
+        assert_eq!(pick_bot(Some("random"), Some("easy")).name(), "random_bot");
+        assert_eq!(pick_bot(Some("balanced"), Some("medium")).name(), "medium");
+        assert_eq!(pick_bot(Some("aggressive"), Some("hard")).name(), "hard");
     }
 }

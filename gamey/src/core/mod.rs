@@ -19,6 +19,7 @@ pub mod movement;
 pub mod player;
 mod player_set;
 pub mod render_options;
+pub mod variant;
 
 pub use action::*;
 pub use board::*;
@@ -27,5 +28,6 @@ pub use game::*;
 pub use movement::*;
 pub use player::*;
 pub use render_options::*;
+pub use variant::*;
 
 type SetIdx = usize;
