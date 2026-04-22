@@ -34,6 +34,10 @@ const REQUEST_TIMEOUT_SECS: u64 = 20;
 /// `GEMINI_API_KEY` and stored in memory for the lifetime of the bot.
 pub struct GenerativeAIBot {
     api_key: String,
+    /// The Gemini endpoint URL. Normally `GEMINI_API_URL`; overridable in tests
+    /// so unit tests can point to a local address that fails immediately without
+    /// any real network dependency or 20-second timeout.
+    api_url: String,
 }
 
 impl GenerativeAIBot {
@@ -45,7 +49,23 @@ impl GenerativeAIBot {
         std::env::var("GEMINI_API_KEY")
             .ok()
             .filter(|k| !k.trim().is_empty())
-            .map(|api_key| Self { api_key })
+            .map(|api_key| Self {
+                api_key,
+                api_url: GEMINI_API_URL.to_string(),
+            })
+    }
+
+    /// Test-only constructor that injects a custom API URL.
+    ///
+    /// Point `api_url` to a port that immediately refuses connections
+    /// (e.g. `"http://127.0.0.1:1"`) to exercise the full error-handling
+    /// code path without any network dependency or timeout wait.
+    #[cfg(test)]
+    fn with_url_override(api_key: impl Into<String>, api_url: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+            api_url: api_url.into(),
+        }
     }
 }
 
@@ -61,7 +81,7 @@ impl YBot for GenerativeAIBot {
 
         let prompt = build_prompt(game);
 
-        match call_gemini_via_thread(&self.api_key, &prompt) {
+        match call_gemini_via_thread(&self.api_key, &prompt, &self.api_url) {
             Ok(text) => {
                 tracing::debug!("Gemini raw response: {text}");
                 parse_coords(&text, game).or_else(|| {
@@ -269,15 +289,16 @@ No words, no explanation, no punctuation before or after. Just coordinates."#,
 
 /// Sends `prompt` to the Gemini API from a dedicated OS thread (safe to call
 /// from within a Tokio async context) and returns the model's text reply.
-fn call_gemini_via_thread(api_key: &str, prompt: &str) -> Result<String, String> {
+fn call_gemini_via_thread(api_key: &str, prompt: &str, api_url: &str) -> Result<String, String> {
     let api_key = api_key.to_string();
     let prompt = prompt.to_string();
+    let api_url = api_url.to_string();
 
     // Channel: capacity 1 so the spawned thread never blocks on send.
     let (tx, rx) = mpsc::sync_channel::<Result<String, String>>(1);
 
     std::thread::spawn(move || {
-        let result = do_http_request(&api_key, &prompt);
+        let result = do_http_request(&api_key, &prompt, &api_url);
         // Ignore send error — receiver may have timed out already.
         let _ = tx.send(result);
     });
@@ -290,8 +311,8 @@ fn call_gemini_via_thread(api_key: &str, prompt: &str) -> Result<String, String>
 
 /// Performs the actual blocking HTTP POST to the Gemini endpoint.
 /// Must be called from a plain OS thread, not from within a Tokio runtime.
-fn do_http_request(api_key: &str, prompt: &str) -> Result<String, String> {
-    let url = format!("{}?key={}", GEMINI_API_URL, api_key);
+fn do_http_request(api_key: &str, prompt: &str, api_url: &str) -> Result<String, String> {
+    let url = format!("{}?key={}", api_url, api_key);
 
     let body = serde_json::json!({
         "contents": [{
@@ -569,9 +590,6 @@ mod tests {
         unsafe { std::env::remove_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ") };
         // from_env must return None when the variable doesn't exist.
         assert!(std::env::var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ").is_err());
-        // Construct directly with an empty key to test the filter logic.
-        let bot_empty = GenerativeAIBot { api_key: String::new() };
-        // An empty key would fail the API call, but from_env filters it out.
         // Verify from_env itself returns None for an empty-string variable.
         unsafe { std::env::set_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ", "") };
         // from_env filters out blank keys with .filter(|k| !k.trim().is_empty())
@@ -580,15 +598,103 @@ mod tests {
             .ok()
             .filter(|k| !k.trim().is_empty());
         assert!(result.is_none(), "empty key must be filtered out");
-        drop(bot_empty); // suppress unused warning
         unsafe { std::env::remove_var("GEMINI_API_KEY_DEFINITELY_NOT_SET_XYZ") };
     }
 
     #[test]
     fn test_bot_name() {
-        // Construct directly for the name check without needing a real key.
-        let bot = GenerativeAIBot { api_key: "test".to_string() };
+        let bot = GenerativeAIBot::with_url_override("test_key", "http://127.0.0.1:1");
         assert_eq!(bot.name(), "gemini");
+    }
+
+    /// Covers the early-return branch: `available_cells().is_empty() → None`.
+    ///
+    /// A size-1 board filled with one piece has no remaining cells.
+    #[test]
+    fn test_choose_move_returns_none_when_no_cells_available() {
+        use crate::{Movement, PlayerId};
+        let mut game = GameY::new(1);
+        // Placing on the only cell finishes the game and empties available_cells.
+        let _ = game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 0),
+        });
+        assert!(
+            game.available_cells().is_empty(),
+            "test setup: size-1 board must have no available cells after filling"
+        );
+        let bot = GenerativeAIBot::with_url_override("any_key", "http://127.0.0.1:1");
+        assert!(
+            bot.choose_move(&game).is_none(),
+            "choose_move must return None when no cells are available"
+        );
+    }
+
+    /// Covers the full API call path via an injected URL that immediately
+    /// refuses the connection (port 1 on localhost).
+    ///
+    /// Code path exercised:
+    ///   choose_move → build_prompt → call_gemini_via_thread
+    ///     → do_http_request → connection refused → Err(...)
+    ///   → choose_move Err branch → random_fallback → Some(legal_move)
+    #[test]
+    fn test_choose_move_falls_back_to_random_on_connection_error() {
+        // Port 1 on localhost is reserved and has no service; the OS
+        // returns "connection refused" in milliseconds — no timeout wait.
+        let bot = GenerativeAIBot::with_url_override("any_key", "http://127.0.0.1:1");
+        let game = GameY::new(3);
+        let chosen = bot.choose_move(&game);
+        assert!(
+            chosen.is_some(),
+            "choose_move must return a legal random move when the API call fails"
+        );
+        let idx = chosen.unwrap().to_index(3);
+        assert!(
+            game.available_cells().contains(&idx),
+            "fallback move must be a legal cell"
+        );
+    }
+
+    /// Covers the `Ok(text)` branch where the API succeeds but Gemini returns
+    /// text that cannot be parsed as valid coordinates → fallback to random.
+    ///
+    /// Achieved by pointing the bot at a URL that returns HTTP 200 with
+    /// a JSON body whose structure matches Gemini's format but whose text
+    /// field contains garbage coordinates.
+    ///
+    /// Since we cannot stand up a local HTTP server in a unit test without
+    /// extra dependencies, we exercise this path indirectly: we call
+    /// `parse_coords` with garbage text directly and verify it returns None,
+    /// then confirm `random_fallback` produces a legal move — together they
+    /// prove the fallback chain is correct.
+    #[test]
+    fn test_parse_coords_garbage_triggers_fallback_chain() {
+        let game = GameY::new(4);
+        // parse_coords with rubbish → None
+        assert!(parse_coords("I have no idea", &game).is_none());
+        // random_fallback always produces a legal move on a non-full board
+        let fallback = random_fallback(&game);
+        assert!(fallback.is_some());
+        assert!(game.available_cells().contains(&fallback.unwrap().to_index(4)));
+    }
+
+    /// Covers `call_gemini_via_thread` and `do_http_request` directly
+    /// (private fns, tested here from within the same module).
+    #[test]
+    fn test_call_gemini_via_thread_connection_refused() {
+        // Pointing at port 1 gives an immediate connection-refused error.
+        let result = call_gemini_via_thread("key", "prompt", "http://127.0.0.1:1");
+        assert!(
+            result.is_err(),
+            "call_gemini_via_thread must propagate the connection error"
+        );
+        let msg = result.unwrap_err();
+        // The error originates either from reqwest ("HTTP request failed")
+        // or from the channel timeout ("did not respond").
+        assert!(
+            msg.contains("HTTP request failed") || msg.contains("did not respond"),
+            "unexpected error message: {msg}"
+        );
     }
 
     #[test]

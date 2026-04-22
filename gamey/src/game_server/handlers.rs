@@ -1181,4 +1181,55 @@ mod tests {
         assert_eq!(pick_bot(Some("generative_ai"), None).name(), "gemini");
         unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
+
+    /// Covers the `t0|` prefix branch in `parse_yen_layout`.
+    ///
+    /// "B/R." — size-2 board: B at top, R at middle-left, empty middle-right.
+    /// Heuristic: b_count(1) == r_count(1) → turn 0 (Blue). The `t0|` prefix
+    /// produces the same answer, but exercises the prefix-stripping code path.
+    #[tokio::test]
+    async fn test_parse_yen_layout_t0_prefix_routes_blue_turn() {
+        let req = axum::Json(PlayRequest {
+            yen_state: Some("t0|B/R.".to_string()),
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 2,
+            variants: vec![],
+            explosives: None,
+            turn: None,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok(), "play with t0| prefix must succeed");
+        let resp = res.unwrap().0;
+        // Bot moved as Blue (B count grew) or Blue won.
+        let b_count_after = resp.yen_state.chars().filter(|c| *c == 'B').count();
+        let b_won = resp.winner == Some("B".to_string());
+        assert!(
+            b_count_after > 1 || b_won,
+            "with t0| prefix (Blue's turn), bot must play as Blue; yen_state={}",
+            resp.yen_state
+        );
+    }
+
+    /// Covers the `generativeai` alias (not yet asserted in the strategy test).
+    #[test]
+    fn test_pick_bot_generativeai_alias_recognized() {
+        // "generativeai" must route to the gemini bot (when key is set) or
+        // fall back to random_bot (when key is absent). It must never panic or
+        // route to a completely unrelated bot.
+        let bot_no_key = {
+            unsafe { std::env::remove_var("GEMINI_API_KEY") };
+            pick_bot(Some("generativeai"), None)
+        };
+        assert!(
+            bot_no_key.name() == "gemini" || bot_no_key.name() == "random_bot",
+            "generativeai without key must be gemini or random_bot, got {}",
+            bot_no_key.name()
+        );
+
+        unsafe { std::env::set_var("GEMINI_API_KEY", "mock") };
+        let bot_with_key = pick_bot(Some("generativeai"), None);
+        assert_eq!(bot_with_key.name(), "gemini");
+        unsafe { std::env::remove_var("GEMINI_API_KEY") };
+    }
 }
