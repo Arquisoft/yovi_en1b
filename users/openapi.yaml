@@ -103,7 +103,7 @@ components:
           example:
             - { name: "random",    difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
             - { name: "defensive", difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
-            - { name: "mcts",      difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
+            - { name: "Monte Carlo",      difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
             - { name: "ai",        difficulty: "Medium 🤖", wins: 1, losses: 1, draws: 0 }
 
     StrategyOption:
@@ -133,7 +133,7 @@ components:
           example:
             - { name: "Random",       difficulty: "Easy 😄"   }
             - { name: "Defensive",    difficulty: "Medium 😐" }
-            - { name: "MCTS",         difficulty: "Hard 😈"   }
+            - { name: "Monte Carlo",         difficulty: "Hard 😈"   }
             - { name: "Generative AI", difficulty: "Medium 🤖" }
         variants:
           type: array
@@ -463,7 +463,7 @@ paths:
       description: >
         Open source endpoint for external users. Send a board position and optional bot_id
         to get the bot's next move. No authentication or internal game id needed.
-        Defaults to the hardest bot (mcts) if bot_id is not provided.
+        Defaults to the hardest bot (Monte Carlo) if bot_id is not provided.
         board_size defaults to position.size if present, otherwise 5.
       parameters:
         - name: position

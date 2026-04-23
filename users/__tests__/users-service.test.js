@@ -169,7 +169,7 @@ describe('GET /leaderboard', () => {
         }
     })
 
-    it('vs_bots has random, defensive, mcts and ai arrays', async () => {
+    it('vs_bots has random, defensive, Monte Carlo and ai arrays', async () => {
         const res = await request(app).get('/leaderboard')
 
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
@@ -759,13 +759,13 @@ describe('GET /games/options', () => {
         const names = res.body.strategies.map(s => s.name)
         expect(names).toContain('Random')
         expect(names).toContain('Defensive')
-        expect(names).toContain('MCTS')
-        expect(names).toContain('Generative AI')
+        expect(names).toContain('Monte Carlo')
+        expect(names).toContain('AI (Gemini)')
 
         const random = res.body.strategies.find(s => s.name === 'Random')
         const defensive = res.body.strategies.find(s => s.name === 'Defensive')
-        const mcts = res.body.strategies.find(s => s.name === 'MCTS')
-        const ai = res.body.strategies.find(s => s.name === 'Generative AI')
+        const mcts = res.body.strategies.find(s => s.name === 'Monte Carlo')
+        const ai = res.body.strategies.find(s => s.name === 'AI (Gemini)')
         expect(random.difficulty).toBe('Easy 😄')
         expect(defensive.difficulty).toBe('Medium 😐')
         expect(mcts.difficulty).toBe('Hard 😈')
@@ -930,7 +930,7 @@ describe('PUT /games/:id/finish', () => {
 
         // vs_bots is now a normalized array under statistics
         expect(Array.isArray(statistics.vs_bots)).toBe(true)
-        const random = statistics.vs_bots.find(b => b.name === 'random')
+        const random = statistics.vs_bots.find(b => b.name === 'Random')
         expect(random).toBeDefined()
         expect(random.difficulty).toBe('Easy 😄')
         expect(random.wins).toBeGreaterThanOrEqual(1)
@@ -951,13 +951,27 @@ describe('PUT /games/:id/finish', () => {
             ai:        'Medium 🤖'
         }
 
-        for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
-            const entry = res.body.statistics.vs_bots.find(b => b.name === name)
-            expect(entry).toBeDefined()
-            expect(entry.difficulty).toBe(difficulty)
-            expect(typeof entry.wins).toBe('number')
-            expect(typeof entry.losses).toBe('number')
-            expect(typeof entry.draws).toBe('number')
+        // Cambiado a STRATEGY_DISPLAY_NAMES para que coincida con el bucle de abajo
+        // Y corregido "AI" en mayúsculas
+        const STRATEGY_DISPLAY_NAMES = {
+            random:        'Random',
+            defensive:     'Defensive',
+            mcts:          'Monte Carlo',
+            ai:            'AI (Gemini)'
+        };
+
+        // Ahora STRATEGY_DISPLAY_NAMES ya existe
+        for (const strategyKey of Object.keys(STRATEGY_DISPLAY_NAMES)) {
+            const name = STRATEGY_DISPLAY_NAMES[strategyKey];
+            const difficulty = BOT_DIFFICULTY[strategyKey];
+
+            const entry = res.body.statistics.vs_bots.find(b => b.name === name);
+
+            expect(entry).toBeDefined();
+            expect(entry.difficulty).toBe(difficulty);
+            expect(typeof entry.wins).toBe('number');
+            expect(typeof entry.losses).toBe('number');
+            expect(typeof entry.draws).toBe('number');
         }
     })
 
@@ -1252,4 +1266,56 @@ describe('MongoUserRepository direct unit tests', () => {
             expect(typeof entry.wins).toBe('number')
         }
     })
+
+    describe('Strategy and Result Coverage (API Level)', () => {
+
+        it('covers result: LOSS and strategy: undefined (defaults to random)', async () => {
+            // Creamos una partida rápida para poder terminarla
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: undefined, game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            const localGameId = gameRes.body._id;
+
+            // Terminamos la partida como LOSS
+            // Esto pasará por: result === 'LOSS' ? 1 : 0
+            // Y por: strategy || 'random'
+            await request(app)
+                .put(`/games/${localGameId}/finish`)
+                .send({ result: 'LOSS', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            const res = await request(app)
+                .get(`/users/${userId}`)
+                .set('Authorization', `Bearer ${token}`);
+
+            const random = res.body.statistics.vs_bots.find(b => b.name === 'Random');
+            expect(random.losses).toBeGreaterThanOrEqual(1);
+        });
+
+        it('covers result: DRAW and strategy case-insensitivity', async () => {
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'MONTE CARLO', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            const localGameId = gameRes.body._id;
+
+            // Terminamos como DRAW
+            // Esto pasará por: result === 'DRAW' ? 1 : 0
+            // Y por: strategy?.toLowerCase() -> 'monte carlo' -> mapeo a 'mcts'
+            await request(app)
+                .put(`/games/${localGameId}/finish`)
+                .send({ result: 'DRAW', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            const res = await request(app)
+                .get(`/users/${userId}`)
+                .set('Authorization', `Bearer ${token}`);
+
+            const mcts = res.body.statistics.vs_bots.find(b => b.name === 'Monte Carlo');
+            expect(mcts.draws).toBeGreaterThanOrEqual(1);
+        });
+    });
 })

@@ -6,10 +6,18 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 
 // Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
-    random:        'easy',
-    defensive:     'medium',
-    mcts:          'hard',
-    ai:            'generative_ai'
+    random:        'Easy 😄',
+    defensive:     'Medium 😐',
+    mcts:          'Hard 😈',
+    ai:            'Medium 🤖'
+};
+
+// Strategy -> name mapping
+const STRATEGY_NAME = {
+    random:        'Random',
+    defensive:     'Defensive',
+    mcts:          'Monte Carlo',
+    ai:            'AI (Gemini)'
 };
 
 // Valid variants and their constraints
@@ -91,10 +99,10 @@ module.exports = function gameRoutes(repository) {
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
             strategies: [
-                { name: 'Random',         difficulty: 'Easy 😄'    },
-                { name: 'Defensive',      difficulty: 'Medium 😐'  },
-                { name: 'MCTS',           difficulty: 'Hard 😈'    },
-                { name: 'Generative AI',  difficulty: 'Medium 🤖'  }
+                { id: 'random',    name: STRATEGY_NAME.random,    difficulty: 'Easy 😄'    },
+                { id: 'defensive', name: STRATEGY_NAME.defensive, difficulty: 'Medium 😐'  },
+                { id: 'mcts',      name: STRATEGY_NAME.mcts,      difficulty: 'Hard 😈'    },
+                { id: 'ai',        name: STRATEGY_NAME.ai,        difficulty: 'Medium 🤖'  }
             ],
             variants: [
                 { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }

@@ -1,16 +1,16 @@
 const express = require('express');
 const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - internal Docker network, http is acceptable
 
+// Strategy -> name mapping
+const STRATEGY_NAME = {
+    random:        'Random',
+    defensive:     'Defensive',
+    mcts:          'Monte Carlo',
+    ai:            'Ai (Gemini)'
+};
+
 module.exports = function playRoute() {
     const router = express.Router();
-
-    // Maps public bot_id names to the strategy strings Gamey (Rust) understands.
-    const STRATEGY_MAP = {
-        random:        'random',
-        defensive:     'defensive',
-        mcts:          'mcts',
-        ai:            'generative_ai'
-    };
 
     // Public bot play — no auth, no game id needed
     // position = yen_state (full YEN JSON), bot_id = strategy (public API naming)
@@ -26,7 +26,7 @@ module.exports = function playRoute() {
             return res.status(400).json({ error: 'position must be valid JSON in YEN format' });
         }
 
-        const resolvedStrategy = bot_id || 'mcts';
+        const resolvedStrategy = STRATEGY_NAME[bot_id?.toLowerCase()] || (bot_id || 'mcts').toLowerCase();
 
         let gameyResponse;
         try {
@@ -35,7 +35,7 @@ module.exports = function playRoute() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     yen_state:  parsedPosition.layout,
-                    strategy:   STRATEGY_MAP[resolvedStrategy.toLowerCase()] || 'mcts',
+                    strategy:   resolvedStrategy.toLowerCase() || 'Monte Carlo',
                     board_size: board_size !== undefined ? Number(board_size) : (parsedPosition.size ?? 5)
                 })
             });
