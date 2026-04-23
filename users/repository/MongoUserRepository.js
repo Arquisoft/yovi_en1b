@@ -42,22 +42,32 @@ class MongoUserRepository extends UserRepository {
   }
 
   async updateStats(userId, { result, type, strategy }) {
-    const update = { $inc: { 'statistics.total_games': 1 } };
+    // 1. Determine increment values based on the result
+    const increments = {
+      wins:   result === 'WIN'  ? 1 : 0,
+      losses: result === 'LOSS' ? 1 : 0,
+      draws:  result === 'DRAW' ? 1 : 0
+    };
 
-    const winIncr  = result === 'WIN'  ? 1 : 0;
-    const lossIncr = result === 'LOSS' ? 1 : 0;
-    const drawIncr = result === 'DRAW' ? 1 : 0;
+    // 2. Initialize the update object with total game increments
+    const update = {
+      $inc: {
+        'statistics.total_games': 1,
+        'statistics.total_wins':   increments.wins,
+        'statistics.total_losses': increments.losses,
+        'statistics.total_draws':  increments.draws
+      }
+    };
 
-    if (type === 'PLAYER') {
-      update.$inc['statistics.vs_player.wins']   = winIncr;
-      update.$inc['statistics.vs_player.losses'] = lossIncr;
-      update.$inc['statistics.vs_player.draws']  = drawIncr;
-    } else {
-      const stratKey = strategy?.toLowerCase() || 'random';
-      update.$inc[`statistics.vs_bot.${stratKey}.wins`]   = winIncr;
-      update.$inc[`statistics.vs_bot.${stratKey}.losses`] = lossIncr;
-      update.$inc[`statistics.vs_bot.${stratKey}.draws`]  = drawIncr;
-    }
+    // 3. Determine the specific path (vs_player or vs_bot.<strategy>)
+    const categoryPath = type === 'PLAYER'
+        ? 'vs_player'
+        : `vs_bot.${(strategy || 'random').toLowerCase()}`;
+
+    // 4. Apply the same increments to the category-specific path
+    update.$inc[`statistics.${categoryPath}.wins`]   = increments.wins;
+    update.$inc[`statistics.${categoryPath}.losses`] = increments.losses;
+    update.$inc[`statistics.${categoryPath}.draws`]  = increments.draws;
 
     return await User.findByIdAndUpdate(userId, update, { new: true });
   }
