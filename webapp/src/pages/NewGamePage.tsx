@@ -50,11 +50,11 @@ export function NewGamePage() {
   }, []);
 
   const selectedStrategy = useMemo(
-    () => strategies.find((strategy) => strategy.name === selectedStrategyName),
-    [strategies, selectedStrategyName]
+      () => strategies.find((strategy) => strategy.name === selectedStrategyName),
+      [strategies, selectedStrategyName]
   );
 
-  const normalizedStrategyName = selectedStrategyName.toLowerCase();
+  const selectedStrategyId = selectedStrategy?.id;
 
   const visibleVariants = useMemo(() => {
     if (gameType !== 'BOT') {
@@ -66,15 +66,15 @@ export function NewGamePage() {
         return true;
       }
 
-      return variant.allowed_strategies.includes(normalizedStrategyName);
+      return variant.allowed_strategies.includes(selectedStrategyId ?? '');
     });
-  }, [gameType, variants, normalizedStrategyName]);
+  }, [gameType, variants, selectedStrategyId]);
 
   const toggleVariant = (name: string) => {
     setSelectedVariants((current) => (
-      current.includes(name)
-        ? current.filter((variant) => variant !== name)
-        : [...current, name]
+        current.includes(name)
+            ? current.filter((variant) => variant !== name)
+            : [...current, name]
     ));
   };
 
@@ -124,156 +124,156 @@ export function NewGamePage() {
   };
 
   return (
-    <Panel title="New Game" subtitle="Configure your game and start playing">
-      <form onSubmit={handleCreateGame} className="new-game-form">
-        <fieldset className="form-section">
-          <legend>Opponent</legend>
-          <div className="form-group">
-            <label className="radio-label">
-              <input
-                type="radio"
-                name="gameType"
-                value="BOT"
-                checked={gameType === 'BOT'}
-                onChange={(e) => setGameType(e.target.value as GameType)}
-                disabled={loading}
-                aria-label="Play vs Bot"
-              />
-              <span className="radio-text">
+      <Panel title="New Game" subtitle="Configure your game and start playing">
+        <form onSubmit={handleCreateGame} className="new-game-form">
+          <fieldset className="form-section">
+            <legend>Opponent</legend>
+            <div className="form-group">
+              <label className="radio-label">
+                <input
+                    type="radio"
+                    name="gameType"
+                    value="BOT"
+                    checked={gameType === 'BOT'}
+                    onChange={(e) => setGameType(e.target.value as GameType)}
+                    disabled={loading}
+                    aria-label="Play vs Bot"
+                />
+                <span className="radio-text">
                 <strong>Play vs Bot</strong>
                 <small>Challenge the Bot</small>
               </span>
-            </label>
+              </label>
 
-            <label className="radio-label">
-              <input
-                type="radio"
-                name="gameType"
-                value="PLAYER"
-                checked={gameType === 'PLAYER'}
-                onChange={(e) => setGameType(e.target.value as GameType)}
-                disabled={loading}
-                aria-label="Play vs Player"
-              />
-              <span className="radio-text">
+              <label className="radio-label">
+                <input
+                    type="radio"
+                    name="gameType"
+                    value="PLAYER"
+                    checked={gameType === 'PLAYER'}
+                    onChange={(e) => setGameType(e.target.value as GameType)}
+                    disabled={loading}
+                    aria-label="Play vs Player"
+                />
+                <span className="radio-text">
                 <strong>Play vs Player</strong>
                 <small>Local multiplayer on this device</small>
               </span>
-            </label>
-          </div>
-
-          {gameType === 'PLAYER' && (
-            <div className="form-field">
-              <label htmlFor="opponentName">Opponent Name</label>
-              <input
-                id="opponentName"
-                type="text"
-                value={opponentName}
-                onChange={(e) => setOpponentName(e.target.value)}
-                placeholder="Enter opponent's name"
-                disabled={loading}
-                aria-invalid={opponentNameError}
-                aria-describedby={opponentNameError ? 'new-game-error' : undefined}
-              />
+              </label>
             </div>
-          )}
-        </fieldset>
 
-        <fieldset className="form-section">
-          <legend>Board Size</legend>
-          <div className="form-field">
-            <label htmlFor="boardSize">Triangle Side Length: {boardSize}</label>
-            <input
-              id="boardSize"
-              type="range"
-              min="3"
-              max="15"
-              value={boardSize}
-              onChange={(e) => setBoardSize(Number(e.target.value))}
-              disabled={loading}
-              className="slider"
-            />
-            <div className="size-info">
-              <span>Smaller (3)</span>
-              <span>Larger (15)</span>
-            </div>
-          </div>
-        </fieldset>
-
-        {gameType === 'BOT' && (
-          <fieldset className="form-section">
-            <legend>Bot Strategy</legend>
-            {loadingOptions ? (
-              <p className="strategy-loading">Loading available strategies...</p>
-            ) : (
-              <div className="form-group">
-                {strategies.map((strategy) => (
-                  <label className="radio-label" key={strategy.name}>
-                    <input
-                      type="radio"
-                      name="strategy"
-                      value={strategy.name}
-                      checked={selectedStrategyName === strategy.name}
-                      onChange={(e) => setSelectedStrategyName(e.target.value)}
+            {gameType === 'PLAYER' && (
+                <div className="form-field">
+                  <label htmlFor="opponentName">Opponent Name</label>
+                  <input
+                      id="opponentName"
+                      type="text"
+                      value={opponentName}
+                      onChange={(e) => setOpponentName(e.target.value)}
+                      placeholder="Enter opponent's name"
                       disabled={loading}
-                      aria-label={strategy.name}
-                    />
-                    <span className="radio-text radio-text-inline">
+                      aria-invalid={opponentNameError}
+                      aria-describedby={opponentNameError ? 'new-game-error' : undefined}
+                  />
+                </div>
+            )}
+          </fieldset>
+
+          <fieldset className="form-section">
+            <legend>Board Size</legend>
+            <div className="form-field">
+              <label htmlFor="boardSize">Triangle Side Length: {boardSize}</label>
+              <input
+                  id="boardSize"
+                  type="range"
+                  min="3"
+                  max="15"
+                  value={boardSize}
+                  onChange={(e) => setBoardSize(Number(e.target.value))}
+                  disabled={loading}
+                  className="slider"
+              />
+              <div className="size-info">
+                <span>Smaller (3)</span>
+                <span>Larger (15)</span>
+              </div>
+            </div>
+          </fieldset>
+
+          {gameType === 'BOT' && (
+              <fieldset className="form-section">
+                <legend>Bot Strategy</legend>
+                {loadingOptions ? (
+                    <p className="strategy-loading">Loading available strategies...</p>
+                ) : (
+                    <div className="form-group">
+                      {strategies.map((strategy) => (
+                          <label className="radio-label" key={strategy.name}>
+                            <input
+                                type="radio"
+                                name="strategy"
+                                value={strategy.name}
+                                checked={selectedStrategyName === strategy.name}
+                                onChange={(e) => setSelectedStrategyName(e.target.value)}
+                                disabled={loading}
+                                aria-label={strategy.name}
+                            />
+                            <span className="radio-text radio-text-inline">
                       <strong>{formatGameLabel(strategy.name)}</strong>
                       <span className="difficulty-tag">{formatGameLabel(strategy.difficulty)}</span>
                     </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </fieldset>
-        )}
+                          </label>
+                      ))}
+                    </div>
+                )}
+              </fieldset>
+          )}
 
-        <fieldset className="form-section">
-          <legend>Variants</legend>
-          <p className="variants-note">Standard rules are always on. You can add one or more extras below.</p>
-          {loadingOptions ? (
-            <p className="strategy-loading">Loading available variants...</p>
-          ) : (
-            <div className="variants-grid" aria-label="Game variants">
-              {visibleVariants.map((variant) => {
-                const checked = selectedVariants.includes(variant.name);
+          <fieldset className="form-section">
+            <legend>Variants</legend>
+            <p className="variants-note">Standard rules are always on. You can add one or more extras below.</p>
+            {loadingOptions ? (
+                <p className="strategy-loading">Loading available variants...</p>
+            ) : (
+                <div className="variants-grid" aria-label="Game variants">
+                  {visibleVariants.map((variant) => {
+                    const checked = selectedVariants.includes(variant.name);
 
-                return (
-                  <label className={`variant-card${checked ? ' variant-card--selected' : ''}`} key={variant.name}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleVariant(variant.name)}
-                      disabled={loading}
-                      aria-label={variant.name}
-                    />
-                    <span className="variant-card__content">
+                    return (
+                        <label className={`variant-card${checked ? ' variant-card--selected' : ''}`} key={variant.name}>
+                          <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleVariant(variant.name)}
+                              disabled={loading}
+                              aria-label={variant.name}
+                          />
+                          <span className="variant-card__content">
                       <strong>{variant.name}</strong>
                       <small>{variant.description}</small>
                     </span>
-                  </label>
-                );
-              })}
-              {visibleVariants.length === 0 && (
-                <p className="strategy-loading">No variants available for selected strategy.</p>
-              )}
-            </div>
-          )}
-        </fieldset>
+                        </label>
+                    );
+                  })}
+                  {visibleVariants.length === 0 && (
+                      <p className="strategy-loading">No variants available for selected strategy.</p>
+                  )}
+                </div>
+            )}
+          </fieldset>
 
-        <div className="form-actions">
-          <button
-            type="submit"
-            disabled={loading || (gameType === 'BOT' && (loadingOptions || strategies.length === 0))}
-            className="btn-primary"
-          >
-            {loading ? 'Creating game...' : 'Start Game'}
-          </button>
-        </div>
+          <div className="form-actions">
+            <button
+                type="submit"
+                disabled={loading || (gameType === 'BOT' && (loadingOptions || strategies.length === 0))}
+                className="btn-primary"
+            >
+              {loading ? 'Creating game...' : 'Start Game'}
+            </button>
+          </div>
 
-        {error && <div id="new-game-error" className="form-error">{error}</div>}
-      </form>
-    </Panel>
+          {error && <div id="new-game-error" className="form-error">{error}</div>}
+        </form>
+      </Panel>
   );
 }

@@ -18,6 +18,7 @@ services:
     restart: always
     ports:
       - "3000:3000"
+      - "3002:3000"
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/app_database
     depends_on:
@@ -37,7 +38,7 @@ services:
     container_name: webapp
     restart: always
     ports:
-      - "80:80"
+      - "8000:80"
     depends_on:
       - users
       - gamey
@@ -54,6 +55,7 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/app_database
       - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - mongodb
     networks:
@@ -79,9 +81,29 @@ services:
     networks:
       - monitor-net
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - webapp
+      - users
+      - gamey
+    networks:
+      - monitor-net
+
 networks:
   monitor-net:
     driver: bridge
 
 volumes:
   mongo-data:
+  caddy_data:
+  caddy_config:

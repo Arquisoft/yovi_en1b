@@ -38,9 +38,9 @@ use crate::{GameYError, RandomBot, YBotRegistry, state::AppState};
 /// This is useful for testing the API without binding to a network port.
 pub fn create_router(state: AppState) -> axum::Router {
     // Configure CORS for development and production environments
+    // We use Any to allow the frontend to be served from any domain (e.g. yovi-en1b.alejandrosanclaudio.com)
     let cors = CorsLayer::new()
-        // Only trust your specific frontend IP
-        .allow_origin("http://4.233.184.98".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
@@ -70,11 +70,6 @@ pub fn create_router(state: AppState) -> axum::Router {
             "/{api_version}/game/board-info/{board_size}",
             axum::routing::get(crate::game_server::handlers::board_info),
         )
-        // Game options (variants info)
-        .route(
-            "/games/options",
-            axum::routing::get(crate::game_server::handlers::game_options),
-        )
         // Partner API
         .route(
             "/play",
@@ -92,11 +87,16 @@ pub fn create_router(state: AppState) -> axum::Router {
 ///
 /// The default state includes the `RandomBot` which selects moves randomly.
 pub fn create_default_state() -> AppState {
-    let bots = YBotRegistry::new()
+    let mut registry = YBotRegistry::new()
         .with_bot(Arc::new(RandomBot))
         .with_bot(Arc::new(crate::DefensiveBot))
         .with_bot(Arc::new(crate::HardBot::default()));
-    AppState::new(bots)
+
+    if let Some(bot) = crate::GenerativeAIBot::from_env() {
+        registry = registry.with_bot(Arc::new(bot));
+    }
+
+    AppState::new(registry)
 }
 
 /// Starts the bot server on the specified port.
@@ -136,4 +136,41 @@ pub async fn run_bot_server(port: u16) -> Result<(), GameYError> {
 /// Returns "OK" to indicate the server is running.
 pub async fn status() -> impl IntoResponse {
     "OK"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_status_endpoint() {
+        let response = status().await.into_response();
+        assert!(response.status().is_success());
+    }
+
+    #[test]
+    fn test_create_default_state_contains_basic_bots() {
+        let state = create_default_state();
+        let registry = state.bots();
+        
+        // Always has these three
+        assert!(registry.find("random_bot").is_some());
+        assert!(registry.find("medium").is_some());
+        assert!(registry.find("hard").is_some());
+    }
+
+    #[test]
+    fn test_create_default_state_registers_generative_bot_when_key_present() {
+        // Mock the environment variable. Use a unique name to avoid conflicts if possible,
+        // but create_default_state specifically looks for GEMINI_API_KEY.
+        unsafe { std::env::set_var("GEMINI_API_KEY", "mock_key") };
+        
+        let state = create_default_state();
+        let registry = state.bots();
+        
+        assert!(registry.find("gemini").is_some(), "GenerativeAIBot should be registered when GEMINI_API_KEY is set");
+        
+        // Clean up
+        unsafe { std::env::remove_var("GEMINI_API_KEY") };
+    }
 }

@@ -12,8 +12,8 @@
 
 🌐 **Play now:** [http://4.233.184.98](http://4.233.184.98)  
 📝 **Documentation:** [https://arquisoft.github.io/yovi_en1b/](https://arquisoft.github.io/yovi_en1b/)  
-⛓ **API documentation:** TODO  
-💻 **Presentation:** TODO
+⛓ **API documentation:** [http://4.233.184.98:3000/api-docs/](http://4.233.184.98:3000/api-docs/)  
+💻 **Presentation:** [TODO](TODO)
 
 </div>
 
@@ -28,7 +28,7 @@ YOVI is a full-stack strategy game built as a monorepo. It combines a React fron
 | Contributor | Git Account | Role |
 |---|---|---|
 | Tobias Navrat | <a href="https://github.com/Th0be">@Th0be</a> | Frontend |
-| Ahmet Bilal Yazıcıoğlu | <a href="https://github.com/bilalyazicioglu">@bilalyazicioglu</a> | Bots |
+| Ahmet Bilal Yazıcıoğlu | <a href="https://github.com/bilalyazicioglu">@bilalyazicioglu</a> | Game Logic & Bots |
 | Ignacio Hoyos Diego | <a href="https://github.com/nacho50900">@nacho50900</a> | Backend |
 | Alejandro de San Claudio Mesa | <a href="https://github.com/UO300896">@UO300896</a> | Database and DevOps |
 

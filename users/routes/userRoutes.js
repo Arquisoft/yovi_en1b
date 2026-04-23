@@ -1,10 +1,20 @@
 const express = require('express');
 const authMiddleware = require('../middleware/auth');
 
+// Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
-    random:    'Easy 😄',
-    defensive: 'Medium 😐',
-    ncts:      'Hard 😈'
+    random:        'Easy 😄',
+    defensive:     'Medium 😐',
+    mcts:          'Hard 😈',
+    ai:            'Medium 🤖'
+};
+
+// Strategy -> name mapping
+const STRATEGY_NAME = {
+    random:        'Random',
+    defensive:     'Defensive',
+    mcts:          'Monte Carlo',
+    ai:            'AI (Gemini)'
 };
 
 module.exports = function userRoutes(repository) {
@@ -23,11 +33,12 @@ module.exports = function userRoutes(repository) {
             const vsBot = stats.vs_bot || {};
 
             const vs_bots = Object.entries(STRATEGY_DIFFICULTY).map(([name, difficulty]) => ({
-                name,
-                difficulty,
-                wins:   vsBot[name]?.wins   ?? 0,
-                losses: vsBot[name]?.losses ?? 0,
-                draws:  vsBot[name]?.draws  ?? 0
+                id:         name,
+                name:       STRATEGY_NAME[name] || name, // Shows "Monte Carlo" instead of "mcts"
+                difficulty: difficulty,
+                wins:       vsBot[name]?.wins   ?? 0,
+                losses:     vsBot[name]?.losses ?? 0,
+                draws:      vsBot[name]?.draws  ?? 0
             }));
 
             const games = await repository.findGamesByPlayer(obj._id);

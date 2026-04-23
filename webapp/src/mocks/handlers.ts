@@ -9,14 +9,14 @@ const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
 ]);
 const mockGames = new Map<string, GameRecord>(
-  SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
+    SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
 );
 let gameCounter = 1;
 
 const DEFAULT_STRATEGY_OPTIONS = [
-  { name: 'random', difficulty: 'easy' },
-  { name: 'ai', difficulty: 'medium' },
-  { name: 'dijkstra', difficulty: 'hard' }
+  { id: 'random', name: 'random', difficulty: 'easy' },
+  { id: 'ai', name: 'ai', difficulty: 'medium' },
+  { id: 'dijkstra', name: 'dijkstra', difficulty: 'hard' }
 ] as const;
 
 const DEFAULT_VARIANTS = [
@@ -37,10 +37,10 @@ function coordinateKey(c: Coordinates): string {
 
 function isOnBoard(size: number, coordinates: Coordinates): boolean {
   return (
-    coordinates.x >= 0 &&
-    coordinates.y >= 0 &&
-    coordinates.z >= 0 &&
-    coordinates.x + coordinates.y + coordinates.z === size - 1
+      coordinates.x >= 0 &&
+      coordinates.y >= 0 &&
+      coordinates.z >= 0 &&
+      coordinates.x + coordinates.y + coordinates.z === size - 1
   );
 }
 
@@ -279,8 +279,8 @@ function getUserStatistics(userId: string): UserStatistics {
 
 function buildLeaderboard(): Leaderboard {
   const userStats = new Map<
-    string,
-    { total_wins: number; total_games: number; botWins: Map<string, number> }
+      string,
+      { total_wins: number; total_games: number; botWins: Map<string, number> }
   >();
 
   // Aggregate stats for all users
@@ -295,32 +295,32 @@ function buildLeaderboard(): Leaderboard {
 
   // Build overall leaderboard (top 10 by total wins)
   const overall = Array.from(mockUsers.entries())
-    .map(([username, user]) => {
-      const stats = userStats.get(user.userId);
-      return {
-        username,
-        total_wins: stats?.total_wins ?? 0,
-        total_games: stats?.total_games ?? 0
-      };
-    })
-    .sort((a, b) => b.total_wins - a.total_wins)
-    .slice(0, 10);
+      .map(([username, user]) => {
+        const stats = userStats.get(user.userId);
+        return {
+          username,
+          total_wins: stats?.total_wins ?? 0,
+          total_games: stats?.total_games ?? 0
+        };
+      })
+      .sort((a, b) => b.total_wins - a.total_wins)
+      .slice(0, 10);
 
   // Build per-bot leaderboards (top 10 per strategy)
   const vs_bots: Record<string, BotLeaderboardEntry[]> = {};
 
   for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.name)) {
     vs_bots[strategy] = Array.from(mockUsers.entries())
-      .map(([username, user]) => {
-        const stats = userStats.get(user.userId);
-        return {
-          username,
-          wins: stats?.botWins.get(strategy) ?? 0
-        };
-      })
-      .filter((entry) => entry.wins > 0)
-      .sort((a, b) => b.wins - a.wins)
-      .slice(0, 10);
+        .map(([username, user]) => {
+          const stats = userStats.get(user.userId);
+          return {
+            username,
+            wins: stats?.botWins.get(strategy) ?? 0
+          };
+        })
+        .filter((entry) => entry.wins > 0)
+        .sort((a, b) => b.wins - a.wins)
+        .slice(0, 10);
   }
 
   return { overall, vs_bots };
@@ -413,13 +413,13 @@ export const handlers = [
     }
 
     const history = [...mockGames.values()]
-      .filter((game) => game.player_id === requestedUserId)
-      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
-      .map((game) => {
-        const copy: Partial<GameRecord> = { ...game };
-        delete copy.moves;
-        return copy;
-      });
+        .filter((game) => game.player_id === requestedUserId)
+        .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
+        .map((game) => {
+          const copy: Partial<GameRecord> = { ...game };
+          delete copy.moves;
+          return copy;
+        });
 
     return HttpResponse.json(history);
   }),
@@ -447,13 +447,14 @@ export const handlers = [
   }),
 
   http.get('*/games/options', () =>
-    HttpResponse.json({
-      strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
-        name: formatLabel(item.name),
-        difficulty: formatLabel(item.difficulty)
-      })),
-      variants: DEFAULT_VARIANTS
-    })
+      HttpResponse.json({
+        strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
+          id: item.id,
+          name: formatLabel(item.name),
+          difficulty: formatLabel(item.difficulty)
+        })),
+        variants: DEFAULT_VARIANTS
+      })
   ),
 
   http.get('*/games/:id', ({ params, request }) => {

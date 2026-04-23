@@ -127,15 +127,28 @@ pub struct CellCoordInfo {
 pub struct PlayRequest {
     /// The current game state as a JSON string (null if first move).
     pub yen_state: Option<String>,
-    /// The bot strategy/difficulty (e.g., "random").
+    /// The bot strategy/difficulty (e.g., "random", "medium", "hard").
     pub strategy: Option<String>,
-    /// The bot difficulty level.
+    /// The bot difficulty level (used as a fallback when `strategy` is not set).
     pub difficulty_level: Option<String>,
     /// The board size.
     pub board_size: u32,
     /// Optional list of active variant names.
     #[serde(default)]
     pub variants: Vec<String>,
+    /// Explosive (bomb) positions as comma-separated flat indices (e.g., "3,14").
+    ///
+    /// This field is used to round-trip bomb positions back to the server when
+    /// the Explosions variant is active. Without it, bombs placed at the start
+    /// of the game would be lost on every subsequent /play call (issue #203).
+    #[serde(default)]
+    pub explosives: Option<String>,
+    /// Whose turn it is (0 = Blue, 1 = Red). Must be echoed back from the
+    /// previous response's `turn` field when the Explosions variant is active;
+    /// bomb detonations can shift piece counts so the server can no longer
+    /// infer the correct turn by counting pieces alone.
+    #[serde(default)]
+    pub turn: Option<u32>,
 }
 
 /// Response format for the /play endpoint.
@@ -147,6 +160,17 @@ pub struct PlayResponse {
     pub yen_state: String,
     /// The winner of the game ("B", "R", or null).
     pub winner: Option<String>,
+    /// Active game variants (echoed back so clients can persist them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<String>,
+    /// Explosive positions as comma-separated flat indices, if the Explosions
+    /// variant is active.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explosives: Option<String>,
+    /// Whose turn it is next (0 = Blue, 1 = Red). Clients MUST echo this back
+    /// in the subsequent request's `turn` field so the server can restore the
+    /// correct turn even after bomb explosions altered the piece counts.
+    pub turn: u32,
 }
 
 /// Request format for the /compute endpoint where a human move is processed.
@@ -156,6 +180,18 @@ pub struct ComputeRequest {
     pub yen_state_prev: Option<String>,
     /// The coordinates where the human placed their piece.
     pub coordinates: Coordinates,
+    /// Optional list of active variant names.
+    #[serde(default)]
+    pub variants: Vec<String>,
+    /// Explosive (bomb) positions as comma-separated flat indices.
+    #[serde(default)]
+    pub explosives: Option<String>,
+    /// Whose turn it is before this move (0 = Blue, 1 = Red). Must be echoed
+    /// back from the previous response's `turn` field when the Explosions
+    /// variant is active; bomb detonations can shift piece counts so the
+    /// server can no longer infer the correct turn by counting pieces alone.
+    #[serde(default)]
+    pub turn: Option<u32>,
 }
 
 /// Response format for the /compute endpoint.
@@ -165,24 +201,17 @@ pub struct ComputeResponse {
     pub yen_state: String,
     /// The winner of the game ("B", "R", or null).
     pub winner: Option<String>,
-}
-
-/// Response format for the GET /games/options endpoint.
-#[derive(Serialize, Debug)]
-pub struct GameOptionsResponse {
-    /// Available game variants.
-    pub variants: Vec<VariantInfo>,
-}
-
-/// Information about a single game variant.
-#[derive(Serialize, Debug)]
-pub struct VariantInfo {
-    /// The name of the variant (e.g., "Double turn", "Explosions").
-    pub name: String,
-    /// Human-readable description of the variant.
-    pub description: String,
-    /// Which bot strategies support this variant.
-    pub allowed_strategies: Vec<String>,
+    /// Active game variants (echoed back so clients can persist them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<String>,
+    /// Explosive positions as comma-separated flat indices, if the Explosions
+    /// variant is active.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explosives: Option<String>,
+    /// Whose turn it is next (0 = Blue, 1 = Red). Clients MUST echo this back
+    /// in the subsequent request's `turn` field so the server can restore the
+    /// correct turn even after bomb explosions altered the piece counts.
+    pub turn: u32,
 }
 
 // ============================================================================

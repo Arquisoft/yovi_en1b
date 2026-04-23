@@ -169,18 +169,19 @@ describe('GET /leaderboard', () => {
         }
     })
 
-    it('vs_bots has random, defensive and ncts arrays', async () => {
+    it('vs_bots has random, defensive, Monte Carlo and ai arrays', async () => {
         const res = await request(app).get('/leaderboard')
 
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
     })
 
     it('vs_bots entries have username and wins', async () => {
         const res = await request(app).get('/leaderboard')
 
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             if (res.body.vs_bots[botKey].length > 0) {
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('username')
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('wins')
@@ -202,10 +203,11 @@ describe('GET /leaderboard', () => {
         expect(Array.isArray(res.body.overall)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
-        expect(Array.isArray(res.body.vs_bots.ncts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
 
         // wins field must always be a number, never undefined
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             res.body.vs_bots[botKey].forEach(entry => {
                 expect(typeof entry.wins).toBe('number')
             })
@@ -613,56 +615,83 @@ describe('GET /games/:id/play', () => {
 
 // ─── Public play endpoint ─────────────────────────────────────────────────────
 
-describe('POST /play', () => {
+const YEN_POSITION = JSON.stringify({ size: 4, turn: 0, players: ['B', 'R'], layout: 'B/.B/RB./B..R' })
+
+describe('GET /play', () => {
     it('returns bot move without auth or game id', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R', bot_id: 'random', board_size: 7 })
+            .get('/play')
+            .query({ position: YEN_POSITION, bot_id: 'random', board_size: 7 })
 
         expect(res.status).toBe(200)
-        expect(res.body).toHaveProperty('coordinates')
-        expect(res.body).toHaveProperty('yen_state')
+        expect(res.body).toHaveProperty('coords')
     })
 
     it('returns 400 if position is missing', async () => {
         const res = await request(app)
-            .post('/play')
-            .send({ bot_id: 'random' })
+            .get('/play')
+            .query({ bot_id: 'random' })
 
         expect(res.status).toBe(400)
     })
 
-    it('defaults to ncts bot when no strategy is provided', async () => {
+    it('returns 400 if position is not valid JSON', async () => {
+        const res = await request(app)
+            .get('/play')
+            .query({ position: 'not-valid-json' })
+
+        expect(res.status).toBe(400)
+    })
+
+    it('defaults to mcts bot when no bot_id is provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         })
         vi.stubGlobal('fetch', fetchMock)
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
-        expect(callBody.strategy).toBe('ncts')  // bot_id maps to strategy
+        expect(callBody.strategy).toBe('mcts')  // bot_id maps to strategy
     })
 
-    it('uses provided board_size when given', async () => {
+    it('derives board_size from position.size when board_size param is not provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         })
         vi.stubGlobal('fetch', fetchMock)
 
+        // No board_size query param — route must fall back to position.size (4)
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R', board_size: 7 })
+            .get('/play')
+            .query({ position: YEN_POSITION })
+
+        expect(res.status).toBe(200)
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+        expect(callBody.board_size).toBe(4)  // falls back to position.size
+    })
+
+    it('uses explicit board_size query param over position.size when both are present', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        // board_size: 7 should take priority over position.size (4)
+        const res = await request(app)
+            .get('/play')
+            .query({ position: YEN_POSITION, board_size: 7 })
 
         expect(res.status).toBe(200)
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body)
@@ -673,8 +702,8 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(503)
     })
@@ -683,8 +712,8 @@ describe('POST /play', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(502)
     })
@@ -692,12 +721,12 @@ describe('POST /play', () => {
     it('does not require authentication', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: 'B/.B/RB./B..R', winner: null })
+            json: async () => ({ coordinates: { x: 1, y: 0, z: 2 }, yen_state: YEN_POSITION, winner: null })
         }))
 
         const res = await request(app)
-            .post('/play')
-            .send({ position: 'B/.B/RB./B..R' })
+            .get('/play')
+            .query({ position: YEN_POSITION })
 
         expect(res.status).toBe(200)
     })
@@ -730,14 +759,17 @@ describe('GET /games/options', () => {
         const names = res.body.strategies.map(s => s.name)
         expect(names).toContain('Random')
         expect(names).toContain('Defensive')
-        expect(names).toContain('NCTS')
+        expect(names).toContain('Monte Carlo')
+        expect(names).toContain('AI (Gemini)')
 
         const random = res.body.strategies.find(s => s.name === 'Random')
         const defensive = res.body.strategies.find(s => s.name === 'Defensive')
-        const ncts = res.body.strategies.find(s => s.name === 'NCTS')
+        const mcts = res.body.strategies.find(s => s.name === 'Monte Carlo')
+        const ai = res.body.strategies.find(s => s.name === 'AI (Gemini)')
         expect(random.difficulty).toBe('Easy 😄')
         expect(defensive.difficulty).toBe('Medium 😐')
-        expect(ncts.difficulty).toBe('Hard 😈')
+        expect(mcts.difficulty).toBe('Hard 😈')
+        expect(ai.difficulty).toBe('Medium 🤖')
     })
 
     it('returns variants as objects with name, description and allowed_strategies', async () => {
@@ -754,8 +786,8 @@ describe('GET /games/options', () => {
         const res = await request(app).get('/games/options')
 
         const names = res.body.variants.map(v => v.name)
-        expect(names[0]).toBe('Classic Y')   // Classic Y must be first
         expect(names).toContain('Explosions')
+        expect(names).not.toContain('Classic Y')
     })
 
     it('does not require authentication', async () => {
@@ -898,29 +930,48 @@ describe('PUT /games/:id/finish', () => {
 
         // vs_bots is now a normalized array under statistics
         expect(Array.isArray(statistics.vs_bots)).toBe(true)
-        const random = statistics.vs_bots.find(b => b.name === 'random')
+        const random = statistics.vs_bots.find(b => b.name === 'Random')
         expect(random).toBeDefined()
         expect(random.difficulty).toBe('Easy 😄')
         expect(random.wins).toBeGreaterThanOrEqual(1)
         expect(typeof random.losses).toBe('number')
     })
 
-    it('vs_bots array contains all three bots with correct shape', async () => {
+    it('vs_bots array contains all four bots with correct shape', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
 
-        const BOT_DIFFICULTY = { random: 'Easy 😄', defensive: 'Medium 😐', ncts: 'Hard 😈' }
+        const BOT_DIFFICULTY = {
+            random:    'Easy 😄',
+            defensive: 'Medium 😐',
+            mcts:      'Hard 😈',
+            ai:        'Medium 🤖'
+        }
 
-        for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
-            const entry = res.body.statistics.vs_bots.find(b => b.name === name)
-            expect(entry).toBeDefined()
-            expect(entry.difficulty).toBe(difficulty)
-            expect(typeof entry.wins).toBe('number')
-            expect(typeof entry.losses).toBe('number')
-            expect(typeof entry.draws).toBe('number')
+        // Cambiado a STRATEGY_DISPLAY_NAMES para que coincida con el bucle de abajo
+        // Y corregido "AI" en mayúsculas
+        const STRATEGY_DISPLAY_NAMES = {
+            random:        'Random',
+            defensive:     'Defensive',
+            mcts:          'Monte Carlo',
+            ai:            'AI (Gemini)'
+        };
+
+        // Ahora STRATEGY_DISPLAY_NAMES ya existe
+        for (const strategyKey of Object.keys(STRATEGY_DISPLAY_NAMES)) {
+            const name = STRATEGY_DISPLAY_NAMES[strategyKey];
+            const difficulty = BOT_DIFFICULTY[strategyKey];
+
+            const entry = res.body.statistics.vs_bots.find(b => b.name === name);
+
+            expect(entry).toBeDefined();
+            expect(entry.difficulty).toBe(difficulty);
+            expect(typeof entry.wins).toBe('number');
+            expect(typeof entry.losses).toBe('number');
+            expect(typeof entry.draws).toBe('number');
         }
     })
 
@@ -1170,11 +1221,11 @@ describe('MongoUserRepository direct unit tests', () => {
 
     it('updateStats increments draws for a BOT game (covers drawIncr and findByIdAndUpdate)', async () => {
         const user = await User.create({ username: 'DrawStatsUser', password_hash: 'x' })
-        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'ncts' })
+        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'mcts' })
 
         const updated = await repo.findById(user._id)
         expect(updated.statistics.total_draws).toBe(1)
-        expect(updated.statistics.vs_bot.ncts.draws).toBe(1)
+        expect(updated.statistics.vs_bot.mcts.draws).toBe(1)
         // wins and losses stay 0
         expect(updated.statistics.total_wins).toBe(0)
         expect(updated.statistics.total_losses).toBe(0)
@@ -1197,7 +1248,8 @@ describe('MongoUserRepository direct unit tests', () => {
                 vs_bot: {
                     random:    { wins: 50, losses: 0, draws: 0 },
                     defensive: { wins: 50, losses: 0, draws: 0 },
-                    ncts:      { wins: 50, losses: 0, draws: 0 },
+                    mcts:      { wins: 50, losses: 0, draws: 0 },
+                    ai:        { wins: 50, losses: 0, draws: 0 },
                 }
             }
         })
@@ -1207,11 +1259,79 @@ describe('MongoUserRepository direct unit tests', () => {
 
         const leaderboard = await repo.getLeaderboard()
 
-        for (const botKey of ['random', 'defensive', 'ncts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             const entry = leaderboard.vs_bots[botKey].find(e => e.username === 'NoBotDataUser')
             expect(entry).toBeDefined()           // user appears in results
             expect(entry.wins).toBe(0)            // ?? 0 fallback was hit
             expect(typeof entry.wins).toBe('number')
         }
     })
+
+    describe('MCTS/AI Logic Branch Coverage', () => {
+
+        it('covers branch: strategy is known in STRATEGY_MAP (e.g. Monte Carlo)', async () => {
+            // Esto cubre: STRATEGY_MAP[strategy.toLowerCase()]
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'Monte Carlo', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(gameRes.body.strategy).toBe('mcts');
+        });
+
+        it('covers branch: strategy is unknown but provided (e.g. CustomBot)', async () => {
+            // Esto cubre: (strategy || 'random').toLowerCase() -> cuando strategy existe pero no está en el MAP
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'Defensive', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            // Si 'defensive' no está en tu STRATEGY_MAP (pero sí en el enum de la DB),
+            // se guardará como 'defensive' en minúsculas.
+            expect(gameRes.body.strategy).toBe('defensive');
+        });
+
+        it('covers branch: strategy is undefined (defaults to random)', async () => {
+            // Esto cubre la parte final: || 'random'
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: undefined, game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(gameRes.body.strategy).toBe('random');
+        });
+
+        it('covers increments for LOSS and DRAW results', async () => {
+            // Creamos un juego para tener un ID válido
+            const game = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'mcts' })
+                .set('Authorization', `Bearer ${token}`);
+
+            // Forzamos el incremento de LOSS
+            await request(app)
+                .put(`/games/${game.body._id}/finish`)
+                .send({ result: 'LOSS', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            // Forzamos el incremento de DRAW
+            const game2 = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'mcts' })
+                .set('Authorization', `Bearer ${token}`);
+
+            await request(app)
+                .put(`/games/${game2.body._id}/finish`)
+                .send({ result: 'DRAW', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            const res = await request(app)
+                .get(`/users/${userId}`)
+                .set('Authorization', `Bearer ${token}`);
+
+            const mcts = res.body.statistics.vs_bots.find(b => b.name === 'Monte Carlo');
+            expect(mcts.losses).toBeGreaterThanOrEqual(1);
+            expect(mcts.draws).toBeGreaterThanOrEqual(1);
+        });
+    });
 })

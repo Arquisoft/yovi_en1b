@@ -347,7 +347,15 @@ export function GamePage() {
     setHighlightedCellKey(null);
   }, [game?.moves]);
 
-  const latestYenState = game?.moves.at(-1)?.yen_state ?? game?.yen_final_state ?? null;
+  // Prefer the latest move's state; before any move is made, fall back to the
+  // initial state Gamey produced at game creation (so pre-placed bombs for the
+  // Explosions variant are visible immediately). After the game finishes we
+  // display the final state.
+  const latestYenState =
+    game?.moves.at(-1)?.yen_state
+    ?? game?.yen_final_state
+    ?? game?.initial_yen_state
+    ?? null;
 
   const cellStateByKey = useMemo(() => {
     if (!game) {

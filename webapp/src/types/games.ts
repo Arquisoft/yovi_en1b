@@ -40,6 +40,7 @@ export type GameRecord = {
   duration_seconds: number;
   created_at: string;
   yen_final_state?: string | null;
+  initial_yen_state?: string | null;
   moves: Move[];
 };
 
@@ -65,6 +66,7 @@ export type FinishGamePayload = {
 };
 
 export type StrategyOption = {
+  id: string;
   name: string;
   difficulty: string;
 };

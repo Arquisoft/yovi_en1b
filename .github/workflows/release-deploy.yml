@@ -130,8 +130,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
           workdir: webapp
-          # Inyectamos la IP real de Azure para que el frontend sepa a donde llamar
-          buildargs: "VITE_API_URL=http://${{ secrets.DEPLOY_HOST }}:3000,VITE_GAMEY_URL=http://${{ secrets.DEPLOY_HOST }}:4000"
+          buildargs: "VITE_API_URL=https://${{ secrets.DEPLOY_DOMAIN }}/api/users,VITE_GAMEY_URL=https://${{ secrets.DEPLOY_DOMAIN }}/api/gamey"
 
   docker-push-gamey:
     name: Publish gamey image
@@ -165,5 +164,6 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/docker-compose.yml -O docker-compose.yml
+            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/Caddyfile -O Caddyfile
             docker compose down
             docker compose up -d --pull always
