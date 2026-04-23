@@ -120,11 +120,34 @@ module.exports = function gameRoutes(repository) {
             return res.status(400).json({ error: 'name_of_enemy is required for PLAYER games' });
         }
 
-        // Validate variants
+        // 1. Definimos el mapa (llaves siempre en minúsculas)
+        const STRATEGY_MAP = {
+            'monte carlo': 'mcts',
+            'ai (gemini)': 'ai',
+            'random':      'random',
+            'defensive':   'defensive'
+        };
+
+        // 2. Normalización CRÍTICA
+        // Primero: pasamos a minúsculas la entrada del FE (ej: "AI (Gemini)" -> "ai (gemini)")
+        const inputLower = strategy?.toLowerCase();
+
+        // Segundo: Buscamos en el mapa. Si no está, usamos la cadena original en minúsculas.
+        const resolvedStrategy = STRATEGY_MAP[inputLower] || inputLower || 'random';
+
         const resolvedVariants = variants ?? [];
         for (const v of resolvedVariants) {
             const config = VALID_VARIANTS[v.toLowerCase()];
             if (!config) return res.status(400).json({ error: `Unknown variant: ${v}` });
+
+            // 3. Validación contra la variante
+            // Aquí resolvedStrategy será "ai", que SI está en ['random', 'ai']
+            if (config.allowed_strategies && !config.allowed_strategies.includes(resolvedStrategy)) {
+                return res.status(400).json({
+                    error: `Strategy '${strategy}' is not allowed with variant '${v}'`
+                });
+            }
+
             if (config.min_board_size && board_size < config.min_board_size) {
                 return res.status(400).json({ error: `Variant '${v}' requires board_size >= ${config.min_board_size}` });
             }
@@ -132,7 +155,6 @@ module.exports = function gameRoutes(repository) {
 
         try {
             const current_turn = crypto.randomInt(2) === 0 ? 'B' : 'R';
-            const resolvedStrategy = strategy || 'random';
 
             // For variants that pre-place pieces (currently just Explosions
             // with its random bomb), fetch the initial board state from Gamey

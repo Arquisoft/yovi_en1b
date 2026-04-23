@@ -66,6 +66,7 @@ export type FinishGamePayload = {
 };
 
 export type StrategyOption = {
+  id: string;
   name: string;
   difficulty: string;
 };
