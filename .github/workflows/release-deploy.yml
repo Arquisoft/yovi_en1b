@@ -163,6 +163,7 @@ jobs:
           user: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           command: |
+            echo "DEPLOY_DOMAIN=${{ secrets.DEPLOY_DOMAIN }}" > .env
             wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/docker-compose.yml -O docker-compose.yml
             wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/Caddyfile -O Caddyfile
             docker compose down

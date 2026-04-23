@@ -85,6 +85,8 @@ services:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
+    environment:
+      - DEPLOY_DOMAIN=${DEPLOY_DOMAIN}
     ports:
       - "80:80"
       - "443:443"
