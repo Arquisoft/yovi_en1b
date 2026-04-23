@@ -1,0 +1,17 @@
+{$DEPLOY_DOMAIN:yovi-en1b.alejandrosanclaudio.com} {
+    # 1. Users API: intercept /api/users and forward to users:3000 container
+    # handle_path automatically strips the prefix before forwarding
+    handle_path /api/users/* {
+        reverse_proxy users:3000
+    }
+
+    # 2. Game API: intercept /api/gamey and forward to gamey:4000 container
+    handle_path /api/gamey/* {
+        reverse_proxy gamey:4000
+    }
+
+    # 3. Everything else falls back to the Frontend application (Webapp)
+    handle {
+        reverse_proxy webapp:80
+    }
+}
