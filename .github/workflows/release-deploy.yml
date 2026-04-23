@@ -168,3 +168,6 @@ jobs:
             wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/Caddyfile -O Caddyfile
             docker compose down
             docker compose up -d --pull always
+            echo "[DEBUG] Waiting for Caddy to start to capture logs..."
+            sleep 15
+            docker compose logs caddy
