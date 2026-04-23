@@ -1266,4 +1266,56 @@ describe('MongoUserRepository direct unit tests', () => {
             expect(typeof entry.wins).toBe('number')
         }
     })
+
+    describe('Strategy and Result Coverage (API Level)', () => {
+
+        it('covers result: LOSS and strategy: undefined (defaults to random)', async () => {
+            // Creamos una partida rápida para poder terminarla
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: undefined, game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            const localGameId = gameRes.body._id;
+
+            // Terminamos la partida como LOSS
+            // Esto pasará por: result === 'LOSS' ? 1 : 0
+            // Y por: strategy || 'random'
+            await request(app)
+                .put(`/games/${localGameId}/finish`)
+                .send({ result: 'LOSS', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            const res = await request(app)
+                .get(`/users/${userId}`)
+                .set('Authorization', `Bearer ${token}`);
+
+            const random = res.body.statistics.vs_bots.find(b => b.name === 'Random');
+            expect(random.losses).toBeGreaterThanOrEqual(1);
+        });
+
+        it('covers result: DRAW and strategy case-insensitivity', async () => {
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'MONTE CARLO', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            const localGameId = gameRes.body._id;
+
+            // Terminamos como DRAW
+            // Esto pasará por: result === 'DRAW' ? 1 : 0
+            // Y por: strategy?.toLowerCase() -> 'monte carlo' -> mapeo a 'mcts'
+            await request(app)
+                .put(`/games/${localGameId}/finish`)
+                .send({ result: 'DRAW', yen_final_state: '...', duration_seconds: 10 })
+                .set('Authorization', `Bearer ${token}`);
+
+            const res = await request(app)
+                .get(`/users/${userId}`)
+                .set('Authorization', `Bearer ${token}`);
+
+            const mcts = res.body.statistics.vs_bots.find(b => b.name === 'Monte Carlo');
+            expect(mcts.draws).toBeGreaterThanOrEqual(1);
+        });
+    });
 })
