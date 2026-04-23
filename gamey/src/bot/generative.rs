@@ -163,12 +163,20 @@ fn build_prompt(game: &GameY) -> String {
     }
 
     // ── Available moves ───────────────────────────────────────────────────────
+    // Bomb cells are annotated with [BOMB] so Gemini does not need to
+    // cross-reference the board visual to know which legal moves trigger an
+    // explosion. Normal cells are listed without annotation.
     let available_list: Vec<String> = game
         .available_cells()
         .iter()
         .map(|&idx| {
             let c = Coordinates::from_index(idx, size);
-            format!("x={},y={},z={}", c.x(), c.y(), c.z())
+            let coord = format!("x={},y={},z={}", c.x(), c.y(), c.z());
+            if has_explosions && game.board().is_bomb(&c) {
+                format!("{coord} [BOMB — triggers explosion]")
+            } else {
+                coord
+            }
         })
         .collect();
 
@@ -188,25 +196,26 @@ fn build_prompt(game: &GameY) -> String {
 
         format!(
             "\n## Explosions variant is ACTIVE\n\
-             Bombs on the board (marked O in the visual): {bomb_coords_str}\n\
+             Remaining bombs (marked O in the visual): {bomb_coords_str}\n\
+             In the legal-moves list below, bomb cells are tagged [BOMB — triggers explosion].\n\
              \n\
-             Explosion rules:\n\
-             1. If you place your piece ON a bomb cell (O), the bomb detonates.\n\
-             2. Your piece STAYS on that cell.\n\
-             3. Every piece (yours or your opponent's) on any cell DIRECTLY \
-                ADJACENT to the bomb cell is REMOVED from the board.\n\
-             4. If an adjacent cell also contained a bomb, it chain-detonates \
-                in turn, removing pieces adjacent to IT as well (the chain \
-                continues until no more adjacent bombs remain).\n\
-             5. After any explosion, the turn ALWAYS passes to the opponent, \
-                even in DoubleTurn mode.\n\
-             6. Strategic notes:\n\
-                - An explosion can destroy your own pieces — weigh the risk.\n\
-                - A well-placed explosion can shatter an opponent's nearly-\
-                  winning chain.\n\
-                - Detonating when you have few adjacent pieces is safest.\n\
-             7. No two bombs are ever placed adjacent to each other at game \
-                start, so a single bomb's blast always has a bounded radius.\n"
+             Explosion rules (read carefully before choosing a [BOMB] move):\n\
+             1. Placing on a [BOMB] cell detonates it.\n\
+             2. YOUR PIECE STAYS on the bomb cell — you keep the position.\n\
+             3. All pieces (yours AND opponent's) on cells DIRECTLY adjacent to \
+                the bomb are REMOVED and those cells become empty again.\n\
+             4. The bomb cell itself is consumed and is no longer a bomb.\n\
+             5. Chain detonation: if a neighbour of the exploding bomb is also \
+                a bomb, IT detonates too, removing pieces adjacent to IT \
+                (continues until no adjacent bombs remain).\n\
+             6. After ANY explosion the turn passes to the opponent immediately \
+                — even if DoubleTurn is active you do NOT get a second move.\n\
+             7. Bombs were placed so that no two bombs are adjacent at game start.\n\
+             \n\
+             Strategic guidance for [BOMB] moves:\n\
+             - Use explosions to break a nearly-complete opponent chain.\n\
+             - Avoid detonating when you have many pieces adjacent to the bomb.\n\
+             - The safest explosion is one where only opponent pieces are adjacent.\n"
         )
     } else {
         String::new()
@@ -274,9 +283,12 @@ No words, no explanation, no punctuation before or after. Just coordinates."#,
         coord_index = coord_index,
         available = available_list.join("  |  "),
         bomb_advice = if has_explosions {
-            "\n4. BOMB CONSIDERATION: placing on a O cell detonates it — \
-             weigh whether removing the adjacent pieces helps or hurts you \
-             before choosing a bomb cell."
+            "\n4. BOMB MOVES (tagged [BOMB] in the legal-moves list): \
+             placing on a bomb cell detonates it — your piece stays, all \
+             neighbouring pieces are removed, turn passes to opponent. \
+             Only choose a [BOMB] move if blowing up the neighbours clearly \
+             benefits you (e.g. destroys a critical opponent chain segment \
+             while your own pieces nearby are few or absent)."
         } else {
             ""
         },
@@ -521,8 +533,18 @@ mod tests {
             "prompt must include explosion rules when variant is active"
         );
         assert!(
-            prompt.contains("chain-detonates"),
+            prompt.contains("chain detonation") || prompt.contains("chain-detonates") || prompt.contains("detonates too"),
             "prompt must explain chain detonation"
+        );
+        // Bomb cells in the legal-moves list must be tagged [BOMB].
+        assert!(
+            prompt.contains("[BOMB — triggers explosion]"),
+            "legal moves for bomb cells must be annotated with [BOMB]"
+        );
+        // The available-moves section must note the tagging.
+        assert!(
+            prompt.contains("tagged [BOMB"),
+            "prompt must tell Gemini that bomb moves are tagged"
         );
     }
 
