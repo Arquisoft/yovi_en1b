@@ -1267,46 +1267,61 @@ describe('MongoUserRepository direct unit tests', () => {
         }
     })
 
-    describe('Strategy and Result Coverage (API Level)', () => {
+    describe('MCTS/AI Logic Branch Coverage', () => {
 
-        it('covers result: LOSS and strategy: undefined (defaults to random)', async () => {
-            // Creamos una partida rápida para poder terminarla
+        it('covers branch: strategy is known in STRATEGY_MAP (e.g. Monte Carlo)', async () => {
+            // Esto cubre: STRATEGY_MAP[strategy.toLowerCase()]
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'Monte Carlo', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(gameRes.body.strategy).toBe('mcts');
+        });
+
+        it('covers branch: strategy is unknown but provided (e.g. CustomBot)', async () => {
+            // Esto cubre: (strategy || 'random').toLowerCase() -> cuando strategy existe pero no está en el MAP
+            const gameRes = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'Defensive', game_type: 'BOT' })
+                .set('Authorization', `Bearer ${token}`);
+
+            // Si 'defensive' no está en tu STRATEGY_MAP (pero sí en el enum de la DB),
+            // se guardará como 'defensive' en minúsculas.
+            expect(gameRes.body.strategy).toBe('defensive');
+        });
+
+        it('covers branch: strategy is undefined (defaults to random)', async () => {
+            // Esto cubre la parte final: || 'random'
             const gameRes = await request(app)
                 .post('/games')
                 .send({ board_size: 7, strategy: undefined, game_type: 'BOT' })
                 .set('Authorization', `Bearer ${token}`);
 
-            const localGameId = gameRes.body._id;
+            expect(gameRes.body.strategy).toBe('random');
+        });
 
-            // Terminamos la partida como LOSS
-            // Esto pasará por: result === 'LOSS' ? 1 : 0
-            // Y por: strategy || 'random'
+        it('covers increments for LOSS and DRAW results', async () => {
+            // Creamos un juego para tener un ID válido
+            const game = await request(app)
+                .post('/games')
+                .send({ board_size: 7, strategy: 'mcts' })
+                .set('Authorization', `Bearer ${token}`);
+
+            // Forzamos el incremento de LOSS
             await request(app)
-                .put(`/games/${localGameId}/finish`)
+                .put(`/games/${game.body._id}/finish`)
                 .send({ result: 'LOSS', yen_final_state: '...', duration_seconds: 10 })
                 .set('Authorization', `Bearer ${token}`);
 
-            const res = await request(app)
-                .get(`/users/${userId}`)
-                .set('Authorization', `Bearer ${token}`);
-
-            const random = res.body.statistics.vs_bots.find(b => b.name === 'Random');
-            expect(random.losses).toBeGreaterThanOrEqual(1);
-        });
-
-        it('covers result: DRAW and strategy case-insensitivity', async () => {
-            const gameRes = await request(app)
+            // Forzamos el incremento de DRAW
+            const game2 = await request(app)
                 .post('/games')
-                .send({ board_size: 7, strategy: 'MONTE CARLO', game_type: 'BOT' })
+                .send({ board_size: 7, strategy: 'mcts' })
                 .set('Authorization', `Bearer ${token}`);
 
-            const localGameId = gameRes.body._id;
-
-            // Terminamos como DRAW
-            // Esto pasará por: result === 'DRAW' ? 1 : 0
-            // Y por: strategy?.toLowerCase() -> 'monte carlo' -> mapeo a 'mcts'
             await request(app)
-                .put(`/games/${localGameId}/finish`)
+                .put(`/games/${game2.body._id}/finish`)
                 .send({ result: 'DRAW', yen_final_state: '...', duration_seconds: 10 })
                 .set('Authorization', `Bearer ${token}`);
 
@@ -1315,6 +1330,7 @@ describe('MongoUserRepository direct unit tests', () => {
                 .set('Authorization', `Bearer ${token}`);
 
             const mcts = res.body.statistics.vs_bots.find(b => b.name === 'Monte Carlo');
+            expect(mcts.losses).toBeGreaterThanOrEqual(1);
             expect(mcts.draws).toBeGreaterThanOrEqual(1);
         });
     });
