@@ -2,9 +2,10 @@ const express = require('express');
 const authMiddleware = require('../middleware/auth');
 
 const STRATEGY_DIFFICULTY = {
-    random:    'Easy 😄',
-    defensive: 'Medium 😐',
-    mcts:      'Hard 😈'
+    random:        'Easy 😄',
+    defensive:     'Medium 😐',
+    mcts:          'Hard 😈',
+    ai:            'Medium 🤖'
 };
 
 module.exports = function userRoutes(repository) {

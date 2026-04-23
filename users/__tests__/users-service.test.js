@@ -169,18 +169,19 @@ describe('GET /leaderboard', () => {
         }
     })
 
-    it('vs_bots has random, defensive and mcts arrays', async () => {
+    it('vs_bots has random, defensive, mcts and ai arrays', async () => {
         const res = await request(app).get('/leaderboard')
 
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
     })
 
     it('vs_bots entries have username and wins', async () => {
         const res = await request(app).get('/leaderboard')
 
-        for (const botKey of ['random', 'defensive', 'mcts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             if (res.body.vs_bots[botKey].length > 0) {
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('username')
                 expect(res.body.vs_bots[botKey][0]).toHaveProperty('wins')
@@ -203,9 +204,10 @@ describe('GET /leaderboard', () => {
         expect(Array.isArray(res.body.vs_bots.random)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.defensive)).toBe(true)
         expect(Array.isArray(res.body.vs_bots.mcts)).toBe(true)
+        expect(Array.isArray(res.body.vs_bots.ai)).toBe(true)
 
         // wins field must always be a number, never undefined
-        for (const botKey of ['random', 'defensive', 'mcts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             res.body.vs_bots[botKey].forEach(entry => {
                 expect(typeof entry.wins).toBe('number')
             })
@@ -758,13 +760,16 @@ describe('GET /games/options', () => {
         expect(names).toContain('Random')
         expect(names).toContain('Defensive')
         expect(names).toContain('MCTS')
+        expect(names).toContain('Generative AI')
 
         const random = res.body.strategies.find(s => s.name === 'Random')
         const defensive = res.body.strategies.find(s => s.name === 'Defensive')
         const mcts = res.body.strategies.find(s => s.name === 'MCTS')
+        const ai = res.body.strategies.find(s => s.name === 'Generative AI')
         expect(random.difficulty).toBe('Easy 😄')
         expect(defensive.difficulty).toBe('Medium 😐')
         expect(mcts.difficulty).toBe('Hard 😈')
+        expect(ai.difficulty).toBe('Medium 🤖')
     })
 
     it('returns variants as objects with name, description and allowed_strategies', async () => {
@@ -932,14 +937,19 @@ describe('PUT /games/:id/finish', () => {
         expect(typeof random.losses).toBe('number')
     })
 
-    it('vs_bots array contains all three bots with correct shape', async () => {
+    it('vs_bots array contains all four bots with correct shape', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(200)
 
-        const BOT_DIFFICULTY = { random: 'Easy 😄', defensive: 'Medium 😐', mcts: 'Hard 😈' }
+        const BOT_DIFFICULTY = {
+            random:    'Easy 😄',
+            defensive: 'Medium 😐',
+            mcts:      'Hard 😈',
+            ai:        'Medium 🤖'
+        }
 
         for (const [name, difficulty] of Object.entries(BOT_DIFFICULTY)) {
             const entry = res.body.statistics.vs_bots.find(b => b.name === name)
@@ -1225,6 +1235,7 @@ describe('MongoUserRepository direct unit tests', () => {
                     random:    { wins: 50, losses: 0, draws: 0 },
                     defensive: { wins: 50, losses: 0, draws: 0 },
                     mcts:      { wins: 50, losses: 0, draws: 0 },
+                    ai:        { wins: 50, losses: 0, draws: 0 },
                 }
             }
         })
@@ -1234,7 +1245,7 @@ describe('MongoUserRepository direct unit tests', () => {
 
         const leaderboard = await repo.getLeaderboard()
 
-        for (const botKey of ['random', 'defensive', 'mcts']) {
+        for (const botKey of ['random', 'defensive', 'mcts', 'ai']) {
             const entry = leaderboard.vs_bots[botKey].find(e => e.username === 'NoBotDataUser')
             expect(entry).toBeDefined()           // user appears in results
             expect(entry.wins).toBe(0)            // ?? 0 fallback was hit

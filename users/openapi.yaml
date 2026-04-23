@@ -104,6 +104,7 @@ components:
             - { name: "random",    difficulty: "Easy 😄",   wins: 1, losses: 0, draws: 0 }
             - { name: "defensive", difficulty: "Medium 😐", wins: 2, losses: 1, draws: 0 }
             - { name: "mcts",      difficulty: "Hard 😈",   wins: 0, losses: 3, draws: 1 }
+            - { name: "ai",        difficulty: "Medium 🤖", wins: 1, losses: 1, draws: 0 }
 
     StrategyOption:
       type: object
@@ -130,9 +131,10 @@ components:
           items:
             $ref: '#/components/schemas/StrategyOption'
           example:
-            - { name: "Random",    difficulty: "Easy 😄"   }
-            - { name: "Defensive", difficulty: "Medium 😐" }
-            - { name: "MCTS",      difficulty: "Hard 😈"   }
+            - { name: "Random",       difficulty: "Easy 😄"   }
+            - { name: "Defensive",    difficulty: "Medium 😐" }
+            - { name: "MCTS",         difficulty: "Hard 😈"   }
+            - { name: "Generative AI", difficulty: "Medium 🤖" }
         variants:
           type: array
           items:
@@ -186,6 +188,10 @@ components:
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
             mcts:
+              type: array
+              items:
+                $ref: '#/components/schemas/BotLeaderboardEntry'
+            ai:
               type: array
               items:
                 $ref: '#/components/schemas/BotLeaderboardEntry'
@@ -472,7 +478,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [random, defensive, mcts]
+            enum: [random, defensive, mcts, ai]
             default: mcts
           description: "Bot strategy to use. Defaults to mcts (hardest) if not provided."
           example: "mcts"
@@ -537,9 +543,9 @@ paths:
                   example: "Tobias"
                 strategy:
                   type: string
-                  enum: [random, defensive, mcts]
+                  enum: [random, defensive, mcts, ai]
                   default: random
-                  description: "Difficulty is derived automatically: random=Easy 😄, defensive=Medium 😐, mcts=Hard 😈"
+                  description: "Difficulty is derived automatically: random=Easy 😄, defensive=Medium 😐, mcts=Hard 😈, ai=Medium 🤖"
                   example: "random"
       responses:
         '201':
