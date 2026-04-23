@@ -6,9 +6,10 @@ module.exports = function playRoute() {
 
     // Maps public bot_id names to the strategy strings Gamey (Rust) understands.
     const STRATEGY_MAP = {
-        random:    'random',
-        defensive: 'defensive',
-        mcts:      'mcts'
+        random:        'random',
+        defensive:     'defensive',
+        mcts:          'mcts',
+        ai:            'generative_ai'
     };
 
     // Public bot play — no auth, no game id needed

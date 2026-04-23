@@ -21,9 +21,10 @@ const userSchema = new mongoose.Schema({
             draws:  { type: Number, default: 0 }
         },
         vs_bot: {
-            random:    strategyStatsSchema,
-            defensive: strategyStatsSchema,
-            mcts:      strategyStatsSchema
+            random:        strategyStatsSchema,
+            defensive:     strategyStatsSchema,
+            mcts:          strategyStatsSchema,
+            ai:            strategyStatsSchema
         }
     }
 });
