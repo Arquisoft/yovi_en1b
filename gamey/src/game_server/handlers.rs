@@ -361,12 +361,17 @@ fn match_bot(name: &str) -> Option<Box<dyn YBot>> {
         // it maps to the hard-mode MCTS bot. Included explicitly so the
         // strategy match wins directly instead of depending on the
         // difficulty_level fallback.
-        "hard" | "ai" | "mcts" | "ncts" | "aggressive" => Some(Box::new(HardBot::default())),
+        // "Monte Carlo" is the display name sent by the webapp (STRATEGY_NAME.mcts).
+        // "montecarlo" covers the no-space variant just in case.
+        "hard" | "ai" | "mcts" | "ncts" | "aggressive" | "monte carlo" | "montecarlo" => {
+            Some(Box::new(HardBot::default()))
+        }
         "medium" | "defensive" | "balanced" => Some(Box::new(DefensiveBot)),
         "random" | "random_bot" | "easy" => Some(Box::new(RandomBot)),
         // Generative AI bot (Google Gemini). Requires GEMINI_API_KEY env var.
         // Falls back to a random move if the key is not set or the API call fails.
-        "gemini" | "generative" | "generativeai" | "generative_ai" => {
+        // "AI (Gemini)" is the display name sent by the webapp (STRATEGY_NAME.ai).
+        "gemini" | "generative" | "generativeai" | "generative_ai" | "ai (gemini)" => {
             GenerativeAIBot::from_env()
                 .map(|b| Box::new(b) as Box<dyn YBot>)
                 .or_else(|| {
@@ -1172,6 +1177,20 @@ mod tests {
         assert_eq!(pick_bot(Some("balanced"), Some("medium")).name(), "medium");
         assert_eq!(pick_bot(Some("aggressive"), Some("hard")).name(), "hard");
 
+        // Webapp display-name aliases (STRATEGY_NAME in gameRoutes.js).
+        // The frontend sends selectedStrategy.name — the human-readable label —
+        // not the internal id, so the server must recognise these strings too.
+        //   STRATEGY_NAME.random    = "Random"      → already matched by "random"
+        //   STRATEGY_NAME.defensive = "Defensive"   → already matched by "defensive"
+        //   STRATEGY_NAME.mcts      = "Monte Carlo" → previously fell through to RandomBot
+        //   STRATEGY_NAME.ai        = "AI (Gemini)" → previously fell through to RandomBot
+        assert_eq!(pick_bot(Some("Monte Carlo"), None).name(), "hard",
+            "'Monte Carlo' (STRATEGY_NAME.mcts) must route to HardBot");
+        assert_eq!(pick_bot(Some("monte carlo"), None).name(), "hard",
+            "case-insensitive match for 'monte carlo'");
+        assert_eq!(pick_bot(Some("montecarlo"), None).name(), "hard",
+            "no-space variant 'montecarlo' must also route to HardBot");
+
         // Gemini / Generative AI bot aliases.
         // We set a mock key temporarily so the bot is successfully created
         // rather than falling back to RandomBot (which would have the wrong name).
@@ -1179,6 +1198,11 @@ mod tests {
         assert_eq!(pick_bot(Some("gemini"), None).name(), "gemini");
         assert_eq!(pick_bot(Some("generative"), None).name(), "gemini");
         assert_eq!(pick_bot(Some("generative_ai"), None).name(), "gemini");
+        // "AI (Gemini)" is STRATEGY_NAME.ai — the display name sent by the webapp.
+        assert_eq!(pick_bot(Some("AI (Gemini)"), None).name(), "gemini",
+            "'AI (Gemini)' (STRATEGY_NAME.ai) must route to GenerativeAIBot");
+        assert_eq!(pick_bot(Some("ai (gemini)"), None).name(), "gemini",
+            "case-insensitive match for 'ai (gemini)'");
         unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
 
