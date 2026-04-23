@@ -48,10 +48,6 @@ class MongoUserRepository extends UserRepository {
     const lossIncr = result === 'LOSS' ? 1 : 0;
     const drawIncr = result === 'DRAW' ? 1 : 0;
 
-    update.$inc['statistics.total_wins']   = winIncr;
-    update.$inc['statistics.total_losses'] = lossIncr;
-    update.$inc['statistics.total_draws']  = drawIncr;
-
     if (type === 'PLAYER') {
       update.$inc['statistics.vs_player.wins']   = winIncr;
       update.$inc['statistics.vs_player.losses'] = lossIncr;
