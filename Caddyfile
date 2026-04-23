@@ -1,4 +1,4 @@
-{$DEPLOY_DOMAIN:yovi-en1b.alejandrosanclaudio.com} {
+{$DEPLOY_DOMAIN} {
     # 1. Users API: intercept /api/users and forward to users:3000 container
     # handle_path automatically strips the prefix before forwarding
     handle_path /api/users/* {

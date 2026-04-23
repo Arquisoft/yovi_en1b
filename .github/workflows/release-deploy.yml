@@ -55,7 +55,6 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox]
-    # Lanzamos MongoDB para que los tests de registro/login funcionen
     services:
       mongodb:
         image: mongo:latest
@@ -85,7 +84,6 @@ jobs:
           npm run test:e2e:install-browsers
       - name: Run E2E tests
         env:
-          # Le decimos al backend de los tests que use el MongoDB que acabamos de levantar
           MONGODB_URI: mongodb://localhost:27017/test_db
           GAMEY_URL: http://localhost:4000
           BROWSER: ${{ matrix.browser }}
@@ -163,7 +161,8 @@ jobs:
           user: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           command: |
-            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/docker-compose.yml -O docker-compose.yml
-            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/master/Caddyfile -O Caddyfile
+            echo "DEPLOY_DOMAIN=${{ secrets.DEPLOY_DOMAIN }}" > .env
+            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/docker-compose.yml -O docker-compose.yml
+            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/Caddyfile -O Caddyfile
             docker compose down
             docker compose up -d --pull always
