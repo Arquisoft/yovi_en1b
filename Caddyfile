@@ -10,7 +10,12 @@
         reverse_proxy gamey:4000
     }
 
-    # 3. Everything else falls back to the Frontend application (Webapp)
+    # 3. Grafana Dashboard
+    handle /grafana* {
+        reverse_proxy grafana:3000
+    }
+
+    # 4. Everything else falls back to the Frontend application (Webapp)
     handle {
         reverse_proxy webapp:80
     }
