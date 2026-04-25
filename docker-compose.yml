@@ -82,6 +82,7 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./users/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
     networks:
       - monitor-net
 
@@ -113,3 +114,4 @@ volumes:
   mongo-data:
   caddy_data:
   caddy_config:
+  grafana_data:
