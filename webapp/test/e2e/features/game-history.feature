@@ -13,11 +13,11 @@ Feature: Game history
     And I configure a local player game with opponent "Alice"
     And I start the game
     And I play the first available hex
-    And I finish the game as canceled
+    And I surrender game
     And I open the game history page
     Then I should see the game history heading
     And the game history list should have at least 1 entry
-    And the game history should show a "CANCELED" result
+    And the game history should show a "SURRENDERED" result
 
   Scenario: Game history entry links to the game page
     Given I have a registered user
@@ -25,8 +25,8 @@ Feature: Game history
     And I configure a local player game with opponent "Bob"
     And I start the game
     And I play the first available hex
-    And I finish the game as canceled
+    And I surrender game
     And I open the game history page
     And I click the first game history entry
     Then I should be on a game page
-    And I should see "CANCELED"
+    And I should see "SURRENDERED"

@@ -221,17 +221,17 @@ function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R
   return {
     ...nextGame,
     status: free.length === 0 ? 'FINISHED' : 'IN_PROGRESS',
-    result: free.length === 0 ? 'CANCELED' : null
+    result: free.length === 0 ? 'SURRENDERED' : null
   };
 }
 
 function emptyWinLoss(): WinLossStats {
-  return { wins: 0, losses: 0, draws: 0 };
+  return { wins: 0, losses: 0, surrendered: 0 };
 }
 
 function getUserStatistics(userId: string): UserStatistics {
   const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
-  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
+  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; surrendered: number }>();
 
   // Initialize all strategies
   for (const option of DEFAULT_STRATEGY_OPTIONS) {
@@ -240,7 +240,7 @@ function getUserStatistics(userId: string): UserStatistics {
       difficulty: option.difficulty,
       wins: 0,
       losses: 0,
-      draws: 0
+      surrendered: 0
     });
   }
 
@@ -248,7 +248,7 @@ function getUserStatistics(userId: string): UserStatistics {
     total_games: userGames.length,
     total_wins: 0,
     total_losses: 0,
-    total_canceled: 0,
+    total_surrendered: 0,
     vs_player: emptyWinLoss(),
     vs_bots: []
   };
@@ -256,12 +256,12 @@ function getUserStatistics(userId: string): UserStatistics {
   for (const game of userGames) {
     if (game.result === 'WIN') stats.total_wins += 1;
     if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'CANCELED') stats.total_canceled += 1;
+    if (game.result === 'SURRENDERED') stats.total_surrendered += 1;
 
     if (game.game_type === 'PLAYER') {
       if (game.result === 'WIN') stats.vs_player.wins += 1;
       if (game.result === 'LOSS') stats.vs_player.losses += 1;
-      if (game.result === 'CANCELED') stats.vs_player.draws += 1;
+      if (game.result === 'SURRENDERED') stats.vs_player.surrendered += 1;
       continue;
     }
 
@@ -269,7 +269,7 @@ function getUserStatistics(userId: string): UserStatistics {
     if (existing) {
       if (game.result === 'WIN') existing.wins += 1;
       if (game.result === 'LOSS') existing.losses += 1;
-      if (game.result === 'CANCELED') existing.draws += 1;
+      if (game.result === 'SURRENDERED') existing.surrendered += 1;
     }
   }
 
@@ -539,7 +539,7 @@ export const handlers = [
 
     const free = getFreeCoordinates(game);
     if (free.length === 0) {
-      const finished = { ...game, status: 'FINISHED' as const, result: 'CANCELED' as const };
+      const finished = { ...game, status: 'FINISHED' as const, result: 'SURRENDERED' as const };
       mockGames.set(finished._id, finished);
       return HttpResponse.json(finished);
     }
@@ -591,7 +591,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'CANCELED'; duration_seconds?: number };
+    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'SURRENDERED'; duration_seconds?: number };
     if (!body.result) {
       return HttpResponse.json({ error: 'result is required' }, { status: 400 });
     }

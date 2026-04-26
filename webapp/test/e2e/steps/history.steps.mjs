@@ -11,11 +11,11 @@ When('I open the game history page', async function () {
   await page.getByRole('heading', { name: 'Game History' }).waitFor({ timeout: 10_000 })
 })
 
-When('I finish the game as canceled', async function () {
+When('I surrender game', async function () {
   const page = this.page
   if (!page) throw new Error('Page not initialized')
 
-  await page.locator('[aria-label="Finish game as canceled"]').click()
+  await page.locator('[aria-label="Surrender game"]').click()
   await page.locator('.game-result-text').waitFor({ timeout: 10_000 })
 })
 

@@ -44,13 +44,13 @@ describe('ProfilePage', () => {
             total_games: 10,
             total_wins: 5,
             total_losses: 3,
-            total_canceled: 2,
-            vs_player: { wins: 2, losses: 1, draws: 1 },
+            total_surrendered: 2,
+            vs_player: { wins: 2, losses: 1, surrendered: 1 },
             vs_bots: [
-              { name: 'random', difficulty: 'easy', wins: 1, losses: 0, draws: 0 },
-              { name: 'ai', difficulty: 'medium', wins: 1, losses: 1, draws: 1 },
-              { name: 'dijkstra', difficulty: 'hard', wins: 1, losses: 1, draws: 0 },
-              { name: 'minimax', difficulty: 'hard', wins: 0, losses: 1, draws: 0 }
+              { name: 'random', difficulty: 'easy', wins: 1, losses: 0, surrendered: 0 },
+              { name: 'ai', difficulty: 'medium', wins: 1, losses: 1, surrendered: 1 },
+              { name: 'dijkstra', difficulty: 'hard', wins: 1, losses: 1, surrendered: 0 },
+              { name: 'minimax', difficulty: 'hard', wins: 0, losses: 1, surrendered: 0 }
             ]
           }
         })
@@ -63,7 +63,7 @@ describe('ProfilePage', () => {
     expect(await screen.findByRole('heading', { name: PROFILE_TEST_DATA.username })).toBeInTheDocument();
     expect(screen.getByText('Total games')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('Canceled games')).toBeInTheDocument();
+    expect(screen.getByText('Surrendered games')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('Win rate')).toBeInTheDocument();
     expect(screen.getByText('50%')).toBeInTheDocument();
@@ -99,12 +99,12 @@ describe('ProfilePage', () => {
             total_games: 0,
             total_wins: 0,
             total_losses: 0,
-            total_canceled: 0,
-            vs_player: { wins: 0, losses: 0, draws: 0 },
+            total_surrendered: 0,
+            vs_player: { wins: 0, losses: 0, surrendered: 0 },
             vs_bots: [
-              { name: 'random', difficulty: 'easy', wins: 0, losses: 0, draws: 0 },
-              { name: 'ai', difficulty: 'medium', wins: 0, losses: 0, draws: 0 },
-              { name: 'dijkstra', difficulty: 'hard', wins: 0, losses: 0, draws: 0 }
+              { name: 'random', difficulty: 'easy', wins: 0, losses: 0, surrendered: 0 },
+              { name: 'ai', difficulty: 'medium', wins: 0, losses: 0, surrendered: 0 },
+              { name: 'dijkstra', difficulty: 'hard', wins: 0, losses: 0, surrendered: 0 }
             ]
           }
         })
