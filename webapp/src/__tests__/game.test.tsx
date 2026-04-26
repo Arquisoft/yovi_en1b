@@ -239,7 +239,7 @@ describe('GamePage — finish', () => {
     );
     renderGamePage();
     await screen.findByLabelText('game board');
-    await userEvent.click(screen.getByRole('button', { name: /finish/i }));
+    await userEvent.click(screen.getByRole('button', { name: /surrender/i }));
     await screen.findByText(/^surrendered$/i);
   });
 
