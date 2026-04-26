@@ -1254,5 +1254,4 @@ mod tests {
         let bot_with_key = pick_bot(Some("generativeai"), None);
         assert_eq!(bot_with_key.name(), "gemini");
     }
-    }
 }
