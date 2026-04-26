@@ -10,12 +10,17 @@
         reverse_proxy gamey:4000
     }
 
-    # 3. Grafana Dashboard
+    # 3. API Documentation (Swagger)
+    handle /api-docs* {
+        reverse_proxy users:3000
+    }
+
+    # 4. Grafana Dashboard
     handle /grafana* {
         reverse_proxy grafana:3000
     }
 
-    # 4. Everything else falls back to the Frontend application (Webapp)
+    # 5. Everything else falls back to the Frontend application (Webapp)
     handle {
         reverse_proxy webapp:80
     }
