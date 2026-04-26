@@ -1,0 +1,12 @@
+{
+  "name": "yovi-load-tests",
+  "version": "1.0.0",
+  "description": "YOVI load tests",
+  "scripts": {
+    "test": "artillery run scenario-flow.yml -o report.json",
+    "report": "artillery report report.json"
+  },
+  "devDependencies": {
+    "artillery": "^2.0.19"
+  }
+}
