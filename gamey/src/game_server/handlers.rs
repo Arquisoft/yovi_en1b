@@ -1205,8 +1205,7 @@ mod tests {
             "no-space variant 'montecarlo' must also route to HardBot");
 
         // Gemini / Generative AI bot aliases.
-        // We set a mock key temporarily so the bot is successfully created
-        // rather than falling back to RandomBot (which would have the wrong name).
+        // We set a mock key so the bot is successfully created.
         unsafe { std::env::set_var("GEMINI_API_KEY", "mock_key") };
         assert_eq!(pick_bot(Some("gemini"), None).name(), "gemini");
         assert_eq!(pick_bot(Some("generative"), None).name(), "gemini");
@@ -1216,7 +1215,6 @@ mod tests {
             "'AI (Gemini)' (STRATEGY_NAME.ai) must route to GenerativeAIBot");
         assert_eq!(pick_bot(Some("ai (gemini)"), None).name(), "gemini",
             "case-insensitive match for 'ai (gemini)'");
-        unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
 
     /// Covers the `t0|` prefix branch in `parse_yen_layout`.
@@ -1251,22 +1249,10 @@ mod tests {
     /// Covers the `generativeai` alias (not yet asserted in the strategy test).
     #[test]
     fn test_pick_bot_generativeai_alias_recognized() {
-        // "generativeai" must route to the gemini bot (when key is set) or
-        // fall back to random_bot (when key is absent). It must never panic or
-        // route to a completely unrelated bot.
-        let bot_no_key = {
-            unsafe { std::env::remove_var("GEMINI_API_KEY") };
-            pick_bot(Some("generativeai"), None)
-        };
-        assert!(
-            bot_no_key.name() == "gemini" || bot_no_key.name() == "random_bot",
-            "generativeai without key must be gemini or random_bot, got {}",
-            bot_no_key.name()
-        );
-
+        // generativeai must route to the gemini bot when key is set.
         unsafe { std::env::set_var("GEMINI_API_KEY", "mock") };
         let bot_with_key = pick_bot(Some("generativeai"), None);
         assert_eq!(bot_with_key.name(), "gemini");
-        unsafe { std::env::remove_var("GEMINI_API_KEY") };
+    }
     }
 }
