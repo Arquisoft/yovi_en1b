@@ -69,3 +69,4 @@ scenarios:
           url: "/games/{{ gameId }}/play"
           headers:
             Authorization: "Bearer {{ jwt_token }}"
+
