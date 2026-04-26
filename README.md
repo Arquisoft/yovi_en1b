@@ -13,7 +13,7 @@
 🌐 **Play now:** [http://4.233.184.98](http://4.233.184.98)  
 📝 **Documentation:** [https://arquisoft.github.io/yovi_en1b/](https://arquisoft.github.io/yovi_en1b/)  
 ⛓ **API documentation:** [http://4.233.184.98:3000/api-docs/](http://4.233.184.98:3000/api-docs/)  
-💻 **Presentation:** [TODO](TODO)
+💻 **Presentation:** [https://unioviedo-my.sharepoint.com/:p:/g/personal/uo300737_uniovi_es/IQB9cM3T7TEoRb0_UlpRNN7KAQqYyhrof3oPOBM6smSkXko?e=MURep5](https://unioviedo-my.sharepoint.com/:p:/g/personal/uo300737_uniovi_es/IQB9cM3T7TEoRb0_UlpRNN7KAQqYyhrof3oPOBM6smSkXko?e=MURep5)
 
 </div>
 
