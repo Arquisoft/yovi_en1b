@@ -24,11 +24,11 @@ function formatDuration(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
-function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'canceled' | 'pending' {
+function getOutcome(game: GameHistoryItem): 'win' | 'loss' | 'surrendered' | 'pending' {
   if (game.status !== 'FINISHED') return 'pending';
   if (game.result === 'WIN') return 'win';
   if (game.result === 'LOSS') return 'loss';
-  if (game.result === 'CANCELED') return 'canceled';
+  if (game.result === 'SURRENDERED') return 'surrendered';
   return 'pending';
 }
 

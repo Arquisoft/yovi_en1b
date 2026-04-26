@@ -301,11 +301,15 @@ module.exports = function gameRoutes(repository) {
         }
     });
 
-    // Finish a game manually (UNFINISHED when user quits — does not affect statistics)
+    // Finish a game manually using an explicit result
     router.put('/:id/finish', authMiddleware, async function finishGame(req, res) {
         const { result, yen_final_state } = req.body || {};
+        const validResults = ['WIN', 'LOSS', 'SURRENDERED'];
 
-        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or UNFINISHED)' });
+        if (!result) return res.status(400).json({ error: 'result is required (WIN, LOSS or SURRENDERED)' });
+        if (!validResults.includes(result)) {
+            return res.status(400).json({ error: `Invalid result: ${result}. Must be one of: ${validResults.join(', ')}` });
+        }
 
         try {
             const game = await repository.findGameById(req.params.id);
@@ -320,13 +324,11 @@ module.exports = function gameRoutes(repository) {
                 duration_seconds
             });
 
-            if (result !== 'UNFINISHED') {
-                await repository.updateStats(game.player_id, {
-                    result,
-                    type:     game.game_type,
-                    strategy: game.strategy
-                });
-            }
+            await repository.updateStats(game.player_id, {
+                result,
+                type:     game.game_type,
+                strategy: game.strategy
+            });
 
             res.json(updatedGame);
         } catch (err) {

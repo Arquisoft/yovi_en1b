@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const strategyStatsSchema = {
     wins:   { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
-    draws:  { type: Number, default: 0 }
+    surrendered: { type: Number, default: 0 }
 };
 
 const userSchema = new mongoose.Schema({
@@ -14,11 +14,11 @@ const userSchema = new mongoose.Schema({
         total_games:  { type: Number, default: 0 },
         total_wins:   { type: Number, default: 0 },
         total_losses: { type: Number, default: 0 },
-        total_draws:  { type: Number, default: 0 },
+        total_surrendered: { type: Number, default: 0 },
         vs_player: {
             wins:   { type: Number, default: 0 },
             losses: { type: Number, default: 0 },
-            draws:  { type: Number, default: 0 }
+            surrendered: { type: Number, default: 0 }
         },
         vs_bot: {
             random:        strategyStatsSchema,

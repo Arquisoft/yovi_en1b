@@ -64,7 +64,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     moves: []
   },
   {
-    _id: 'seed-game-bot-hard-draw',
+    _id: 'seed-game-bot-hard-surrendered',
     player_id: DEFAULT_MOCK_USER.userId,
     game_type: 'BOT',
     name_of_enemy: null,
@@ -75,7 +75,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     rule_set: 'normal',
     current_turn: 'B',
     status: 'FINISHED',
-    result: 'CANCELED',
+    result: 'SURRENDERED',
     duration_seconds: 300,
     created_at: '2026-03-16T13:00:00.000Z',
     yen_final_state: 'B/.R/RB./B..R/.....',
