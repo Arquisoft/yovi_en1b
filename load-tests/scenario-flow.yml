@@ -5,7 +5,7 @@ config:
     local:
       target: "http://localhost:3000"
     production:
-      target: "https://your-domain.com/api/users"
+      target: "https://{{ $processEnvironment.DEPLOY_DOMAIN }}/api/users"
   processor: "./processor.js"
   phases:
     - duration: 15

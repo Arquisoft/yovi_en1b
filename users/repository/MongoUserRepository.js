@@ -59,7 +59,7 @@ class MongoUserRepository extends UserRepository {
     const increments = {
       wins:   result === 'WIN'  ? 1 : 0,
       losses: result === 'LOSS' ? 1 : 0,
-      draws:  result === 'DRAW' ? 1 : 0
+      surrendered: result === 'SURRENDERED' ? 1 : 0
     };
 
     // 3. Initialize the update object with total game increments
@@ -68,7 +68,7 @@ class MongoUserRepository extends UserRepository {
         'statistics.total_games': 1,
         'statistics.total_wins':   increments.wins,
         'statistics.total_losses': increments.losses,
-        'statistics.total_draws':  increments.draws
+        'statistics.total_surrendered': increments.surrendered
       }
     };
 
@@ -80,7 +80,7 @@ class MongoUserRepository extends UserRepository {
     // 5. Apply the same increments to the category-specific path
     update.$inc[`statistics.${categoryPath}.wins`]   = increments.wins;
     update.$inc[`statistics.${categoryPath}.losses`] = increments.losses;
-    update.$inc[`statistics.${categoryPath}.draws`]  = increments.draws;
+    update.$inc[`statistics.${categoryPath}.surrendered`]  = increments.surrendered;
 
     return await User.findByIdAndUpdate(userId, update, { new: true });
   }

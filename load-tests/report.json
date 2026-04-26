@@ -1,7 +1,7 @@
 {
   "aggregate": {
     "counters": {
-      "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 480,
+      "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 480,
       "vusers.created": 480,
       "http.requests": 2400,
       "http.codes.201": 1440,
@@ -269,7 +269,7 @@
   "intermediate": [
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 14,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 14,
         "vusers.created": 14,
         "http.requests": 70,
         "http.codes.201": 42,
@@ -537,7 +537,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 26,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 26,
         "vusers.created": 26,
         "http.requests": 130,
         "http.codes.201": 78,
@@ -805,7 +805,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 50,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 50,
         "vusers.created": 50,
         "http.requests": 250,
         "http.codes.201": 150,
@@ -1073,7 +1073,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 50,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 50,
         "vusers.created": 50,
         "http.requests": 250,
         "http.codes.201": 150,
@@ -1341,7 +1341,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 67,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 67,
         "vusers.created": 67,
         "http.requests": 328,
         "http.codes.201": 196,
@@ -1609,7 +1609,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 150,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 150,
         "vusers.created": 150,
         "http.requests": 750,
         "http.codes.201": 450,
@@ -1877,7 +1877,7 @@
     },
     {
       "counters": {
-        "vusers.created_by_name.Flujo Completo: Registro, Login y Jugar contra Bot": 123,
+        "vusers.created_by_name.Full Flow: Register, Login, and Play against Bot": 123,
         "vusers.created": 123,
         "http.requests": 622,
         "http.codes.201": 374,

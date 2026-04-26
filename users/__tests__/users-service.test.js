@@ -253,7 +253,7 @@ describe('GET /users/:id', () => {
         expect(typeof statistics.total_games).toBe('number')
         expect(typeof statistics.total_wins).toBe('number')
         expect(typeof statistics.total_losses).toBe('number')
-        expect(typeof statistics.total_draws).toBe('number')
+        expect(typeof statistics.total_surrendered).toBe('number')
         expect(Array.isArray(statistics.vs_bots)).toBe(true)
     })
 
@@ -277,7 +277,7 @@ describe('GET /users/:id', () => {
         expect(res.status).toBe(404)
     })
 
-    it('includes vs_player stats with wins, losses and draws', async () => {
+    it('includes vs_player stats with wins, losses and surrendered', async () => {
         const res = await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)
@@ -287,7 +287,7 @@ describe('GET /users/:id', () => {
         expect(vs_player).toBeDefined()
         expect(typeof vs_player.wins).toBe('number')
         expect(typeof vs_player.losses).toBe('number')
-        expect(typeof vs_player.draws).toBe('number')
+        expect(typeof vs_player.surrendered).toBe('number')
     })
 
     it('returns 500 when repository throws', async () => {
@@ -874,7 +874,7 @@ describe('POST /games/:id/undo', () => {
 
         await request(app)
             .put(`/games/${finishedId}/finish`)
-            .send({ result: 'UNFINISHED' })
+            .send({ result: 'SURRENDERED' })
             .set('Authorization', `Bearer ${token}`)
 
         const res = await request(app)
@@ -971,11 +971,11 @@ describe('PUT /games/:id/finish', () => {
             expect(entry.difficulty).toBe(difficulty);
             expect(typeof entry.wins).toBe('number');
             expect(typeof entry.losses).toBe('number');
-            expect(typeof entry.draws).toBe('number');
+            expect(typeof entry.surrendered).toBe('number');
         }
     })
 
-    it('does NOT update stats when result is UNFINISHED (user quit)', async () => {
+    it('updates surrendered stats when result is SURRENDERED (user quit)', async () => {
         const statsBefore = (await request(app)
             .get(`/users/${userId}`)
             .set('Authorization', `Bearer ${token}`)).body.statistics
@@ -986,7 +986,7 @@ describe('PUT /games/:id/finish', () => {
             .set('Authorization', `Bearer ${token}`)
         await request(app)
             .put(`/games/${createRes.body._id}/finish`)
-            .send({ result: 'UNFINISHED' })
+            .send({ result: 'SURRENDERED' })
             .set('Authorization', `Bearer ${token}`)
 
         const statsAfter = (await request(app)
@@ -995,6 +995,7 @@ describe('PUT /games/:id/finish', () => {
 
         expect(statsAfter.total_wins).toBe(statsBefore.total_wins)
         expect(statsAfter.total_losses).toBe(statsBefore.total_losses)
+        expect(statsAfter.total_surrendered).toBe(statsBefore.total_surrendered + 1)
     })
 
     it('returns 400 if result is missing', async () => {
@@ -1217,15 +1218,15 @@ describe('MongoUserRepository direct unit tests', () => {
         expect(updated.result).toBe('WIN')
     })
 
-    // ── updateStats: draws branch (covers vs_bot draws + findByIdAndUpdate) ──
+    // ── updateStats: surrendered branch (covers vs_bot surrendered + findByIdAndUpdate) ──
 
-    it('updateStats increments draws for a BOT game (covers drawIncr and findByIdAndUpdate)', async () => {
-        const user = await User.create({ username: 'DrawStatsUser', password_hash: 'x' })
-        await repo.updateStats(user._id, { result: 'DRAW', type: 'BOT', strategy: 'mcts' })
+    it('updateStats increments surrendered for a BOT game (covers findByIdAndUpdate)', async () => {
+        const user = await User.create({ username: 'SurrenderedStatsUser', password_hash: 'x' })
+        await repo.updateStats(user._id, { result: 'SURRENDERED', type: 'BOT', strategy: 'mcts' })
 
         const updated = await repo.findById(user._id)
-        expect(updated.statistics.total_draws).toBe(1)
-        expect(updated.statistics.vs_bot.mcts.draws).toBe(1)
+        expect(updated.statistics.total_surrendered).toBe(1)
+        expect(updated.statistics.vs_bot.mcts.surrendered).toBe(1)
         // wins and losses stay 0
         expect(updated.statistics.total_wins).toBe(0)
         expect(updated.statistics.total_losses).toBe(0)
@@ -1244,12 +1245,12 @@ describe('MongoUserRepository direct unit tests', () => {
                 total_games:  3,
                 total_wins:   50,
                 total_losses: 0,
-                total_draws:  0,
+                total_surrendered:  0,
                 vs_bot: {
-                    random:    { wins: 50, losses: 0, draws: 0 },
-                    defensive: { wins: 50, losses: 0, draws: 0 },
-                    mcts:      { wins: 50, losses: 0, draws: 0 },
-                    ai:        { wins: 50, losses: 0, draws: 0 },
+                    random:    { wins: 50, losses: 0, surrendered: 0 },
+                    defensive: { wins: 50, losses: 0, surrendered: 0 },
+                    mcts:      { wins: 50, losses: 0, surrendered: 0 },
+                    ai:        { wins: 50, losses: 0, surrendered: 0 },
                 }
             }
         })
@@ -1301,7 +1302,7 @@ describe('MongoUserRepository direct unit tests', () => {
             expect(gameRes.body.strategy).toBe('random');
         });
 
-        it('covers increments for LOSS and DRAW results', async () => {
+        it('covers increments for LOSS and SURRENDERED results', async () => {
             // Creamos un juego para tener un ID válido
             const game = await request(app)
                 .post('/games')
@@ -1314,7 +1315,7 @@ describe('MongoUserRepository direct unit tests', () => {
                 .send({ result: 'LOSS', yen_final_state: '...', duration_seconds: 10 })
                 .set('Authorization', `Bearer ${token}`);
 
-            // Forzamos el incremento de DRAW
+            // Forzamos el incremento de SURRENDERED
             const game2 = await request(app)
                 .post('/games')
                 .send({ board_size: 7, strategy: 'mcts' })
@@ -1322,7 +1323,7 @@ describe('MongoUserRepository direct unit tests', () => {
 
             await request(app)
                 .put(`/games/${game2.body._id}/finish`)
-                .send({ result: 'DRAW', yen_final_state: '...', duration_seconds: 10 })
+                .send({ result: 'SURRENDERED', yen_final_state: '...', duration_seconds: 10 })
                 .set('Authorization', `Bearer ${token}`);
 
             const res = await request(app)
@@ -1331,7 +1332,7 @@ describe('MongoUserRepository direct unit tests', () => {
 
             const mcts = res.body.statistics.vs_bots.find(b => b.name === 'Monte Carlo');
             expect(mcts.losses).toBeGreaterThanOrEqual(1);
-            expect(mcts.draws).toBeGreaterThanOrEqual(1);
+            expect(mcts.surrendered).toBeGreaterThanOrEqual(1);
         });
     });
 })
