@@ -542,8 +542,8 @@ export function GamePage() {
                     className="icon-btn icon-btn--danger"
                     onClick={handleFinish}
                     disabled={actionLoading || !inProgress}
-                    title="Finish game as surrendered"
-                    aria-label="Finish game as surrendered"
+                    title="Surrender game"
+                    aria-label="Surrender game"
                   >
                     ⏹
                   </button>
