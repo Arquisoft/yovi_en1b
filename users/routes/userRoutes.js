@@ -38,7 +38,7 @@ module.exports = function userRoutes(repository) {
                 difficulty: difficulty,
                 wins:       vsBot[name]?.wins   ?? 0,
                 losses:     vsBot[name]?.losses ?? 0,
-                draws:      vsBot[name]?.draws  ?? 0
+                surrendered: vsBot[name]?.surrendered ?? 0
             }));
 
             const games = await repository.findGamesByPlayer(obj._id);
@@ -52,8 +52,8 @@ module.exports = function userRoutes(repository) {
                     total_games:  stats.total_games  ?? 0,
                     total_wins:   stats.total_wins   ?? 0,
                     total_losses: stats.total_losses ?? 0,
-                    total_draws:  stats.total_draws  ?? 0,
-                    vs_player:    stats.vs_player    ?? { wins: 0, losses: 0, draws: 0 },
+                    total_surrendered: stats.total_surrendered ?? 0,
+                    vs_player:    stats.vs_player    ?? { wins: 0, losses: 0, surrendered: 0 },
                     vs_bots
                 }
             };
