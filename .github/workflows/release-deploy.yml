@@ -162,7 +162,21 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           command: |
             echo "DEPLOY_DOMAIN=${{ secrets.DEPLOY_DOMAIN }}" > .env
-            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/docker-compose.yml -O docker-compose.yml
-            wget https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}/Caddyfile -O Caddyfile
+            
+            BASE_URL="https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}"
+            
+            wget $BASE_URL/docker-compose.yml -O docker-compose.yml
+            wget $BASE_URL/Caddyfile -O Caddyfile
+            
+            # Fetch monitoring configuration files
+            mkdir -p users/monitoring/prometheus
+            mkdir -p users/monitoring/grafana/provisioning/datasources
+            mkdir -p users/monitoring/grafana/provisioning/dashboards
+            
+            wget $BASE_URL/users/monitoring/prometheus/prometheus.yml -O users/monitoring/prometheus/prometheus.yml
+            wget $BASE_URL/users/monitoring/grafana/provisioning/datasources/datasource.yml -O users/monitoring/grafana/provisioning/datasources/datasource.yml
+            wget $BASE_URL/users/monitoring/grafana/provisioning/dashboards/dashboard.json -O users/monitoring/grafana/provisioning/dashboards/dashboard.json
+            wget $BASE_URL/users/monitoring/grafana/provisioning/dashboards/dashboard.yml -O users/monitoring/grafana/provisioning/dashboards/dashboard.yml
+            
             docker compose down
             docker compose up -d --pull always

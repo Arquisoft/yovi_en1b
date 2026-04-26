@@ -1,0 +1,71 @@
+config:
+  # Default fallback target
+  target: "http://localhost:3000"
+  environments:
+    local:
+      target: "http://localhost:3000"
+    production:
+      target: "https://your-domain.com/api/users"
+  processor: "./processor.js"
+  phases:
+    - duration: 15
+      arrivalRate: 2
+      name: "Warm up"
+    - duration: 30
+      arrivalRate: 5
+      name: "Sustained load"
+    - duration: 20
+      arrivalRate: 15
+      name: "Peak load"
+scenarios:
+  - name: "Full Flow: Register, Login, and Play against Bot"
+    flow:
+      # 1. Generate user variables
+      - function: "generateUserData"
+
+      # 2. Register the user
+      - post:
+          url: "/createuser"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+      
+      # 3. Login to obtain JWT
+      - post:
+          url: "/login"
+          json:
+            username: "{{ username }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.token"
+              as: "jwt_token"
+
+      # 4. Create a new game against a Bot (Random strategy)
+      - post:
+          url: "/games"
+          headers:
+            Authorization: "Bearer {{ jwt_token }}"
+          json:
+            board_size: 5
+            strategy: "random"
+            game_type: "BOT"
+          capture:
+            - json: "$._id"
+              as: "gameId"
+      
+      # 5. Make the first player move
+      - post:
+          url: "/games/{{ gameId }}/move"
+          headers:
+            Authorization: "Bearer {{ jwt_token }}"
+          json:
+            coordinates:
+              x: 0
+              y: 0
+              z: 0
+
+      # 6. Request the Bot to play
+      - get:
+          url: "/games/{{ gameId }}/play"
+          headers:
+            Authorization: "Bearer {{ jwt_token }}"

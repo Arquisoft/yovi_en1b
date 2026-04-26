@@ -76,8 +76,13 @@ services:
     container_name: grafana
     ports:
       - "9091:3000"
+    environment:
+      - GF_SERVER_DOMAIN=$DEPLOY_DOMAIN
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./users/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
     networks:
       - monitor-net
 
@@ -109,3 +114,4 @@ volumes:
   mongo-data:
   caddy_data:
   caddy_config:
+  grafana_data:

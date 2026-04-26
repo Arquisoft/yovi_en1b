@@ -1,0 +1,36 @@
+name: Load Testing (Production)
+
+on:
+  workflow_dispatch:
+    # Triggered manually from the GitHub Actions UI
+
+jobs:
+  run-load-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: load-tests/package-lock.json || load-tests/package.json
+
+      - name: Install dependencies
+        working-directory: ./load-tests
+        run: npm install
+
+      - name: Run Artillery Load Test
+        working-directory: ./load-tests
+        env:
+          DEPLOY_DOMAIN: ${{ secrets.DEPLOY_DOMAIN }}
+        run: |
+          if [ -z "$DEPLOY_DOMAIN" ]; then
+            echo "Error: DEPLOY_DOMAIN secret is not set!"
+            exit 1
+          fi
+          # Target Production URL dynamically
+          npx artillery run -e production scenario-flow.yml

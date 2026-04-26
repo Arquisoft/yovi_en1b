@@ -928,16 +928,29 @@ mod tests {
         // game (no yen_state), the server should place bombs. Afterwards, when
         // round-tripping the game through /play, the bomb positions must be
         // preserved and echoed back in the PlayResponse.
-        let req = axum::Json(PlayRequest {
-            yen_state: None,
-            strategy: Some("random".to_string()),
-            difficulty_level: None,
-            board_size: 7,
-            variants: vec!["Explosions".to_string()],
-            explosives: None,
-            turn: None,
-        });
-        let first = play(req).await.expect("play should succeed").0;
+        let mut first;
+        loop {
+            let req = axum::Json(PlayRequest {
+                yen_state: None,
+                strategy: Some("random".to_string()),
+                difficulty_level: None,
+                board_size: 7,
+                variants: vec!["Explosions".to_string()],
+                explosives: None,
+                turn: None,
+            });
+            first = play(req).await.expect("play should succeed").0;
+            
+            // Flaky test fix: if the random bot happens to place its first piece
+            // EXACTLY on the randomly generated bomb, the bomb detonates and is
+            // consumed, meaning `explosives` will be None. In that rare case (1/28 chance
+            // on a size 7 board), just retry until it misses the bomb so we can
+            // actually test the round-trip.
+            if first.explosives.is_some() {
+                break;
+            }
+        }
+
         assert!(first.explosives.is_some(), "bomb positions should be returned");
         assert!(first.variants.iter().any(|v| v == "Explosions"));
         assert_eq!(first.yen_state.split('/').count(), 7);
