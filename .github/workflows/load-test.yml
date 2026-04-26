@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: load-tests/package-lock.json || load-tests/package.json
+          cache-dependency-path: load-tests/package-lock.json
 
       - name: Install dependencies
         working-directory: ./load-tests
