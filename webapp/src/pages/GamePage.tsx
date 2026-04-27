@@ -85,6 +85,14 @@ function getEnemyTitle(game: GameRecord): string {
   return game.name_of_enemy ?? 'Player 2 (Red)';
 }
 
+function getWinnerTitle(game: GameRecord): string {
+  if (game.result === 'WIN') {
+    return 'You';
+  }
+
+  return getEnemyTitle(game);
+}
+
 function getOwnerClass(owner: Move['player'] | null | undefined): string {
   if (owner === 'B') {
     return ' blue';
@@ -508,9 +516,11 @@ export function GamePage() {
   };
 
   const getResultText = (): string => {
-    if (game.result === 'WIN') return 'YOU WIN';
-    if (game.result === 'LOSS') return 'YOU LOSE';
-    return 'SURRENDERED';
+    if (game.result === 'SURRENDERED') {
+      return `Surrendered`;
+    }
+
+    return `Winner: ${getWinnerTitle(game)}`;
   };
 
   return (
@@ -553,6 +563,12 @@ export function GamePage() {
                 <div className={`game-result-box game-result-box--${getResultBoxClass()}`}>
                   <p className="game-result-time">{formatDuration(displayedDuration)}</p>
                   <p className="game-result-text">{getResultText()}</p>
+                  <div className="game-result-actions">
+                    <button type="button" onClick={() => navigate('/games/new')}>
+                      Play Again
+                    </button>
+                    <button type="button" onClick={() => navigate('/')}>Main Menu</button>
+                  </div>
                 </div>
               )}
             </div>

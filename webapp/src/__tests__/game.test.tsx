@@ -60,6 +60,11 @@ function renderGamePage(gameId = GAME_TEST_DATA.gameId) {
   );
 }
 
+function renderFinishedGamePage(game: GameRecord) {
+  server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(game)));
+  renderGamePage();
+}
+
 // ─── loading ──────────────────────────────────────────────────────────────────
 
 describe('GamePage — loading', () => {
@@ -259,6 +264,94 @@ describe('GamePage — finish', () => {
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.queryByRole('button', { name: /finish/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('GamePage — finished panel', () => {
+  test('shows You as the winner after a WIN result', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(/winner: you/i);
+    expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /main menu/i })).toBeInTheDocument();
+  });
+
+  test('shows the enemy name as winner after a LOSS result', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'LOSS',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(new RegExp(`winner: ${GAME_TEST_DATA.enemyName}`, 'i'));
+  });
+
+  test('shows Bot as winner after a SURRENDERED result in bot games', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      name_of_enemy: null,
+      status: 'FINISHED',
+      result: 'SURRENDERED',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(/^surrendered$/i);
+  });
+
+  test('play again navigates to the new game page', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN'
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByRole('button', { name: /play again/i });
+    await userEvent.click(screen.getByRole('button', { name: /play again/i }));
+    await screen.findByText(/new game page/i);
+  });
+
+  test('main menu navigates to the home page', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN'
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByRole('button', { name: /main menu/i });
+    await userEvent.click(screen.getByRole('button', { name: /main menu/i }));
+    await screen.findByText(/home page/i);
   });
 });
 
