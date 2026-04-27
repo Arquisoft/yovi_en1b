@@ -1,5 +1,17 @@
+/**
+ * Mock Test Data Fixtures
+ * 
+ * Provides seed data used by MSW handlers for testing and development.
+ * These constants are imported by handlers.ts to populate the in-memory database.
+ */
+
 import type { GameRecord } from '../types/games';
 
+/**
+ * Default test user for authentication
+ * Credentials: username='user', password='user'
+ * Automatically seeded into mockUsers Map in handlers.ts
+ */
 export const DEFAULT_MOCK_USER = {
   username: 'user',
   password: 'user',
@@ -8,6 +20,16 @@ export const DEFAULT_MOCK_USER = {
   displayName: 'YOVI Player'
 } as const;
 
+/**
+ * Pre-made game records for testing
+ * Provides 4 finished games with different outcomes:
+ * - Player vs Player (WIN)
+ * - Bot Easy (WIN)
+ * - Bot Medium (LOSS)
+ * - Bot Hard (SURRENDERED)
+ * 
+ * Used to populate mockGames Map and test game history, leaderboard, etc.
+ */
 export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
   {
     _id: 'seed-game-player-win',
@@ -31,7 +53,7 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     _id: 'seed-game-bot-easy-win',
     player_id: DEFAULT_MOCK_USER.userId,
     game_type: 'BOT',
-    name_of_enemy: null,
+    name_of_enemy: 'Random',
     board_size: 5,
     strategy: 'random',
     variants: [],
@@ -49,9 +71,9 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     _id: 'seed-game-bot-medium-loss',
     player_id: DEFAULT_MOCK_USER.userId,
     game_type: 'BOT',
-    name_of_enemy: null,
+    name_of_enemy: 'Defensive',
     board_size: 5,
-    strategy: 'ai',
+    strategy: 'defensive',
     variants: [],
     difficulty_level: 'medium',
     rule_set: 'normal',
@@ -67,9 +89,9 @@ export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
     _id: 'seed-game-bot-hard-surrendered',
     player_id: DEFAULT_MOCK_USER.userId,
     game_type: 'BOT',
-    name_of_enemy: null,
+    name_of_enemy: 'Monte Carlo',
     board_size: 5,
-    strategy: 'dijkstra',
+    strategy: 'mcts',
     variants: [],
     difficulty_level: 'hard',
     rule_set: 'normal',
