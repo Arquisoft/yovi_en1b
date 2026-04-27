@@ -1,7 +1,7 @@
 import { Given, When, Then } from '@cucumber/cucumber'
 import assert from 'node:assert'
 
-const USERS_URL = 'http://127.0.0.1:3000'
+const USERS_URL = process.env.USERS_API_URL || process.env.VITE_API_URL || 'http://localhost:3000'
 
 Given('the public bot API is reachable', async function () {
     try {
