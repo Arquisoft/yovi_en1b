@@ -1336,6 +1336,23 @@ describe('MongoUserRepository direct unit tests', () => {
         });
     });
 
+    describe('Error paths for Sonar', () => {
+        it('POST /createuser returns 500 on db error', async () => {
+            const User = mongoose.model('User');
+            const spy = vi.spyOn(User.prototype, 'save').mockRejectedValueOnce(new Error('db fail'));
+            const res = await request(app).post('/createuser').send({ username: 'fail', password: 'p' });
+            expect(res.status).toBe(500);
+            spy.mockRestore();
+        });
+        it('POST /login returns 500 on db error', async () => {
+            const User = mongoose.model('User');
+            const spy = vi.spyOn(User, 'findOne').mockRejectedValueOnce(new Error('db fail'));
+            const res = await request(app).post('/login').send({ username: 'fail', password: 'p' });
+            expect(res.status).toBe(500);
+            spy.mockRestore();
+        });
+    });
+
     describe('DELETE /deleteuser', () => {
         it('deletes user', async () => {
             const temp = { username: 'DelUser', password: 'password123' };

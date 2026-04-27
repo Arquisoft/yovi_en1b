@@ -3,11 +3,22 @@ const promBundle = require('express-prom-bundle');
 const metricsMiddleware = promBundle({
     includeMethod: true,
     includePath: true,
-    // Ignore the root and health checks to avoid noise from Azure pings
-    excludeRoutes: [/^\/$/, "/health"],
-    // Group IDs so Grafana shows /games/:id instead of a different line for every game
+    includeStatusCode: true,
+    // Ignore noise from Azure pings and metrics polling
+    excludeRoutes: [
+        /^\/$/, 
+        "/health", 
+        "/metrics", 
+        "/favicon.ico"
+    ],
+    // Group IDs to avoid path explosion in Grafana
     normalizePath: [
-        ["^/games/.*", "/games/:id"]
+        ["^/games/[^/]+/move$", "/games/:id/move"],
+        ["^/games/[^/]+/play$", "/games/:id/play"],
+        ["^/games/[^/]+$", "/games/:id"],
+        ["^/users/[^/]+$", "/users/:id"],
+        ["^/users/[^/]+/history$", "/users/:id/history"],
+        ["^/exists/.*$", "/exists/:username"]
     ]
 });
 
