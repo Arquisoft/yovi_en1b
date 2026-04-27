@@ -6,27 +6,27 @@ const GAMEY_URL = process.env.GAMEY_URL || 'http://gamey:4000'; // NOSONAR - int
 
 // Strategy -> difficulty mapping
 const STRATEGY_DIFFICULTY = {
-    random:        'Easy 😄',
-    defensive:     'Medium 😐',
-    mcts:          'Hard 😈',
-    ai:            'Medium 🤖'
+    random: 'Easy 😄',
+    defensive: 'Medium 😐',
+    mcts: 'Hard 😈',
+    ai: 'Medium 🤖'
 };
 
 // Strategy -> name mapping
 const STRATEGY_NAME = {
-    random:        'Random',
-    defensive:     'Defensive',
-    mcts:          'Monte Carlo',
-    ai:            'AI (Gemini)'
+    random: 'Random',
+    defensive: 'Defensive',
+    mcts: 'Monte Carlo',
+    ai: 'AI (Gemini)'
 };
 
 // Valid variants and their constraints
 const VALID_VARIANTS = {
     explosions: {
-        name:               'Explosions',
-        description:        'A bomb appears randomly on the board at game start. Playing on the bomb captures that cell and clears all neighbouring cells.',
+        name: 'Explosions',
+        description: 'A bomb appears randomly on the board at game start. Playing on the bomb captures that cell and clears all neighbouring cells.',
         allowed_strategies: ['random', 'ai'],
-        min_board_size:     7
+        min_board_size: 7
     }
 };
 
@@ -43,7 +43,7 @@ async function autoFinishIfWinner(game, winner, repository) {
     });
     await repository.updateStats(game.player_id, {
         result,
-        type:     game.game_type,
+        type: game.game_type,
         strategy: game.strategy
     });
 }
@@ -99,10 +99,10 @@ module.exports = function gameRoutes(repository) {
     router.get('/options', async function getGameOptions(req, res) {
         res.json({
             strategies: [
-                { id: 'random',    name: STRATEGY_NAME.random,    difficulty: 'Easy 😄'    },
-                { id: 'defensive', name: STRATEGY_NAME.defensive, difficulty: 'Medium 😐'  },
-                { id: 'mcts',      name: STRATEGY_NAME.mcts,      difficulty: 'Hard 😈'    },
-                { id: 'ai',        name: STRATEGY_NAME.ai,        difficulty: 'Medium 🤖'  }
+                { id: 'random', name: STRATEGY_NAME.random, difficulty: 'Easy 😄' },
+                { id: 'defensive', name: STRATEGY_NAME.defensive, difficulty: 'Medium 😐' },
+                { id: 'mcts', name: STRATEGY_NAME.mcts, difficulty: 'Hard 😈' },
+                { id: 'ai', name: STRATEGY_NAME.ai, difficulty: 'Medium 🤖' }
             ],
             variants: [
                 { name: 'Explosions', description: VALID_VARIANTS.explosions.description, allowed_strategies: VALID_VARIANTS.explosions.allowed_strategies }
@@ -124,8 +124,8 @@ module.exports = function gameRoutes(repository) {
         const STRATEGY_MAP = {
             'monte carlo': 'mcts',
             'ai (gemini)': 'ai',
-            'random':      'random',
-            'defensive':   'defensive'
+            'random': 'random',
+            'defensive': 'defensive'
         };
 
         // 2. Normalización CRÍTICA
@@ -167,13 +167,13 @@ module.exports = function gameRoutes(repository) {
             }
 
             const game = await repository.createGame({
-                player_id:        req.user.userId,
-                game_type:        game_type || 'BOT',
-                name_of_enemy:    name_of_enemy || null,
+                player_id: req.user.userId,
+                game_type: game_type || 'BOT',
+                name_of_enemy: name_of_enemy || null,
                 board_size,
-                strategy:         resolvedStrategy,
+                strategy: resolvedStrategy,
                 difficulty_level: STRATEGY_DIFFICULTY[resolvedStrategy.toLowerCase()] || 'easy',
-                variants:         resolvedVariants,
+                variants: resolvedVariants,
                 initial_yen_state,
                 current_turn
             });
@@ -268,10 +268,10 @@ module.exports = function gameRoutes(repository) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     yen_state,
-                    strategy:         game.strategy,
+                    strategy: game.strategy,
                     difficulty_level: game.difficulty_level,
-                    board_size:       game.board_size,
-                    variants:         game.variants
+                    board_size: game.board_size,
+                    variants: game.variants
                 })
             });
         } catch {
@@ -287,9 +287,9 @@ module.exports = function gameRoutes(repository) {
         try {
             game.moves.push({
                 move_number: game.moves.length + 1,
-                player:      game.current_turn,
+                player: game.current_turn,
                 coordinates,
-                yen_state:   botYenState
+                yen_state: botYenState
             });
             game.current_turn = game.current_turn === 'B' ? 'R' : 'B';
             await game.save();
@@ -326,7 +326,7 @@ module.exports = function gameRoutes(repository) {
 
             await repository.updateStats(game.player_id, {
                 result,
-                type:     game.game_type,
+                type: game.game_type,
                 strategy: game.strategy
             });
 

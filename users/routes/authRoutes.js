@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const authMiddleware = require('../middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_secret';
 
@@ -9,7 +10,7 @@ module.exports = function authRoutes(repository) {
 
     // Register
     router.post('/createuser', async function createUser(req, res) {
-        const { username, password } = req.body || {};
+        const { username, password, is_test } = req.body || {};
 
         if (!username || !password) {
             return res.status(400).json({ error: 'Username and password are required' });
@@ -25,7 +26,7 @@ module.exports = function authRoutes(repository) {
             }
 
             const password_hash = await bcrypt.hash(password, 10);
-            const newUser = await repository.create({ username, password_hash });
+            const newUser = await repository.create({ username, password_hash, is_test: !!is_test });
 
             res.status(201).json({ message: `Welcome ${username}!`, userId: newUser._id });
         } catch (err) {
@@ -53,6 +54,17 @@ module.exports = function authRoutes(repository) {
 
             const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
             res.json({ token, username: user.username, userId: user._id });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    
+    // Delete current user (used by tests for cleanup)
+    router.delete('/deleteuser', authMiddleware, async function deleteUser(req, res) {
+        try {
+            const deleted = await repository.deleteById(req.user.userId);
+            if (!deleted) return res.status(404).json({ error: 'User not found' });
+            res.json({ message: 'User deleted successfully' });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

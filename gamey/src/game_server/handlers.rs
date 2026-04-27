@@ -614,7 +614,7 @@ mod tests {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(0, 0, 1)),
+                coords: Some(Coordinates::new(1, 0, 0)),
                 action: None,
             },
         });
@@ -626,7 +626,7 @@ mod tests {
     #[tokio::test]
     async fn test_make_move_invalid_yen() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "123".to_string()); // invalid layout
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "123".to_string());
         let req = axum::Json(MakeMoveRequest {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
@@ -649,7 +649,7 @@ mod tests {
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
                 coords: Some(Coordinates::new(0, 0, 1)),
-                action: Some("swap".to_string()), // both coords and action
+                action: Some("swap".to_string()),
             },
         });
         let res = make_move(params, req).await;
@@ -660,12 +660,12 @@ mod tests {
    #[tokio::test]
     async fn test_make_move_game_error() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // B is occupied
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string());
         let req = axum::Json(MakeMoveRequest {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(0, 0, 1)), // B is at (0,0,1) with the new React-synced coords
+                coords: Some(Coordinates::new(1, 0, 0)),
                 action: None,
             },
         });
@@ -795,54 +795,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_with_defensive_strategy() {
-        // Size 2, R at top corner (0,0,1)
         let req = play_req(Some("R/.."), Some("defensive"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
 
-        // Size 2 board, R at top corner (0,0,1). Neighbors are (1,0,0) and (0,1,0).
-        // The bot (B) should have picked one of these.
         let chosen_coords = res_json.coordinates;
-        let r_coords = Coordinates::new(0, 0, 1);
+        let r_coords = Coordinates::new(1, 0, 0);
         let neighbors = r_coords.neighbors(2);
-        assert!(neighbors.contains(&chosen_coords), "Defensive bot should pick a neighbor of R's move");
+        assert!(neighbors.contains(&chosen_coords));
     }
 
     #[tokio::test]
     async fn test_play_success_with_medium_strategy() {
-        // "medium" is the actual registered name of DefensiveBot. Before the fix
-        // for issue #194, passing "medium" silently fell through to RandomBot.
         let req = play_req(Some("R/.."), Some("medium"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         let chosen_coords = res_json.coordinates;
-        let r_coords = Coordinates::new(0, 0, 1);
+        let r_coords = Coordinates::new(1, 0, 0);
         let neighbors = r_coords.neighbors(2);
-        assert!(
-            neighbors.contains(&chosen_coords),
-            "'medium' should route to DefensiveBot, which picks a neighbor of R's move"
-        );
+        assert!(neighbors.contains(&chosen_coords));
     }
 
     #[tokio::test]
     async fn test_play_strategy_is_case_insensitive() {
-        // "HARD" / "Medium" / mixed case should still route to the right bot.
         let req = play_req(Some("./.."), Some("HARD"), 2);
         assert!(play(req).await.is_ok());
 
         let req = play_req(Some("R/.."), Some("Medium"), 2);
         let res = play(req).await.unwrap().0;
         let chosen = res.coordinates;
-        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        let neighbors = Coordinates::new(1, 0, 0).neighbors(2);
         assert!(neighbors.contains(&chosen));
     }
 
     #[tokio::test]
     async fn test_play_strategy_falls_back_to_difficulty_level() {
-        // If the caller sets difficulty_level instead of strategy, we should still
-        // honour it (the Nacho partner API uses difficulty_level).
         let req = axum::Json(PlayRequest {
             yen_state: Some("R/..".to_string()),
             strategy: None,
@@ -855,7 +844,7 @@ mod tests {
         let res = play(req).await;
         assert!(res.is_ok());
         let chosen = res.unwrap().0.coordinates;
-        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        let neighbors = Coordinates::new(1, 0, 0).neighbors(2);
         assert!(neighbors.contains(&chosen));
     }
 
@@ -1146,8 +1135,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_invalid_move() {
-        // Top cell occupied; try to play there again.
-        let req = compute_req(Some("B/.."), Coordinates::new(0, 0, 1));
+        let req = compute_req(Some("B/.."), Coordinates::new(1, 0, 0));
         let res = compute(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid move"));

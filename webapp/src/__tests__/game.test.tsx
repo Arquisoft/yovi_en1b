@@ -142,7 +142,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -175,7 +175,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -207,7 +207,7 @@ describe('GamePage — undo', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -251,7 +251,7 @@ describe('GamePage — finish', () => {
       result: 'WIN',
       moves: [{
         move_number: 1, player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -306,13 +306,13 @@ describe('GamePage — move history hover', () => {
         {
           move_number: 1,
           player: 'B',
-          coordinates: { x: 0, y: 0, z: 2 },
+          coordinates: { x: 2, y: 0, z: 0 },
           created_at: new Date().toISOString()
         },
         {
           move_number: 2,
           player: 'R',
-          coordinates: { x: 0, y: 1, z: 1 },
+          coordinates: { x: 1, y: 0, z: 1 },
           created_at: new Date().toISOString()
         }
       ]
@@ -326,7 +326,7 @@ describe('GamePage — move history hover', () => {
     const firstMoveItem = screen.getByText('#1').closest('li');
     expect(firstMoveItem).not.toBeNull();
 
-    const firstMoveHex = screen.getByLabelText(/^Hex \(0, 0, 2\)/i);
+    const firstMoveHex = screen.getByLabelText(/^Hex \(2, 0, 0\)/i);
     expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
 
     await userEvent.hover(firstMoveItem as HTMLElement);
@@ -354,10 +354,10 @@ describe('GamePage — explosions variant', () => {
 
     renderGamePage();
 
-    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    const mineHex = await screen.findByLabelText(/^Hex \(2, 0, 0\) - mine$/i);
     await userEvent.hover(mineHex);
 
-    expect(screen.getByLabelText(/^Hex \(0, 1, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
+    expect(screen.getByLabelText(/^Hex \(1, 0, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
   });
 
   test('clicking a mine applies returned yen_state snapshot', async () => {
@@ -382,7 +382,7 @@ describe('GamePage — explosions variant', () => {
               {
                 move_number: 1,
                 player: 'B',
-                coordinates: { x: 0, y: 0, z: 2 },
+                coordinates: { x: 2, y: 0, z: 0 },
                 yen_state: 'B/../...',
                 created_at: new Date().toISOString()
               }
@@ -396,10 +396,10 @@ describe('GamePage — explosions variant', () => {
 
     renderGamePage();
 
-    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    const mineHex = await screen.findByLabelText(/^Hex \(2, 0, 0\) - mine$/i);
     await userEvent.click(mineHex);
 
-    await screen.findByLabelText(/^Hex \(0, 0, 2\) - Blue$/i);
-    expect(screen.queryByLabelText(/^Hex \(0, 0, 2\) - mine$/i)).not.toBeInTheDocument();
+    await screen.findByLabelText(/^Hex \(2, 0, 0\) - Blue$/i);
+    expect(screen.queryByLabelText(/^Hex \(2, 0, 0\) - mine$/i)).not.toBeInTheDocument();
   });
 });
