@@ -342,7 +342,7 @@ impl MctsTree {
             if won {
                 // Game over — backpropagate
                 let winner = current_player;
-                self.backpropagate(&path, winner);
+                self.backpropagate_visits(&path, Some(winner));
                 return;
             }
             current_player = other_player(current_player);
@@ -386,7 +386,7 @@ impl MctsTree {
             let won = board.place(cell_idx, current_player);
             if won {
                 let winner = current_player;
-                self.backpropagate(&path, winner);
+                self.backpropagate_visits(&path, Some(winner));
                 return;
             }
             current_player = other_player(current_player);
@@ -396,17 +396,21 @@ impl MctsTree {
         let winner = self.random_playout(&mut board, current_player);
 
         // 4. Backpropagation
-        if let Some(winner) = winner {
-            self.backpropagate(&path, winner);
-        }
+        // IMPORTANT: always backpropagate visit counts, even when the playout
+        // finds no winner (full board / draw).  Skipping backpropagation when
+        // `winner` is None leaves node visit counts at 0, which means UCB1
+        // treats those nodes as unvisited forever and keeps re-selecting them —
+        // all 800 simulations go through the same dead-end path, `best_move()`
+        // sees every root child at 0 visits and returns None, and the handler
+        // reports "Bot could not find a move" even when moves are available.
+        self.backpropagate_visits(&path, winner);
     }
 
     /// Select child with highest UCB1 score.
     /// At even depths (bot's turn), maximize bot win rate.
     /// At odd depths (opponent's turn), minimize bot win rate (maximize opponent's).
     fn select_child(&self, node_idx: usize) -> usize {
-        let parent_visits = self.nodes[node_idx].visits as f64;
-        let ln_parent = parent_visits.ln();
+        let parent_visits = self.nodes[node_idx].visits;
         let parent_depth = self.nodes[node_idx].depth;
         // At even depth, the bot is choosing → maximize bot wins
         // At odd depth, the opponent is choosing → minimize bot wins
@@ -428,7 +432,15 @@ impl MctsTree {
             } else {
                 1.0 - bot_win_rate // Opponent wants to minimize bot wins
             };
-            let exploration = EXPLORATION_C * (ln_parent / child.visits as f64).sqrt();
+
+            // Guard: if parent has 0 or 1 visits the logarithm is ≤ 0 which
+            // produces -∞ or 0 exploration — clamp to 0 so we fall back to
+            // pure exploitation rather than emitting NaN scores.
+            let exploration = if parent_visits > 1 {
+                EXPLORATION_C * ((parent_visits as f64).ln() / child.visits as f64).sqrt()
+            } else {
+                0.0
+            };
             let score = exploitation + exploration;
 
             if score > best_score {
@@ -457,10 +469,15 @@ impl MctsTree {
     }
 
     /// Backpropagate results up the path.
-    fn backpropagate(&mut self, path: &[usize], winner: PlayerId) {
+    ///
+    /// Always increments visit counts for every node in `path`.
+    /// Only increments win counts when there is an actual winner.
+    /// This fixes the bug where a `None` winner (full board, no win detected)
+    /// left all nodes with visits=0, causing UCB1 to loop forever.
+    fn backpropagate_visits(&mut self, path: &[usize], winner: Option<PlayerId>) {
         for &node_idx in path {
             self.nodes[node_idx].visits += 1;
-            if winner == self.bot_player {
+            if winner == Some(self.bot_player) {
                 self.nodes[node_idx].wins += 1.0;
             }
         }

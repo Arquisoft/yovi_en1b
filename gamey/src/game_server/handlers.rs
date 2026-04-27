@@ -222,9 +222,38 @@ pub async fn play(
 
     let bot = pick_bot(req.strategy.as_deref(), req.difficulty_level.as_deref());
 
-    let coords = bot.choose_move(&game).ok_or_else(|| {
+    // Run the (potentially CPU-intensive) bot computation on a dedicated
+    // blocking thread so we don't stall the Tokio async runtime.  Under
+    // concurrent tournament load the MCTS bot runs 800 simulations; keeping
+    // that on the async thread starves other requests.
+    // We snapshot the available cells and board size before moving `game`
+    // into the closure so we can still use them for validation afterwards.
+    let available_cells: Vec<u32> = game.available_cells().clone();
+    let board_size = game.board_size();
+    // Move both `bot` and `game` into the closure; return `game` alongside the
+    // chosen coordinates so we can apply the move after the blocking call.
+    let (coords, mut game) =
+        tokio::task::spawn_blocking(move || {
+            let coords = bot.choose_move(&game);
+            (coords, game)
+        })
+        .await
+        .map_err(|_| Json(ErrorResponse::error("Bot task panicked", None, None)))?;
+    let coords = coords.ok_or_else(|| {
         Json(ErrorResponse::error("Bot could not find a move", None, None))
     })?;
+
+    // Defensive check: ensure the bot returned an actually-available cell.
+    // This guards against any future bot implementation bug that could cause
+    // an "invalid move" error deep inside add_move (issue #234).
+    let coord_idx = coords.to_index(board_size);
+    if !available_cells.contains(&coord_idx) {
+        return Err(Json(ErrorResponse::error(
+            &format!("Bot returned an invalid coordinate {:?} (cell {} is not available)", coords, coord_idx),
+            None,
+            None,
+        )));
+    }
 
     let next_player = match game.status() {
         crate::GameStatus::Ongoing { next_player } => next_player,

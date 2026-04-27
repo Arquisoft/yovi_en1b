@@ -1,9 +1,10 @@
 //! GameY binary entry point.
 //!
-//! This is the main executable for the GameY application. It supports three modes:
+//! This is the main executable for the GameY application. It supports four modes:
 //!
 //! - **Human mode** (default): Two players take turns at the terminal
 //! - **Computer mode**: Play against a bot
+//! - **Simulate mode**: Two bots play against each other automatically
 //! - **Server mode**: Run as an HTTP server exposing the bot API
 //!
 //! # Usage
@@ -14,6 +15,12 @@
 //!
 //! # Play against the random bot
 //! gamey --mode computer
+//!
+//! # Watch MCTS bot play against itself
+//! gamey --mode simulate --bot hard --delay 300
+//!
+//! # Watch two different bots play
+//! gamey --mode simulate --bot hard --bot2 defensive --delay 200
 //!
 //! # Start the bot server on port 3000
 //! gamey --mode server --port 3000

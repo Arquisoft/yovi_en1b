@@ -1,9 +1,10 @@
 //! Command-line interface for the Y game.
 //!
 //! This module provides the CLI application for playing Y games interactively.
-//! It supports three modes:
+//! It supports four modes:
 //! - Human vs Human: Two players take turns at the same terminal
 //! - Human vs Computer: Play against a bot
+//! - Simulate: Two bots play against each other automatically
 //! - Server: Run as an HTTP server for bot API
 
 use crate::{
@@ -16,6 +17,7 @@ use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::fmt::Display;
 use std::sync::Arc;
+use std::thread;
 
 /// Command-line arguments for the GameY application.
 #[derive(Parser, Debug)]
@@ -30,9 +32,18 @@ pub struct CliArgs {
     #[arg(short, long, default_value_t = Mode::Human)]
     pub mode: Mode,
 
-    /// The bot to use (only used with --mode=computer), default = random_bot
+    /// The bot to use (only used with --mode=computer or --mode=simulate), default = random_bot
     #[arg(short, long, default_value = "random_bot")]
     pub bot: String,
+
+    /// The second bot to use (only used with --mode=simulate).
+    /// If not specified, defaults to the same as --bot.
+    #[arg(long, default_value = None)]
+    pub bot2: Option<String>,
+
+    /// Delay between moves in milliseconds (only used with --mode=simulate), default = 500
+    #[arg(short, long, default_value_t = 500)]
+    pub delay: u64,
 
     /// Port to run the server on (only used with --mode=server)
     #[arg(short, long, default_value_t = 3000)]
@@ -51,6 +62,8 @@ pub enum Mode {
     Computer,
     /// Two humans playing at the same terminal.
     Human,
+    /// Two bots play against each other automatically.
+    Simulate,
     /// Run as an HTTP server for bot API.
     Server,
 }
@@ -60,6 +73,7 @@ impl Display for Mode {
         let s = match self {
             Mode::Computer => "computer",
             Mode::Human => "human",
+            Mode::Simulate => "simulate",
             Mode::Server => "server",
         };
         write!(f, "{}", s)
@@ -74,14 +88,8 @@ pub fn run_cli_game() -> Result<()> {
     let args = CliArgs::parse();
     let mut render_options = crate::RenderOptions::default();
     let mut rl = DefaultEditor::new()?;
-    let mut bots_registry = YBotRegistry::new()
-        .with_bot(Arc::new(RandomBot))
-        .with_bot(Arc::new(crate::DefensiveBot))
-        .with_bot(Arc::new(crate::HardBot::default()));
+    let bots_registry = build_bot_registry();
 
-    if let Some(bot) = crate::GenerativeAIBot::from_env() {
-        bots_registry = bots_registry.with_bot(Arc::new(bot));
-    }
     let bot: Arc<dyn YBot> = match bots_registry.find(&args.bot) {
         Some(b) => b,
         None => {
@@ -103,7 +111,31 @@ pub fn run_cli_game() -> Result<()> {
         }
     }
 
-    let mut game = game::GameY::new_with_variants(args.size, selected_variants);
+    let mut game = game::GameY::new_with_variants(args.size, selected_variants.clone());
+
+    // Handle simulate mode separately
+    if args.mode == Mode::Simulate {
+        let bot2_name = args.bot2.as_deref().unwrap_or(&args.bot);
+        let bot2: Arc<dyn YBot> = match bots_registry.find(bot2_name) {
+            Some(b) => b,
+            None => {
+                println!(
+                    "Bot2 '{}' not found. Available bots: {:?}",
+                    bot2_name,
+                    bots_registry.names()
+                );
+                return Ok(());
+            }
+        };
+        return run_simulation(
+            args.size,
+            selected_variants,
+            bot.as_ref(),
+            bot2.as_ref(),
+            args.delay,
+        );
+    }
+
     loop {
         println!("{}", game.render(&render_options));
         let status = game.status();
@@ -139,6 +171,100 @@ pub fn run_cli_game() -> Result<()> {
                             bot.as_ref(),
                         )?;
                     }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Builds the bot registry with all available bots.
+fn build_bot_registry() -> YBotRegistry {
+    let mut registry = YBotRegistry::new()
+        .with_bot(Arc::new(RandomBot))
+        .with_bot(Arc::new(crate::DefensiveBot))
+        .with_bot(Arc::new(crate::HardBot::default()));
+
+    if let Some(bot) = crate::GenerativeAIBot::from_env() {
+        registry = registry.with_bot(Arc::new(bot));
+    }
+    registry
+}
+
+/// Runs a bot-vs-bot simulation.
+///
+/// Both bots take turns playing on the same board. The game state is printed
+/// after each move with a configurable delay between moves for readability.
+///
+/// # Arguments
+/// * `size` - Board size
+/// * `variants` - Active game variants
+/// * `bot1` - Bot playing as Player 1 (Blue)
+/// * `bot2` - Bot playing as Player 2 (Red)
+/// * `delay_ms` - Milliseconds to wait between each move
+fn run_simulation(
+    size: u32,
+    variants: Vec<crate::GameVariant>,
+    bot1: &dyn YBot,
+    bot2: &dyn YBot,
+    delay_ms: u64,
+) -> Result<()> {
+    let mut game = game::GameY::new_with_variants(size, variants);
+    let render_options = RenderOptions::default();
+    let mut move_count = 0u32;
+
+    println!("╔═══════════════════════════════════════════╗");
+    println!("║          🤖  BOT SIMULATION  🤖          ║");
+    println!("╠═══════════════════════════════════════════╣");
+    println!("║  Player 1 (Blue): {:<24}║", bot1.name());
+    println!("║  Player 2 (Red):  {:<24}║", bot2.name());
+    println!("║  Board size:      {:<24}║", size);
+    println!("║  Delay:           {:<21}ms ║", delay_ms);
+    println!("╚═══════════════════════════════════════════╝");
+    println!();
+
+    println!("{}", game.render(&render_options));
+
+    loop {
+        match game.status() {
+            GameStatus::Finished { winner } => {
+                println!("\n══════════════════════════════════════");
+                println!("  🏆 Game over after {} moves!", move_count);
+                println!("  Winner: {}", winner);
+                println!("══════════════════════════════════════\n");
+                break;
+            }
+            GameStatus::Ongoing { next_player } => {
+                let player = *next_player;
+                let current_bot: &dyn YBot = if player.id() == 0 { bot1 } else { bot2 };
+
+                if let Some(coords) = current_bot.choose_move(&game) {
+                    let movement = Movement::Placement { player, coords };
+                    match game.add_move(movement) {
+                        Ok(()) => {
+                            move_count += 1;
+                            let idx = coords.to_index(game.board_size());
+                            println!(
+                                "  ▶ Move #{}: {} ({}) placed at index {}",
+                                move_count,
+                                current_bot.name(),
+                                player,
+                                idx
+                            );
+                            println!("{}", game.render(&render_options));
+
+                            if delay_ms > 0 {
+                                thread::sleep(std::time::Duration::from_millis(delay_ms));
+                            }
+                        }
+                        Err(e) => {
+                            println!("  ✗ Bot {} error: {}", current_bot.name(), e);
+                            break;
+                        }
+                    }
+                } else {
+                    println!("  ✗ Bot {} has no available moves.", current_bot.name());
+                    break;
                 }
             }
         }
@@ -537,6 +663,56 @@ mod tests {
         let debug = format!("{:?}", cmd);
         assert!(debug.contains("Place"));
         assert!(debug.contains("5"));
+    }
+
+    #[test]
+    fn test_mode_display_simulate() {
+        assert_eq!(format!("{}", Mode::Simulate), "simulate");
+    }
+
+    #[test]
+    fn test_parse_simulate_mode() {
+        let args = CliArgs::parse_from(&["gamey", "--mode", "simulate", "--bot", "hard"]);
+        assert_eq!(args.mode, Mode::Simulate);
+        assert_eq!(args.bot, "hard");
+    }
+
+    #[test]
+    fn test_parse_simulate_with_bot2() {
+        let args = CliArgs::parse_from(&[
+            "gamey", "--mode", "simulate", "--bot", "hard", "--bot2", "random_bot",
+        ]);
+        assert_eq!(args.mode, Mode::Simulate);
+        assert_eq!(args.bot, "hard");
+        assert_eq!(args.bot2, Some("random_bot".to_string()));
+    }
+
+    #[test]
+    fn test_parse_simulate_with_delay() {
+        let args = CliArgs::parse_from(&[
+            "gamey", "--mode", "simulate", "--bot", "hard", "--delay", "100",
+        ]);
+        assert_eq!(args.delay, 100);
+    }
+
+    #[test]
+    fn test_parse_default_delay() {
+        let args = CliArgs::parse_from(&["gamey"]);
+        assert_eq!(args.delay, 500);
+    }
+
+    #[test]
+    fn test_parse_default_bot2_is_none() {
+        let args = CliArgs::parse_from(&["gamey"]);
+        assert_eq!(args.bot2, None);
+    }
+
+    #[test]
+    fn test_run_simulation_completes() {
+        // Run a quick simulation with random bots on a small board (no delay)
+        let bot = crate::RandomBot;
+        let result = run_simulation(3, vec![], &bot, &bot, 0);
+        assert!(result.is_ok());
     }
 }
 

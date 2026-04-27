@@ -73,17 +73,35 @@ pub async fn choose(
             )));
         }
     };
-    let coords = match bot.choose_move(&game_y) {
-        Some(coords) => coords,
-        None => {
-            // Handle the case where the bot has no valid moves
-            return Err(Json(ErrorResponse::error(
-                "No valid moves available for the bot",
-                Some(params.api_version),
-                Some(params.bot_id),
-            )));
-        }
-    };
+
+    // Run CPU-intensive bot computation on a dedicated blocking thread so
+    // concurrent requests don't stall the Tokio async runtime (issue #234).
+    let available_cells: Vec<u32> = game_y.available_cells().clone();
+    let board_size = game_y.board_size();
+
+    let coords = tokio::task::spawn_blocking(move || bot.choose_move(&game_y))
+        .await
+        .map_err(|_| Json(ErrorResponse::error(
+            "Bot task panicked",
+            Some(params.api_version.clone()),
+            Some(params.bot_id.clone()),
+        )))?
+        .ok_or_else(|| Json(ErrorResponse::error(
+            "No valid moves available for the bot",
+            Some(params.api_version.clone()),
+            Some(params.bot_id.clone()),
+        )))?;
+
+    // Defensive check: ensure the bot returned an actually-available cell.
+    let coord_idx = coords.to_index(board_size);
+    if !available_cells.contains(&coord_idx) {
+        return Err(Json(ErrorResponse::error(
+            &format!("Bot returned an invalid coordinate (cell {} is not available)", coord_idx),
+            Some(params.api_version),
+            Some(params.bot_id),
+        )));
+    }
+
     let response = MoveResponse {
         api_version: params.api_version,
         bot_id: params.bot_id,
