@@ -1,5 +1,17 @@
+/**
+ * Mock Test Data Fixtures
+ * 
+ * Provides seed data used by MSW handlers for testing and development.
+ * These constants are imported by handlers.ts to populate the in-memory database.
+ */
+
 import type { GameRecord } from '../types/games';
 
+/**
+ * Default test user for authentication
+ * Credentials: username='user', password='user'
+ * Automatically seeded into mockUsers Map in handlers.ts
+ */
 export const DEFAULT_MOCK_USER = {
   username: 'user',
   password: 'user',
@@ -8,6 +20,16 @@ export const DEFAULT_MOCK_USER = {
   displayName: 'YOVI Player'
 } as const;
 
+/**
+ * Pre-made game records for testing
+ * Provides 4 finished games with different outcomes:
+ * - Player vs Player (WIN)
+ * - Bot Easy (WIN)
+ * - Bot Medium (LOSS)
+ * - Bot Hard (SURRENDERED)
+ * 
+ * Used to populate mockGames Map and test game history, leaderboard, etc.
+ */
 export const SEEDED_DEFAULT_USER_GAMES: GameRecord[] = [
   {
     _id: 'seed-game-player-win',
