@@ -81,7 +81,7 @@ export function parseYenState(size: number, yenState: string | null | undefined)
     const rowState = rows[row] ?? '';
 
     for (let col = 0; col <= row; col += 1) {
-      const coordinates: Coordinates = { x: col, y: row - col, z: size - 1 - row };
+      const coordinates: Coordinates = { x: size - 1 - row, y: col, z: row - col };
       board.set(coordinateKey(coordinates), symbolToState(rowState[col] ?? '.'));
     }
   }
@@ -96,7 +96,7 @@ export function serializeYenState(size: number, stateByKey: Map<string, YenCellS
     const symbols: string[] = [];
 
     for (let col = 0; col <= row; col += 1) {
-      const coordinates: Coordinates = { x: col, y: row - col, z: size - 1 - row };
+      const coordinates: Coordinates = { x: size - 1 - row, y: col, z: row - col };
       const cell = stateByKey.get(coordinateKey(coordinates));
 
       if (cell?.owner === 'B') {

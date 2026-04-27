@@ -183,18 +183,19 @@ When('I play a full game until Blue wins', async function () {
   const blueFirst = await blueActive.isVisible().catch(() => false)
 
   if (blueFirst) {
-    await playHexAt(page, '0, 0, 2')
-    await playHexAt(page, '2, 0, 0')
-    await playHexAt(page, '0, 1, 1')
-    await playHexAt(page, '0, 2, 0')
-    await playHexAt(page, '1, 1, 0')
+    // New coordinates for size 3 win (connecting Top to Bottom sides)
+    await playHexAt(page, '2, 0, 0') // Top
+    await playHexAt(page, '0, 0, 2') // Bottom-Left
+    await playHexAt(page, '1, 0, 1') // Middle-Left path
+    await playHexAt(page, '0, 2, 0') // Bottom-Right
+    await playHexAt(page, '0, 1, 1') // Completes the bridge
   } else {
-    await playHexAt(page, '2, 0, 0')
     await playHexAt(page, '0, 0, 2')
+    await playHexAt(page, '2, 0, 0')
     await playHexAt(page, '0, 2, 0')
-    await playHexAt(page, '0, 1, 1')
     await playHexAt(page, '1, 0, 1')
     await playHexAt(page, '1, 1, 0')
+    await playHexAt(page, '0, 1, 1')
   }
 })
 
