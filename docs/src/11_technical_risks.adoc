@@ -3,7 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-technical-risks]]
 == Risks and Technical Debts
 
-
 ifdef::arc42help[]
 [role="arc42help"]
 ****
@@ -11,12 +10,12 @@ ifdef::arc42help[]
 A list of identified technical risks or technical debts, ordered by priority
 
 .Motivation
-“Risk management is project management for grown-ups” (Tim Lister, Atlantic Systems Guild.) 
+"Risk management is project management for grown-ups" (Tim Lister, Atlantic Systems Guild.)
 
 This should be your motto for systematic detection and evaluation of risks and technical debts in the architecture, which will be needed by management stakeholders (e.g. project managers, product owners) as part of the overall risk analysis and measurement planning.
 
 .Form
-List of risks and/or technical debts, probably including suggested measures to minimize, mitigate or avoid risks or reduce technical debts.
+List of risks and/or technical debts, probably including suggested measures to minimize, mitigate or avoided risks or reduce technical debts.
 
 
 .Further Information
@@ -25,3 +24,78 @@ See https://docs.arc42.org/section-11/[Risks and Technical Debt] in the arc42 do
 
 ****
 endif::arc42help[]
+
+=== Technical Risks
+
+[cols="1,2,2,2", options="header"]
+|===
+|Priority |Risk |Impact |Mitigation
+
+|*1 — Critical*
+|*Gamey service instability under load*
+The Rust game engine has no persistent state and manages active game sessions in memory. Under concurrent load it has shown connection resets and crashes, requiring a full container restart to recover.
+|Total service unavailability for all active games. Users lose their current game session with no recovery path.
+|Add a health-check endpoint to Gamey and configure Docker Compose `restart: always`. Implement a timeout (5 s) and circuit breaker in the Users service fetch calls to Gamey so that a crash returns a clean 503 rather than hanging.
+
+|*2 — High*
+|*Single point of failure: Users service and MongoDB on one VM*
+The entire backend (Users service, MongoDB, Gamey) runs on a single Azure VM (IP 4.233.184.98). No redundancy or failover exists.
+|A VM outage, network issue, or resource exhaustion takes down the entire platform simultaneously.
+|Document the risk explicitly. For the scope of this course, accept it. For production, migrate to a managed service (e.g., MongoDB Atlas) and deploy behind a load balancer with at least two VM instances.
+
+|*3 — High*
+|*JWT secret not rotated; hardcoded fallback in code*
+The JWT signing secret is loaded from an environment variable but falls back to a hardcoded default if unset. A leaked or default secret allows token forgery for any user.
+|Full authentication bypass — an attacker could forge tokens and impersonate any user including administrators.
+|Enforce the environment variable as mandatory (throw on startup if unset). Rotate the secret and redeploy. Store it in a secrets manager rather than a `.env` file committed to the repo.
+
+|*4 — Medium*
+|*No input sanitization on board coordinates*
+The Users service forwards coordinates received from the frontend directly to Gamey without validating that they are integers within the valid triangular board range.
+|Malformed input could crash Gamey or cause undefined behaviour in the Rust engine, triggering a full service restart.
+|Add a validation middleware in the Users service that rejects moves where `col > row` or `row >= board_size` before forwarding to Gamey.
+
+|*5 — Medium*
+|*Grafana excessive disk I/O degrading VM performance*
+Grafana has been observed causing high disk I/O on the shared VM, slowing down all co-located services including the Users service and MongoDB.
+|Increased response latency across the entire platform, potential timeout cascades under normal load.
+|Tune Grafana's retention policy and reduce scrape frequency in Prometheus. Consider moving monitoring to a separate lightweight instance or disabling Grafana between demos.
+
+|*6 — Low*
+|*VITE_API_URL baked at build time*
+The frontend URL for the Users service API is embedded at Docker image build time via a Vite build argument. Changing the VM IP or adding a domain requires a full image rebuild and redeploy.
+|Any infrastructure change (IP rotation, domain migration) breaks the frontend without a rebuild.
+|Use a runtime configuration file (e.g., `/config.js` served by nginx) instead of a build-time variable, so the URL can be changed without rebuilding the image.
+|===
+
+=== Technical Debts
+
+[cols="1,2,2", options="header"]
+|===
+|Priority |Debt |Remediation
+
+|*1 — High*
+|*Legacy bot strategy keys in MongoDB*
+Early versions of the application stored bot strategy results under the keys `easy`, `medium`, and `hard` in the `statistics.vs_bot` subdocument. Current code uses `random`, `ai`, and `dijkstra`. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).
+|Run the provided migration script (`migrate-vs-bot-keys.js`) on the production database, or wipe the database with `docker compose down -v` to start clean. Add a schema version field to user documents to detect and auto-migrate stale records on first access.
+
+|*2 — High*
+|*Section 8 (Cross-cutting Concepts) not documented*
+The arc42 cross-cutting concepts section remains empty. Security strategy, error handling conventions, logging approach, and the JWT authentication flow are implemented but not documented.
+|Document at minimum: authentication/authorisation flow, error handling conventions (HTTP status codes used), CORS policy, and the monitoring stack (Prometheus + Grafana metrics exposed).
+
+|*3 — Medium*
+|*No rate limiting on public endpoints*
+The public `GET /play` endpoint and the `POST /createuser` endpoint have no rate limiting. A single client can flood the service with requests, exhausting Gamey connections or enabling user enumeration.
+|Integrate `express-rate-limit` middleware on unauthenticated routes. Apply stricter limits to `/createuser` (e.g., 10 req/min per IP) and `/play` (e.g., 60 req/min per IP).
+
+|*4 — Medium*
+|*Game moves array not excluded from history endpoint*
+`GET /games/:id` returns the full game document including the `moves` array, which can be very large for long games and is not needed for listing purposes.
+|Already partially addressed: `findGamesByPlayer` uses `.select('-moves')`. Verify all listing endpoints consistently exclude `moves` and only expose them via the dedicated `GET /games/:id/moves` endpoint.
+
+|*5 — Low*
+|*arc42 sections 9, 10, 11, 12 incomplete*
+Architecture Decision Records (ADRs), quality scenarios, risks, and the glossary were not populated during early development sprints.
+|Complete sections 9 and 10 before the final course submission. Document at minimum: the decision to use Rust for the game engine, the MongoDB schema design choice, and the JWT authentication approach as ADRs.
+|===
