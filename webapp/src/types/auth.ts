@@ -6,6 +6,7 @@ export type LoginPayload = {
 export type RegisterPayload = {
   username: string;
   password: string;
+  is_test?: boolean;
 };
 
 export type LoginResponse = {

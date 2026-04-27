@@ -29,6 +29,7 @@ scenarios:
           json:
             username: "{{ username }}"
             password: "{{ password }}"
+            is_test: true
       
       # 3. Login to obtain JWT
       - post:
@@ -67,5 +68,11 @@ scenarios:
       # 6. Request the Bot to play
       - get:
           url: "/games/{{ gameId }}/play"
+          headers:
+            Authorization: "Bearer {{ jwt_token }}"
+
+      # 7. Cleanup: Delete the test user
+      - delete:
+          url: "/deleteuser"
           headers:
             Authorization: "Bearer {{ jwt_token }}"

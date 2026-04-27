@@ -8,10 +8,10 @@ const LEADERBOARD_SIZE = 10;
 const STRATEGY_MAP = {
   'monte carlo': 'mcts',
   'ai (gemini)': 'ai',
-  'ai':          'ai',
-  'mcts':        'mcts',
-  'random':      'random',
-  'defensive':   'defensive'
+  'ai': 'ai',
+  'mcts': 'mcts',
+  'random': 'random',
+  'defensive': 'defensive'
 };
 
 class MongoUserRepository extends UserRepository {
@@ -57,7 +57,7 @@ class MongoUserRepository extends UserRepository {
 
     // 2. Determine increment values based on the result
     const increments = {
-      wins:   result === 'WIN'  ? 1 : 0,
+      wins: result === 'WIN' ? 1 : 0,
       losses: result === 'LOSS' ? 1 : 0,
       surrendered: result === 'SURRENDERED' ? 1 : 0
     };
@@ -66,7 +66,7 @@ class MongoUserRepository extends UserRepository {
     const update = {
       $inc: {
         'statistics.total_games': 1,
-        'statistics.total_wins':   increments.wins,
+        'statistics.total_wins': increments.wins,
         'statistics.total_losses': increments.losses,
         'statistics.total_surrendered': increments.surrendered
       }
@@ -74,39 +74,44 @@ class MongoUserRepository extends UserRepository {
 
     // 4. Determine the specific path (vs_player or vs_bot.<internalStrategy>)
     const categoryPath = type === 'PLAYER'
-        ? 'vs_player'
-        : `vs_bot.${internalStrategy}`;
+      ? 'vs_player'
+      : `vs_bot.${internalStrategy}`;
 
     // 5. Apply the same increments to the category-specific path
-    update.$inc[`statistics.${categoryPath}.wins`]   = increments.wins;
+    update.$inc[`statistics.${categoryPath}.wins`] = increments.wins;
     update.$inc[`statistics.${categoryPath}.losses`] = increments.losses;
-    update.$inc[`statistics.${categoryPath}.surrendered`]  = increments.surrendered;
+    update.$inc[`statistics.${categoryPath}.surrendered`] = increments.surrendered;
 
     return await User.findByIdAndUpdate(userId, update, { new: true });
   }
 
   async getLeaderboard() {
+    const filter = { is_test: { $ne: true } };
     const [overall, random, defensive, mcts, ai] = await Promise.all([
-      User.find().sort({ 'statistics.total_wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.total_wins statistics.total_games').lean(),
-      User.find().sort({ 'statistics.vs_bot.random.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.random').lean(),
-      User.find().sort({ 'statistics.vs_bot.defensive.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.defensive').lean(),
-      User.find().sort({ 'statistics.vs_bot.mcts.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.mcts').lean(),
-      User.find().sort({ 'statistics.vs_bot.ai.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.ai').lean(),
+      User.find(filter).sort({ 'statistics.total_wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.total_wins statistics.total_games').lean(),
+      User.find(filter).sort({ 'statistics.vs_bot.random.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.random').lean(),
+      User.find(filter).sort({ 'statistics.vs_bot.defensive.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.defensive').lean(),
+      User.find(filter).sort({ 'statistics.vs_bot.mcts.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.mcts').lean(),
+      User.find(filter).sort({ 'statistics.vs_bot.ai.wins': -1 }).limit(LEADERBOARD_SIZE).select('username statistics.vs_bot.ai').lean(),
     ]);
 
     return {
       overall: overall.map(u => ({
-        username:    u.username,
-        total_wins:  u.statistics.total_wins,
+        username: u.username,
+        total_wins: u.statistics.total_wins,
         total_games: u.statistics.total_games
       })),
       vs_bots: {
-        random:    random.map(u =>    ({ username: u.username, wins: u.statistics?.vs_bot?.random?.wins    ?? 0 })),
+        random: random.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.random?.wins ?? 0 })),
         defensive: defensive.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.defensive?.wins ?? 0 })),
-        mcts:      mcts.map(u =>      ({ username: u.username, wins: u.statistics?.vs_bot?.mcts?.wins      ?? 0 })),
-        ai:        ai.map(u =>        ({ username: u.username, wins: u.statistics?.vs_bot?.ai?.wins        ?? 0 }))
+        mcts: mcts.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.mcts?.wins ?? 0 })),
+        ai: ai.map(u => ({ username: u.username, wins: u.statistics?.vs_bot?.ai?.wins ?? 0 }))
       }
     };
+  }
+
+  async deleteById(id) {
+    return await User.findByIdAndDelete(id);
   }
 }
 

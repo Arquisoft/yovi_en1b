@@ -84,7 +84,11 @@ export function EntryPage() {
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
         }
-        await auth.signUp({ username, password });
+        await auth.signUp({ 
+          username, 
+          password, 
+          is_test: /^loadtest_/.test(username)
+        });
       }
       navigate('/');
     } catch (err) {
