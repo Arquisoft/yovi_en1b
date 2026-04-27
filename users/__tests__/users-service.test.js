@@ -1335,4 +1335,27 @@ describe('MongoUserRepository direct unit tests', () => {
             expect(mcts.surrendered).toBeGreaterThanOrEqual(1);
         });
     });
+
+    describe('DELETE /deleteuser', () => {
+        it('deletes user', async () => {
+            const temp = { username: 'DelUser', password: 'password123' };
+            await request(app).post('/createuser').send(temp);
+            const login = await request(app).post('/login').send(temp);
+            await request(app).delete('/deleteuser').set('Authorization', `Bearer ${login.body.token}`).expect(200);
+        });
+        it('returns 500 on db error', async () => {
+             const User = mongoose.model('User');
+             const spy = vi.spyOn(User, 'findByIdAndDelete').mockRejectedValueOnce(new Error('fail'));
+             await request(app).delete('/deleteuser').set('Authorization', `Bearer ${token}`).expect(500);
+             spy.mockRestore();
+        });
+    });
+
+    describe('GET /leaderboard filter', () => {
+        it('hides test users', async () => {
+            await request(app).post('/createuser').send({ username: 'Hidden', password: 'password123', is_test: true });
+            const res = await request(app).get('/leaderboard');
+            expect(res.body.overall.map(u => u.username)).not.toContain('Hidden');
+        });
+    });
 })
