@@ -129,9 +129,10 @@ export const handlers = [
         total_surrendered: 1,
         vs_player: { wins: 1, losses: 0, surrendered: 0 },
         vs_bots: [
-          { name: 'random', difficulty: 'easy', wins: 1, losses: 0, surrendered: 0 },
-          { name: 'ai', difficulty: 'medium', wins: 0, losses: 1, surrendered: 1 },
-          { name: 'dijkstra', difficulty: 'hard', wins: 0, losses: 0, surrendered: 0 }
+          { name: 'Random', difficulty: 'Easy 😄', wins: 1, losses: 0, surrendered: 0 },
+          { name: 'Defensive', difficulty: 'Medium 😐', wins: 0, losses: 1, surrendered: 1 },
+          { name: 'Monte Carlo', difficulty: 'Hard 😈', wins: 0, losses: 0, surrendered: 0 },
+          { name: 'AI (Gemini)', difficulty: 'Medium 🤖', wins: 0, losses: 0, surrendered: 0 }
         ]
       }
     };
@@ -169,9 +170,10 @@ export const handlers = [
         { username: 'Champion', total_wins: 10, total_games: 15 }
       ],
       vs_bots: {
-        random: [{ username: 'user', wins: 1 }],
-        ai: [{ username: 'Champion', wins: 5 }],
-        dijkstra: [{ username: 'Champion', wins: 4 }]
+        Random: [{ username: 'user', wins: 1 }],
+        Defensive: [{ username: 'Champion', wins: 5 }],
+        'Monte Carlo': [{ username: 'Champion', wins: 4 }],
+        'AI (Gemini)': [{ username: 'Champion', wins: 3 }]
       }
     };
     return HttpResponse.json(leaderboard);
@@ -181,9 +183,10 @@ export const handlers = [
   http.get('*/games/options', () => {
     return HttpResponse.json({
       strategies: [
-        { id: 'random', name: 'Random', difficulty: 'Easy' },
-        { id: 'ai', name: 'AI', difficulty: 'Medium' },
-        { id: 'dijkstra', name: 'Dijkstra', difficulty: 'Hard' }
+        { id: 'random', name: 'Random', difficulty: 'Easy 😄' },
+        { id: 'defensive', name: 'Defensive', difficulty: 'Medium 😐' },
+        { id: 'mcts', name: 'Monte Carlo', difficulty: 'Hard 😈' },
+        { id: 'ai', name: 'AI (Gemini)', difficulty: 'Medium 🤖' }
       ],
       variants: [{ name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }]
     });
@@ -212,7 +215,7 @@ export const handlers = [
       _id: `game-${gameCounter++}`,
       player_id: userId,
       game_type: body.game_type,
-      name_of_enemy: body.name_of_enemy ?? null,
+      name_of_enemy: body.game_type === 'BOT' ? body.strategy : (body.name_of_enemy ?? null),
       board_size: body.board_size,
       strategy: body.strategy ?? 'random',
       variants: body.variants ?? [],
