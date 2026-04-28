@@ -1,7 +1,7 @@
 export type WinLossStats = {
   wins: number;
   losses: number;
-  draws: number;
+  surrendered: number;
 };
 
 export type BotStat = {
@@ -9,14 +9,14 @@ export type BotStat = {
   difficulty: string;
   wins: number;
   losses: number;
-  draws: number;
+  surrendered: number;
 };
 
 export type UserStatistics = {
   total_games: number;
   total_wins: number;
   total_losses: number;
-  total_canceled: number;
+  total_surrendered: number;
   vs_player: WinLossStats;
   vs_bots: BotStat[];
 };

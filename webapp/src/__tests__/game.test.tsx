@@ -60,6 +60,11 @@ function renderGamePage(gameId = GAME_TEST_DATA.gameId) {
   );
 }
 
+function renderFinishedGamePage(game: GameRecord) {
+  server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(game)));
+  renderGamePage();
+}
+
 // ─── loading ──────────────────────────────────────────────────────────────────
 
 describe('GamePage — loading', () => {
@@ -142,7 +147,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -175,7 +180,7 @@ describe('GamePage — move', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -207,7 +212,7 @@ describe('GamePage — undo', () => {
       moves: [{
         move_number: 1,
         player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -230,17 +235,17 @@ describe('GamePage — undo', () => {
 // ─── finish ───────────────────────────────────────────────────────────────────
 
 describe('GamePage — finish', () => {
-  test('finish button sends CANCELED result and shows canceled status in UI', async () => {
+  test('finish button sends SURRENDERED result and shows surrendered status in UI', async () => {
     server.use(
       http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)),
       http.put(`*/games/${GAME_TEST_DATA.gameId}/finish`, () =>
-        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'CANCELED' })
+        HttpResponse.json({ ...BASE_GAME, status: 'FINISHED', result: 'SURRENDERED' })
       )
     );
     renderGamePage();
     await screen.findByLabelText('game board');
-    await userEvent.click(screen.getByRole('button', { name: /finish/i }));
-    await screen.findByText(/^canceled$/i);
+    await userEvent.click(screen.getByRole('button', { name: /surrender/i }));
+    await screen.findByText(/^surrendered$/i);
   });
 
   test('finish action is not available after game is already finished', async () => {
@@ -251,7 +256,7 @@ describe('GamePage — finish', () => {
       result: 'WIN',
       moves: [{
         move_number: 1, player: 'B',
-        coordinates: { x: 0, y: 0, z: 2 },
+        coordinates: { x: 2, y: 0, z: 0 },
         created_at: new Date().toISOString()
       }]
     };
@@ -259,6 +264,94 @@ describe('GamePage — finish', () => {
     renderGamePage();
     await screen.findByLabelText('game board');
     expect(screen.queryByRole('button', { name: /finish/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('GamePage — finished panel', () => {
+  test('shows You as the winner after a WIN result', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(/winner: you/i);
+    expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /main menu/i })).toBeInTheDocument();
+  });
+
+  test('shows the enemy name as winner after a LOSS result', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'LOSS',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(new RegExp(`winner: ${GAME_TEST_DATA.enemyName}`, 'i'));
+  });
+
+  test('shows Bot as winner after a SURRENDERED result in bot games', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      game_type: 'BOT',
+      name_of_enemy: null,
+      status: 'FINISHED',
+      result: 'SURRENDERED',
+      moves: [{
+        move_number: 1,
+        player: 'B',
+        coordinates: { x: 2, y: 0, z: 0 },
+        created_at: new Date().toISOString()
+      }]
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByText(/^surrendered$/i);
+  });
+
+  test('play again navigates to the new game page', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN'
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByRole('button', { name: /play again/i });
+    await userEvent.click(screen.getByRole('button', { name: /play again/i }));
+    await screen.findByText(/new game page/i);
+  });
+
+  test('main menu navigates to the home page', async () => {
+    const finishedGame: GameRecord = {
+      ...BASE_GAME,
+      status: 'FINISHED',
+      result: 'WIN'
+    };
+
+    renderFinishedGamePage(finishedGame);
+
+    await screen.findByRole('button', { name: /main menu/i });
+    await userEvent.click(screen.getByRole('button', { name: /main menu/i }));
+    await screen.findByText(/home page/i);
   });
 });
 
@@ -306,13 +399,13 @@ describe('GamePage — move history hover', () => {
         {
           move_number: 1,
           player: 'B',
-          coordinates: { x: 0, y: 0, z: 2 },
+          coordinates: { x: 2, y: 0, z: 0 },
           created_at: new Date().toISOString()
         },
         {
           move_number: 2,
           player: 'R',
-          coordinates: { x: 0, y: 1, z: 1 },
+          coordinates: { x: 1, y: 0, z: 1 },
           created_at: new Date().toISOString()
         }
       ]
@@ -326,7 +419,7 @@ describe('GamePage — move history hover', () => {
     const firstMoveItem = screen.getByText('#1').closest('li');
     expect(firstMoveItem).not.toBeNull();
 
-    const firstMoveHex = screen.getByLabelText(/^Hex \(0, 0, 2\)/i);
+    const firstMoveHex = screen.getByLabelText(/^Hex \(2, 0, 0\)/i);
     expect(firstMoveHex).not.toHaveClass('hex-wrap--history-highlight');
 
     await userEvent.hover(firstMoveItem as HTMLElement);
@@ -354,10 +447,10 @@ describe('GamePage — explosions variant', () => {
 
     renderGamePage();
 
-    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    const mineHex = await screen.findByLabelText(/^Hex \(2, 0, 0\) - mine$/i);
     await userEvent.hover(mineHex);
 
-    expect(screen.getByLabelText(/^Hex \(0, 1, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
+    expect(screen.getByLabelText(/^Hex \(1, 0, 1\)$/i)).toHaveClass('hex-wrap--mine-neighbor');
   });
 
   test('clicking a mine applies returned yen_state snapshot', async () => {
@@ -382,7 +475,7 @@ describe('GamePage — explosions variant', () => {
               {
                 move_number: 1,
                 player: 'B',
-                coordinates: { x: 0, y: 0, z: 2 },
+                coordinates: { x: 2, y: 0, z: 0 },
                 yen_state: 'B/../...',
                 created_at: new Date().toISOString()
               }
@@ -396,10 +489,10 @@ describe('GamePage — explosions variant', () => {
 
     renderGamePage();
 
-    const mineHex = await screen.findByLabelText(/^Hex \(0, 0, 2\) - mine$/i);
+    const mineHex = await screen.findByLabelText(/^Hex \(2, 0, 0\) - mine$/i);
     await userEvent.click(mineHex);
 
-    await screen.findByLabelText(/^Hex \(0, 0, 2\) - Blue$/i);
-    expect(screen.queryByLabelText(/^Hex \(0, 0, 2\) - mine$/i)).not.toBeInTheDocument();
+    await screen.findByLabelText(/^Hex \(2, 0, 0\) - Blue$/i);
+    expect(screen.queryByLabelText(/^Hex \(2, 0, 0\) - mine$/i)).not.toBeInTheDocument();
   });
 });

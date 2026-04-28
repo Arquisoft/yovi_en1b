@@ -1,30 +1,31 @@
 const mongoose = require('mongoose');
 
 const strategyStatsSchema = {
-    wins:   { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
-    draws:  { type: Number, default: 0 }
+    surrendered: { type: Number, default: 0 }
 };
 
 const userSchema = new mongoose.Schema({
-    username:      { type: String, required: true, unique: true },
+    username: { type: String, required: true, unique: true },
     password_hash: { type: String, required: true },
-    created_at:    { type: Date, default: Date.now },
+    is_test: { type: Boolean, default: false },
+    created_at: { type: Date, default: Date.now },
     statistics: {
-        total_games:  { type: Number, default: 0 },
-        total_wins:   { type: Number, default: 0 },
+        total_games: { type: Number, default: 0 },
+        total_wins: { type: Number, default: 0 },
         total_losses: { type: Number, default: 0 },
-        total_draws:  { type: Number, default: 0 },
+        total_surrendered: { type: Number, default: 0 },
         vs_player: {
-            wins:   { type: Number, default: 0 },
+            wins: { type: Number, default: 0 },
             losses: { type: Number, default: 0 },
-            draws:  { type: Number, default: 0 }
+            surrendered: { type: Number, default: 0 }
         },
         vs_bot: {
-            random:        strategyStatsSchema,
-            defensive:     strategyStatsSchema,
-            mcts:          strategyStatsSchema,
-            ai:            strategyStatsSchema
+            random: strategyStatsSchema,
+            defensive: strategyStatsSchema,
+            mcts: strategyStatsSchema,
+            ai: strategyStatsSchema
         }
     }
 });

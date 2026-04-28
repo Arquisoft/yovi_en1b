@@ -27,7 +27,7 @@ const gameSchema = new mongoose.Schema({
     initial_yen_state:  { type: String, default: null },
     current_turn:       { type: String, enum: ['B', 'R'], required: true },
     status:             { type: String, enum: ['IN_PROGRESS', 'FINISHED'], default: 'IN_PROGRESS' },
-    result:             { type: String, enum: ['WIN', 'LOSS', 'UNFINISHED', null], default: null },
+    result:             { type: String, enum: ['WIN', 'LOSS', 'SURRENDERED', null], default: null },
     duration_seconds:   { type: Number, default: 0 },
     yen_final_state:    { type: String },
     created_at:         { type: Date, default: Date.now },

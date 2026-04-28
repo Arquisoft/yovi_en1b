@@ -14,7 +14,7 @@ Feature: Leaderboard
     And I set the board size to 3
     And I start the game
     And I play a full game until Blue wins
-    Then the game result should show "YOU WIN"
+    Then the game result should show "Winner: You"
     When I open the leaderboard page
     Then I should see the leaderboard heading
     And the leaderboard should show my username with 1 win and 1 game

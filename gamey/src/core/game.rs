@@ -481,9 +481,11 @@ impl TryFrom<YEN> for GameY {
         for (row, row_str) in game.layout().split('/').enumerate() {
             for (col, cell) in row_str.chars().enumerate() {
                 if cell == 'e' {
-                    let x = col as u32;
-                    let y = (row as u32).saturating_sub(col as u32);
-                    let z = game.size().saturating_sub(1).saturating_sub(row as u32);
+                    let r = row as u32;
+                    let c = col as u32;
+                    let x = game.size() - 1 - r;
+                    let y = c;
+                    let z = (game.size() - 1) - x - y;
                     bombs.insert(Coordinates::new(x, y, z));
                 }
             }
@@ -522,9 +524,11 @@ impl TryFrom<YEN> for GameY {
                 });
             }
             for (col, cell) in cells.iter().enumerate() {
-                let x = col as u32;
-                let y = (row as u32) - (col as u32);
-                let z = game.size() - 1 - (row as u32);
+                let r = row as u32;
+                let c = col as u32;
+                let x = game.size() - 1 - r;
+                let y = c;
+                let z = (game.size() - 1) - x - y;
                 let coords = Coordinates::new(x, y, z);
                 match cell {
                     'B' => {
@@ -576,9 +580,11 @@ impl From<&GameY> for YEN {
 
         for row in 0..size {
             for col in 0..=row {
-                let x = col;
-                let y = row - col;
-                let z = size - 1 - row;
+                let r = row;
+                let c = col;
+                let x = size - 1 - r;
+                let y = c;
+                let z = (size - 1) - x - y;
                 let coords = Coordinates::new(x, y, z);
 
                 // Empty + bomb cells are encoded as 'e' so the frontend can
@@ -606,17 +612,18 @@ impl From<&GameY> for YEN {
             .map(|v| format!("{:?}", v)) // Uses Debug repr: "Explosions", "DoubleTurn"
             .collect();
 
-        // Serialize bomb positions as comma-separated flat indices
         let explosives = if game.board.bombs().is_empty() {
             None
         } else {
-            let indices: Vec<String> = game
+            let mut indices: Vec<u32> = game
                 .board
                 .bombs()
                 .iter()
-                .map(|c| c.to_index(size).to_string())
+                .map(|c| c.to_index(size))
                 .collect();
-            Some(indices.join(","))
+            indices.sort_unstable();
+            let indices_str: Vec<String> = indices.into_iter().map(|i| i.to_string()).collect();
+            Some(indices_str.join(","))
         };
 
         YEN::new_with_variants(size, turn, players, layout, variant_names, explosives)
@@ -1124,28 +1131,24 @@ mod tests {
     /// enough.
     #[test]
     fn test_bomb_parsed_from_e_in_layout_only() {
-        // Row 0: top (1 cell); Row 1: middle (2 cells); Row 2: bottom (3 cells)
-        // The 'e' is at row 2, col 0 → coords (0, 2, 0).
         let yen = YEN::new_with_variants(
             3,
             0,
             vec!['B', 'R'],
             "./../e..".to_string(),
             vec!["Explosions".to_string()],
-            None, // no explosives field — bomb only in layout
+            None,
         );
         let game = GameY::try_from(yen).unwrap();
         let bombs = game.bomb_positions();
         assert_eq!(bombs.len(), 1);
-        assert!(bombs.contains(&Coordinates::new(0, 2, 0)));
+        assert!(bombs.contains(&Coordinates::new(0, 0, 2)));
     }
 
     /// When *both* the `explosives` field and inline 'e' markers are present
     /// they should union (duplicates dedup since bombs is a HashSet).
     #[test]
     fn test_bomb_layout_and_explosives_union() {
-        // 'e' at row 1, col 1 → (1, 0, 1). explosives "0" = flat index 0
-        // which is row 0, col 0 → (0, 0, 2).
         let yen = YEN::new_with_variants(
             3,
             0,

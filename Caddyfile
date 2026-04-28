@@ -1,0 +1,27 @@
+{$DEPLOY_DOMAIN} {
+    # 1. Users API: intercept /api/users and forward to users:3000 container
+    # handle_path automatically strips the prefix before forwarding
+    handle_path /api/users/* {
+        reverse_proxy users:3000
+    }
+
+    # 2. Game API: intercept /api/gamey and forward to gamey:4000 container
+    handle_path /api/gamey/* {
+        reverse_proxy gamey:4000
+    }
+
+    # 3. API Documentation (Swagger)
+    handle /api-docs* {
+        reverse_proxy users:3000
+    }
+
+    # 4. Grafana Dashboard
+    handle /grafana* {
+        reverse_proxy grafana:3000
+    }
+
+    # 5. Everything else falls back to the Frontend application (Webapp)
+    handle {
+        reverse_proxy webapp:80
+    }
+}

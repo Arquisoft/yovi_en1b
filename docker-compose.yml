@@ -38,7 +38,7 @@ services:
     container_name: webapp
     restart: always
     ports:
-      - "80:80"
+      - "8000:80"
     depends_on:
       - users
       - gamey
@@ -76,8 +76,33 @@ services:
     container_name: grafana
     ports:
       - "9091:3000"
+    environment:
+      - GF_SERVER_DOMAIN=$DEPLOY_DOMAIN
+      - GF_SERVER_ROOT_URL=${GRAFANA_URL:-https://${DEPLOY_DOMAIN}/grafana/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./users/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitor-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    environment:
+      - DEPLOY_DOMAIN=${DEPLOY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - webapp
+      - users
+      - gamey
     networks:
       - monitor-net
 
@@ -87,3 +112,6 @@ networks:
 
 volumes:
   mongo-data:
+  caddy_data:
+  caddy_config:
+  grafana_data:

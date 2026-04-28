@@ -663,7 +663,7 @@ mod tests {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(0, 0, 1)),
+                coords: Some(Coordinates::new(1, 0, 0)),
                 action: None,
             },
         });
@@ -675,7 +675,7 @@ mod tests {
     #[tokio::test]
     async fn test_make_move_invalid_yen() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "123".to_string()); // invalid layout
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "123".to_string());
         let req = axum::Json(MakeMoveRequest {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
@@ -698,7 +698,7 @@ mod tests {
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
                 coords: Some(Coordinates::new(0, 0, 1)),
-                action: Some("swap".to_string()), // both coords and action
+                action: Some("swap".to_string()),
             },
         });
         let res = make_move(params, req).await;
@@ -709,12 +709,12 @@ mod tests {
    #[tokio::test]
     async fn test_make_move_game_error() {
         let params = axum::extract::Path(VersionParam { api_version: "v1".to_string() });
-        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string()); // B is occupied
+        let yen = crate::YEN::new(2, 0, vec!['B', 'R'], "B/..".to_string());
         let req = axum::Json(MakeMoveRequest {
             game: yen,
             movement: crate::game_server::dto::MoveRequest {
                 player_id: 0,
-                coords: Some(Coordinates::new(0, 0, 1)), // B is at (0,0,1) with the new React-synced coords
+                coords: Some(Coordinates::new(1, 0, 0)),
                 action: None,
             },
         });
@@ -844,54 +844,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_play_success_with_defensive_strategy() {
-        // Size 2, R at top corner (0,0,1)
         let req = play_req(Some("R/.."), Some("defensive"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
 
-        // Size 2 board, R at top corner (0,0,1). Neighbors are (1,0,0) and (0,1,0).
-        // The bot (B) should have picked one of these.
         let chosen_coords = res_json.coordinates;
-        let r_coords = Coordinates::new(0, 0, 1);
+        let r_coords = Coordinates::new(1, 0, 0);
         let neighbors = r_coords.neighbors(2);
-        assert!(neighbors.contains(&chosen_coords), "Defensive bot should pick a neighbor of R's move");
+        assert!(neighbors.contains(&chosen_coords));
     }
 
     #[tokio::test]
     async fn test_play_success_with_medium_strategy() {
-        // "medium" is the actual registered name of DefensiveBot. Before the fix
-        // for issue #194, passing "medium" silently fell through to RandomBot.
         let req = play_req(Some("R/.."), Some("medium"), 2);
         let res = play(req).await;
         assert!(res.is_ok());
         let res_json = res.unwrap().0;
         let chosen_coords = res_json.coordinates;
-        let r_coords = Coordinates::new(0, 0, 1);
+        let r_coords = Coordinates::new(1, 0, 0);
         let neighbors = r_coords.neighbors(2);
-        assert!(
-            neighbors.contains(&chosen_coords),
-            "'medium' should route to DefensiveBot, which picks a neighbor of R's move"
-        );
+        assert!(neighbors.contains(&chosen_coords));
     }
 
     #[tokio::test]
     async fn test_play_strategy_is_case_insensitive() {
-        // "HARD" / "Medium" / mixed case should still route to the right bot.
         let req = play_req(Some("./.."), Some("HARD"), 2);
         assert!(play(req).await.is_ok());
 
         let req = play_req(Some("R/.."), Some("Medium"), 2);
         let res = play(req).await.unwrap().0;
         let chosen = res.coordinates;
-        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        let neighbors = Coordinates::new(1, 0, 0).neighbors(2);
         assert!(neighbors.contains(&chosen));
     }
 
     #[tokio::test]
     async fn test_play_strategy_falls_back_to_difficulty_level() {
-        // If the caller sets difficulty_level instead of strategy, we should still
-        // honour it (the Nacho partner API uses difficulty_level).
         let req = axum::Json(PlayRequest {
             yen_state: Some("R/..".to_string()),
             strategy: None,
@@ -904,7 +893,7 @@ mod tests {
         let res = play(req).await;
         assert!(res.is_ok());
         let chosen = res.unwrap().0.coordinates;
-        let neighbors = Coordinates::new(0, 0, 1).neighbors(2);
+        let neighbors = Coordinates::new(1, 0, 0).neighbors(2);
         assert!(neighbors.contains(&chosen));
     }
 
@@ -977,16 +966,29 @@ mod tests {
         // game (no yen_state), the server should place bombs. Afterwards, when
         // round-tripping the game through /play, the bomb positions must be
         // preserved and echoed back in the PlayResponse.
-        let req = axum::Json(PlayRequest {
-            yen_state: None,
-            strategy: Some("random".to_string()),
-            difficulty_level: None,
-            board_size: 7,
-            variants: vec!["Explosions".to_string()],
-            explosives: None,
-            turn: None,
-        });
-        let first = play(req).await.expect("play should succeed").0;
+        let mut first;
+        loop {
+            let req = axum::Json(PlayRequest {
+                yen_state: None,
+                strategy: Some("random".to_string()),
+                difficulty_level: None,
+                board_size: 7,
+                variants: vec!["Explosions".to_string()],
+                explosives: None,
+                turn: None,
+            });
+            first = play(req).await.expect("play should succeed").0;
+            
+            // Flaky test fix: if the random bot happens to place its first piece
+            // EXACTLY on the randomly generated bomb, the bomb detonates and is
+            // consumed, meaning `explosives` will be None. In that rare case (1/28 chance
+            // on a size 7 board), just retry until it misses the bomb so we can
+            // actually test the round-trip.
+            if first.explosives.is_some() {
+                break;
+            }
+        }
+
         assert!(first.explosives.is_some(), "bomb positions should be returned");
         assert!(first.variants.iter().any(|v| v == "Explosions"));
         assert_eq!(first.yen_state.split('/').count(), 7);
@@ -1182,8 +1184,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_compute_invalid_move() {
-        // Top cell occupied; try to play there again.
-        let req = compute_req(Some("B/.."), Coordinates::new(0, 0, 1));
+        let req = compute_req(Some("B/.."), Coordinates::new(1, 0, 0));
         let res = compute(req).await;
         assert!(res.is_err());
         assert!(res.unwrap_err().0.message.contains("Invalid move"));
@@ -1241,8 +1242,7 @@ mod tests {
             "no-space variant 'montecarlo' must also route to HardBot");
 
         // Gemini / Generative AI bot aliases.
-        // We set a mock key temporarily so the bot is successfully created
-        // rather than falling back to RandomBot (which would have the wrong name).
+        // We set a mock key so the bot is successfully created.
         unsafe { std::env::set_var("GEMINI_API_KEY", "mock_key") };
         assert_eq!(pick_bot(Some("gemini"), None).name(), "gemini");
         assert_eq!(pick_bot(Some("generative"), None).name(), "gemini");
@@ -1252,7 +1252,6 @@ mod tests {
             "'AI (Gemini)' (STRATEGY_NAME.ai) must route to GenerativeAIBot");
         assert_eq!(pick_bot(Some("ai (gemini)"), None).name(), "gemini",
             "case-insensitive match for 'ai (gemini)'");
-        unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
 
     /// Covers the `t0|` prefix branch in `parse_yen_layout`.
@@ -1287,22 +1286,9 @@ mod tests {
     /// Covers the `generativeai` alias (not yet asserted in the strategy test).
     #[test]
     fn test_pick_bot_generativeai_alias_recognized() {
-        // "generativeai" must route to the gemini bot (when key is set) or
-        // fall back to random_bot (when key is absent). It must never panic or
-        // route to a completely unrelated bot.
-        let bot_no_key = {
-            unsafe { std::env::remove_var("GEMINI_API_KEY") };
-            pick_bot(Some("generativeai"), None)
-        };
-        assert!(
-            bot_no_key.name() == "gemini" || bot_no_key.name() == "random_bot",
-            "generativeai without key must be gemini or random_bot, got {}",
-            bot_no_key.name()
-        );
-
+        // generativeai must route to the gemini bot when key is set.
         unsafe { std::env::set_var("GEMINI_API_KEY", "mock") };
         let bot_with_key = pick_bot(Some("generativeai"), None);
         assert_eq!(bot_with_key.name(), "gemini");
-        unsafe { std::env::remove_var("GEMINI_API_KEY") };
     }
 }

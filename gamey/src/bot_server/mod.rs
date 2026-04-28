@@ -38,9 +38,9 @@ use crate::{GameYError, RandomBot, YBotRegistry, state::AppState};
 /// This is useful for testing the API without binding to a network port.
 pub fn create_router(state: AppState) -> axum::Router {
     // Configure CORS for development and production environments
+    // We use Any to allow the frontend to be served from any domain (e.g. yovi-en1b.alejandrosanclaudio.com)
     let cors = CorsLayer::new()
-        // Only trust your specific frontend IP
-        .allow_origin("http://4.233.184.98".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,

@@ -44,7 +44,7 @@ interface MoveHistoryProps {
 function buildBoard(size: number): HexCell[][] {
   return Array.from({ length: size }, (_, row) =>
     Array.from({ length: row + 1 }, (_, col) => ({
-      coordinates: { x: col, y: row - col, z: size - 1 - row }
+      coordinates: { x: size - 1 - row, y: col, z: row - col }
     }))
   );
 }
@@ -83,6 +83,14 @@ function getEnemyTitle(game: GameRecord): string {
   }
 
   return game.name_of_enemy ?? 'Player 2 (Red)';
+}
+
+function getWinnerTitle(game: GameRecord): string {
+  if (game.result === 'WIN') {
+    return 'You';
+  }
+
+  return getEnemyTitle(game);
 }
 
 function getOwnerClass(owner: Move['player'] | null | undefined): string {
@@ -468,7 +476,7 @@ export function GamePage() {
     setError(null);
 
     try {
-      const next = await finishGame(id, { result: 'CANCELED', duration_seconds: elapsed });
+      const next = await finishGame(id, { result: 'SURRENDERED', duration_seconds: elapsed });
       setGame(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finish game');
@@ -504,13 +512,15 @@ export function GamePage() {
   const getResultBoxClass = (): string => {
     if (game.result === 'WIN') return 'blue';
     if (game.result === 'LOSS') return 'red';
-    return 'canceled';
+    return 'surrendered';
   };
 
   const getResultText = (): string => {
-    if (game.result === 'WIN') return 'YOU WIN';
-    if (game.result === 'LOSS') return 'YOU LOSE';
-    return 'CANCELED';
+    if (game.result === 'SURRENDERED') {
+      return `Surrendered`;
+    }
+
+    return `Winner: ${getWinnerTitle(game)}`;
   };
 
   return (
@@ -542,8 +552,8 @@ export function GamePage() {
                     className="icon-btn icon-btn--danger"
                     onClick={handleFinish}
                     disabled={actionLoading || !inProgress}
-                    title="Finish game as canceled"
-                    aria-label="Finish game as canceled"
+                    title="Surrender game"
+                    aria-label="Surrender game"
                   >
                     ⏹
                   </button>
@@ -553,6 +563,12 @@ export function GamePage() {
                 <div className={`game-result-box game-result-box--${getResultBoxClass()}`}>
                   <p className="game-result-time">{formatDuration(displayedDuration)}</p>
                   <p className="game-result-text">{getResultText()}</p>
+                  <div className="game-result-actions">
+                    <button type="button" onClick={() => navigate('/games/new')}>
+                      Play Again
+                    </button>
+                    <button type="button" onClick={() => navigate('/')}>Main Menu</button>
+                  </div>
                 </div>
               )}
             </div>

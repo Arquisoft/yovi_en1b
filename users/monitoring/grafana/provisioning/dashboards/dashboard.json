@@ -347,7 +347,10 @@
   "refresh": false,
   "schemaVersion": 25,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "yovi",
+    "simple"
+  ],
   "templating": {
     "list": []
   },
@@ -369,7 +372,7 @@
     ]
   },
   "timezone": "",
-  "title": "Example Service Dashboard",
+  "title": "YOVI Simple Dashboard",
   "uid": "1DYaynomMk",
   "version": 2
 }

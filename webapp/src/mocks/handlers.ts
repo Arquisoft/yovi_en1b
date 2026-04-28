@@ -1,346 +1,72 @@
+/**
+ * MSW (Mock Service Worker) Handlers for Frontend Testing
+ * 
+ * This file defines HTTP request handlers that intercept API calls during development
+ * and testing. Handlers are lightweight and return static mock data (not game logic).
+ * 
+ * Purpose:
+ * - Enable testing without a backend server
+ * - Provide consistent, predictable API responses
+ * - Support development with `npm run dev:mock`
+ * 
+ * Architecture:
+ * - In-memory storage (mockUsers, mockGames)
+ * - Simple CRUD operations only
+ * - No game state evaluation (board logic, winning conditions)
+ * - Static test data from mockFixtures
+ */
+
 import { http, HttpResponse } from 'msw';
 import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
-import type { Coordinates, CreateGamePayload, GameRecord, Move } from '../types/games';
-import type { UserProfile, UserStatistics, WinLossStats, Leaderboard, BotLeaderboardEntry } from '../types/users';
+import type { Coordinates, CreateGamePayload, GameRecord } from '../types/games';
+import type { UserProfile, Leaderboard } from '../types/users';
 import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
-import { buildEmptyYenState, getNeighborCoordinates, parseYenState, serializeYenState } from '../utils/yenState';
 
+// ─── In-Memory Storage ─────────────────────────────────────────────────────────
+// Maps that simulate a simple database for testing
+
+/** Test user credentials (username: 'user', password: 'user') */
 const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
 ]);
+
+/** Game records seeded with test data (4 pre-made finished games) */
 const mockGames = new Map<string, GameRecord>(
-    SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
+  SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
 );
+
+/** Counter for generating unique game IDs */
 let gameCounter = 1;
 
-const DEFAULT_STRATEGY_OPTIONS = [
-  { id: 'random', name: 'random', difficulty: 'easy' },
-  { id: 'ai', name: 'ai', difficulty: 'medium' },
-  { id: 'dijkstra', name: 'dijkstra', difficulty: 'hard' }
-] as const;
+// ─── Helper Functions ──────────────────────────────────────────────────────────
 
-const DEFAULT_VARIANTS = [
-  { name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }
-] as const;
-
-function formatLabel(value: string): string {
-  if (value.toLowerCase() === 'ai') {
-    return 'AI';
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
-
-function coordinateKey(c: Coordinates): string {
-  return `${c.x}:${c.y}:${c.z}`;
-}
-
-function isOnBoard(size: number, coordinates: Coordinates): boolean {
-  return (
-      coordinates.x >= 0 &&
-      coordinates.y >= 0 &&
-      coordinates.z >= 0 &&
-      coordinates.x + coordinates.y + coordinates.z === size - 1
-  );
-}
-
-function getLatestYenState(game: GameRecord): string {
-  return game.moves.at(-1)?.yen_state ?? game.yen_final_state ?? buildEmptyYenState(game.board_size);
-}
-
-function listBoardCoordinates(size: number): Coordinates[] {
-  const all: Coordinates[] = [];
-  for (let row = 0; row < size; row += 1) {
-    for (let column = 0; column <= row; column += 1) {
-      all.push({ x: column, y: row - column, z: size - 1 - row });
-    }
-  }
-  return all;
-}
-
-function createInitialYenState(size: number, variants: string[]): string {
-  const map = parseYenState(size, buildEmptyYenState(size));
-
-  if (!variants.includes('Explosions')) {
-    return serializeYenState(size, map);
-  }
-
-  const mineCandidates = listBoardCoordinates(size).filter((coord) => coord.x > 0 && coord.y > 0 && coord.z > 0);
-  const mineCount = Math.min(3, Math.max(1, Math.floor(size / 3)));
-
-  for (let index = 0; index < mineCount && index < mineCandidates.length; index += 1) {
-    const selected = mineCandidates[(index * 2) % mineCandidates.length];
-    map.set(coordinateKey(selected), { owner: null, hasMine: true });
-  }
-
-  return serializeYenState(size, map);
-}
-
-function getFreeCoordinates(game: GameRecord): Coordinates[] {
-  const currentMap = parseYenState(game.board_size, getLatestYenState(game));
-  return listBoardCoordinates(game.board_size).filter((coordinates) => !currentMap.get(coordinateKey(coordinates))?.owner);
-}
-
+/** Extract user ID from Authorization token (format: "Bearer mock-token-<userId>") */
 function extractUserId(request: Request): string | null {
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const tokenPart = authHeader.replace('Bearer ', '');
-  return tokenPart.replace('mock-token-', '');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  return authHeader.replace('Bearer mock-token-', '');
 }
 
-function createGameRecord(userId: string, payload: CreateGamePayload): GameRecord {
-  const gameId = `game-${gameCounter++}`;
-  const variants = payload.variants ?? [];
-
-  return {
-    _id: gameId,
-    player_id: userId,
-    game_type: payload.game_type,
-    name_of_enemy: payload.name_of_enemy ?? null,
-    board_size: payload.board_size,
-    strategy: payload.strategy ?? 'random',
-    variants,
-    difficulty_level: payload.difficulty_level ?? 'medium',
-    rule_set: payload.rule_set ?? 'normal',
-    current_turn: 'B',
-    status: 'IN_PROGRESS',
-    result: null,
-    duration_seconds: 0,
-    created_at: new Date().toISOString(),
-    yen_final_state: createInitialYenState(payload.board_size, variants),
-    moves: []
-  };
-}
-
+/** Retrieve a game if it belongs to the requesting user, else null (authorization check) */
 function getGameForUser(gameId: string, userId: string): GameRecord | null {
   const game = mockGames.get(gameId);
-  if (!game || game.player_id !== userId) {
-    return null;
-  }
-  return game;
+  return game?.player_id === userId ? game : null;
 }
 
-function hasWinningConnection(state: ReturnType<typeof parseYenState>, boardSize: number, player: 'B' | 'R'): boolean {
-  const owned = new Set<string>();
-
-  for (const [key, cell] of state.entries()) {
-    if (cell.owner === player) {
-      owned.add(key);
-    }
-  }
-
-  const visited = new Set<string>();
-
-  for (const start of owned) {
-    if (visited.has(start)) {
-      continue;
-    }
-
-    const [x, y, z] = start.split(':').map(Number);
-    const queue: Coordinates[] = [{ x, y, z }];
-    const touched = new Set<'x' | 'y' | 'z'>();
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const key = coordinateKey(current);
-
-      if (visited.has(key)) {
-        continue;
-      }
-
-      visited.add(key);
-
-      if (current.x === 0) touched.add('x');
-      if (current.y === 0) touched.add('y');
-      if (current.z === 0) touched.add('z');
-
-      for (const neighbor of getNeighborCoordinates(boardSize, current)) {
-        const neighborKey = coordinateKey(neighbor);
-
-        if (!visited.has(neighborKey) && owned.has(neighborKey)) {
-          queue.push(neighbor);
-        }
-      }
-    }
-
-    if (touched.size === 3) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function appendMove(game: GameRecord, coordinates: Coordinates, player: 'B' | 'R'): GameRecord {
-  const currentMap = parseYenState(game.board_size, getLatestYenState(game));
-  const nextMap = new Map(currentMap);
-
-  const targetKey = coordinateKey(coordinates);
-  const target = nextMap.get(targetKey);
-  const explosionsEnabled = game.variants.includes('Explosions');
-
-  if (explosionsEnabled && target?.hasMine && !target.owner) {
-    nextMap.set(targetKey, { owner: player, hasMine: false });
-
-    for (const neighbor of getNeighborCoordinates(game.board_size, coordinates)) {
-      nextMap.set(coordinateKey(neighbor), { owner: null, hasMine: false });
-    }
-  } else {
-    nextMap.set(targetKey, { owner: player, hasMine: false });
-  }
-
-  const nextYenState = serializeYenState(game.board_size, nextMap);
-
-  const move: Move = {
-    move_number: game.moves.length + 1,
-    player,
-    coordinates,
-    yen_state: nextYenState,
-    created_at: new Date().toISOString()
-  };
-
-  const nextGame: GameRecord = {
-    ...game,
-    moves: [...game.moves, move],
-    yen_final_state: nextYenState,
-    current_turn: player === 'B' ? 'R' : 'B'
-  };
-
-  if (hasWinningConnection(nextMap, game.board_size, 'B')) {
-    return { ...nextGame, status: 'FINISHED', result: 'WIN' };
-  }
-
-  if (hasWinningConnection(nextMap, game.board_size, 'R')) {
-    return { ...nextGame, status: 'FINISHED', result: 'LOSS' };
-  }
-
-  const free = getFreeCoordinates(nextGame);
-  return {
-    ...nextGame,
-    status: free.length === 0 ? 'FINISHED' : 'IN_PROGRESS',
-    result: free.length === 0 ? 'CANCELED' : null
-  };
-}
-
-function emptyWinLoss(): WinLossStats {
-  return { wins: 0, losses: 0, draws: 0 };
-}
-
-function getUserStatistics(userId: string): UserStatistics {
-  const userGames = [...mockGames.values()].filter((game) => game.player_id === userId && game.status === 'FINISHED');
-  const botBuckets = new Map<string, { name: string; difficulty: string; wins: number; losses: number; draws: number }>();
-
-  // Initialize all strategies
-  for (const option of DEFAULT_STRATEGY_OPTIONS) {
-    botBuckets.set(option.name, {
-      name: option.name,
-      difficulty: option.difficulty,
-      wins: 0,
-      losses: 0,
-      draws: 0
-    });
-  }
-
-  const stats: UserStatistics = {
-    total_games: userGames.length,
-    total_wins: 0,
-    total_losses: 0,
-    total_canceled: 0,
-    vs_player: emptyWinLoss(),
-    vs_bots: []
-  };
-
-  for (const game of userGames) {
-    if (game.result === 'WIN') stats.total_wins += 1;
-    if (game.result === 'LOSS') stats.total_losses += 1;
-    if (game.result === 'CANCELED') stats.total_canceled += 1;
-
-    if (game.game_type === 'PLAYER') {
-      if (game.result === 'WIN') stats.vs_player.wins += 1;
-      if (game.result === 'LOSS') stats.vs_player.losses += 1;
-      if (game.result === 'CANCELED') stats.vs_player.draws += 1;
-      continue;
-    }
-
-    const existing = botBuckets.get(game.strategy);
-    if (existing) {
-      if (game.result === 'WIN') existing.wins += 1;
-      if (game.result === 'LOSS') existing.losses += 1;
-      if (game.result === 'CANCELED') existing.draws += 1;
-    }
-  }
-
-  stats.vs_bots = Array.from(botBuckets.values());
-  return stats;
-}
-
-function buildLeaderboard(): Leaderboard {
-  const userStats = new Map<
-      string,
-      { total_wins: number; total_games: number; botWins: Map<string, number> }
-  >();
-
-  // Aggregate stats for all users
-  for (const [, user] of mockUsers) {
-    const stats = getUserStatistics(user.userId);
-    userStats.set(user.userId, {
-      total_wins: stats.total_wins,
-      total_games: stats.total_games,
-      botWins: new Map(stats.vs_bots.map((bot) => [bot.name, bot.wins]))
-    });
-  }
-
-  // Build overall leaderboard (top 10 by total wins)
-  const overall = Array.from(mockUsers.entries())
-      .map(([username, user]) => {
-        const stats = userStats.get(user.userId);
-        return {
-          username,
-          total_wins: stats?.total_wins ?? 0,
-          total_games: stats?.total_games ?? 0
-        };
-      })
-      .sort((a, b) => b.total_wins - a.total_wins)
-      .slice(0, 10);
-
-  // Build per-bot leaderboards (top 10 per strategy)
-  const vs_bots: Record<string, BotLeaderboardEntry[]> = {};
-
-  for (const strategy of DEFAULT_STRATEGY_OPTIONS.map((opt) => opt.name)) {
-    vs_bots[strategy] = Array.from(mockUsers.entries())
-        .map(([username, user]) => {
-          const stats = userStats.get(user.userId);
-          return {
-            username,
-            wins: stats?.botWins.get(strategy) ?? 0
-          };
-        })
-        .filter((entry) => entry.wins > 0)
-        .sort((a, b) => b.wins - a.wins)
-        .slice(0, 10);
-  }
-
-  return { overall, vs_bots };
-}
+// ─── HTTP Handlers ────────────────────────────────────────────────────────────
+// Simple CRUD operations with static responses, no game logic evaluation
 
 export const handlers = [
+  // ──── AUTHENTICATION ────────────────────────────────────────────────────────
+  
+  /** POST /exists/:username - Check if username is available */
   http.get('*/exists/:username', ({ params }) => {
-    const exists = mockUsers.has(params.username as string);
-    return HttpResponse.json({ exists } as ExistsResponse);
+    return HttpResponse.json({ exists: mockUsers.has(String(params.username)) });
   }),
 
-  http.get('*/leaderboard', () => {
-    const leaderboard = buildLeaderboard();
-    return HttpResponse.json(leaderboard);
-  }),
-
+  /** POST /login - Authenticate user and return token */
   http.post('*/login', async ({ request }) => {
-    const body = (await request.json()) as { username?: string; password?: string };
-    const { username, password } = body;
-
+    const { username, password } = (await request.json()) as any;
     if (!username || !password) {
       return HttpResponse.json({ error: 'Username and password required' }, { status: 400 });
     }
@@ -354,13 +80,12 @@ export const handlers = [
       token: `mock-token-${user.userId}`,
       username,
       userId: user.userId
-    } as LoginResponse);
+    });
   }),
 
+  /** POST /createuser - Register new user */
   http.post('*/createuser', async ({ request }) => {
-    const body = (await request.json()) as { username?: string; password?: string };
-    const { username, password } = body;
-
+    const { username, password } = (await request.json()) as any;
     if (!username || !password) {
       return HttpResponse.json({ error: 'Username and password required' }, { status: 400 });
     }
@@ -371,10 +96,12 @@ export const handlers = [
 
     const userId = `user-${Date.now()}`;
     mockUsers.set(username, { password, userId });
-
-    return HttpResponse.json({ message: `User ${username} created`, userId } as RegisterResponse, { status: 201 });
+    return HttpResponse.json({ message: `User ${username} created`, userId }, { status: 201 });
   }),
 
+  // ──── USER PROFILE & STATISTICS ────────────────────────────────────────────
+
+  /** GET /users/:id - Fetch user profile with static statistics */
   http.get('*/users/:id', ({ params, request }) => {
     const tokenUserId = extractUserId(request);
     if (!tokenUserId) {
@@ -395,12 +122,25 @@ export const handlers = [
       _id: requestedUserId,
       username: usernameEntry[0],
       created_at: DEFAULT_MOCK_USER.createdAt,
-      statistics: getUserStatistics(requestedUserId)
+      statistics: {
+        total_games: 4,
+        total_wins: 2,
+        total_losses: 1,
+        total_surrendered: 1,
+        vs_player: { wins: 1, losses: 0, surrendered: 0 },
+        vs_bots: [
+          { name: 'Random', difficulty: 'Easy 😄', wins: 1, losses: 0, surrendered: 0 },
+          { name: 'Defensive', difficulty: 'Medium 😐', wins: 0, losses: 1, surrendered: 1 },
+          { name: 'Monte Carlo', difficulty: 'Hard 😈', wins: 0, losses: 0, surrendered: 0 },
+          { name: 'AI (Gemini)', difficulty: 'Medium 🤖', wins: 0, losses: 0, surrendered: 0 }
+        ]
+      }
     };
 
     return HttpResponse.json(profile);
   }),
 
+  /** GET /users/:id/history - Fetch user's game history */
   http.get('*/users/:id/history', ({ params, request }) => {
     const tokenUserId = extractUserId(request);
     if (!tokenUserId) {
@@ -413,17 +153,49 @@ export const handlers = [
     }
 
     const history = [...mockGames.values()]
-        .filter((game) => game.player_id === requestedUserId)
-        .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
-        .map((game) => {
-          const copy: Partial<GameRecord> = { ...game };
-          delete copy.moves;
-          return copy;
-        });
+      .filter((game) => game.player_id === requestedUserId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map(({ moves, ...rest }) => rest); // Remove moves for history
 
     return HttpResponse.json(history);
   }),
 
+  // ──── LEADERBOARD & OPTIONS ────────────────────────────────────────────────
+
+  /** GET /leaderboard - Return static mock leaderboard data */
+  http.get('*/leaderboard', () => {
+    const leaderboard: Leaderboard = {
+      overall: [
+        { username: 'user', total_wins: 2, total_games: 4 },
+        { username: 'Champion', total_wins: 10, total_games: 15 }
+      ],
+      vs_bots: {
+        Random: [{ username: 'user', wins: 1 }],
+        Defensive: [{ username: 'Champion', wins: 5 }],
+        'Monte Carlo': [{ username: 'Champion', wins: 4 }],
+        'AI (Gemini)': [{ username: 'Champion', wins: 3 }]
+      }
+    };
+    return HttpResponse.json(leaderboard);
+  }),
+
+  /** GET /games/options - Return available strategies and game variants */
+  http.get('*/games/options', () => {
+    return HttpResponse.json({
+      strategies: [
+        { id: 'random', name: 'Random', difficulty: 'Easy 😄' },
+        { id: 'defensive', name: 'Defensive', difficulty: 'Medium 😐' },
+        { id: 'mcts', name: 'Monte Carlo', difficulty: 'Hard 😈' },
+        { id: 'ai', name: 'AI (Gemini)', difficulty: 'Medium 🤖' }
+      ],
+      variants: [{ name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }]
+    });
+  }),
+
+  // ──── GAME CRUD OPERATIONS ─────────────────────────────────────────────────
+  // Simple store/retrieve without game logic evaluation
+
+  /** POST /games - Create a new game */
   http.post('*/games', async ({ request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -431,7 +203,6 @@ export const handlers = [
     }
 
     const body = (await request.json()) as CreateGamePayload;
-
     if (!body.board_size) {
       return HttpResponse.json({ error: 'board_size is required' }, { status: 400 });
     }
@@ -440,23 +211,30 @@ export const handlers = [
       return HttpResponse.json({ error: 'name_of_enemy is required for PLAYER games' }, { status: 400 });
     }
 
-    const game = createGameRecord(userId, body);
-    mockGames.set(game._id, game);
+    const game: GameRecord = {
+      _id: `game-${gameCounter++}`,
+      player_id: userId,
+      game_type: body.game_type,
+      name_of_enemy: body.game_type === 'BOT' ? body.strategy : (body.name_of_enemy ?? null),
+      board_size: body.board_size,
+      strategy: body.strategy ?? 'random',
+      variants: body.variants ?? [],
+      difficulty_level: body.difficulty_level ?? 'medium',
+      rule_set: body.rule_set ?? 'normal',
+      current_turn: 'B',
+      status: 'IN_PROGRESS',
+      result: null,
+      duration_seconds: 0,
+      created_at: new Date().toISOString(),
+      yen_final_state: '',
+      moves: []
+    };
 
+    mockGames.set(game._id, game);
     return HttpResponse.json(game, { status: 201 });
   }),
 
-  http.get('*/games/options', () =>
-      HttpResponse.json({
-        strategies: DEFAULT_STRATEGY_OPTIONS.map((item) => ({
-          id: item.id,
-          name: formatLabel(item.name),
-          difficulty: formatLabel(item.difficulty)
-        })),
-        variants: DEFAULT_VARIANTS
-      })
-  ),
-
+  /** GET /games/:id - Retrieve a specific game */
   http.get('*/games/:id', ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -471,6 +249,7 @@ export const handlers = [
     return HttpResponse.json(game);
   }),
 
+  /** GET /games/:id/moves - Fetch all moves for a game */
   http.get('*/games/:id/moves', ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -485,6 +264,7 @@ export const handlers = [
     return HttpResponse.json(game.moves);
   }),
 
+  /** POST /games/:id/move - Record a player move (no validation, just store) */
   http.post('*/games/:id/move', async ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -503,21 +283,55 @@ export const handlers = [
     const body = (await request.json()) as { coordinates?: Coordinates };
     const coordinates = body.coordinates;
 
-    if (!coordinates || !isOnBoard(game.board_size, coordinates)) {
+    if (!coordinates) {
       return HttpResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
 
-    const currentMap = parseYenState(game.board_size, getLatestYenState(game));
-    if (currentMap.get(coordinateKey(coordinates))?.owner) {
-      return HttpResponse.json({ error: 'Coordinate is already occupied' }, { status: 400 });
-    }
+    // Simple mutation: just add the move, flip turn
+    const move = {
+      move_number: game.moves.length + 1,
+      player: game.current_turn,
+      coordinates,
+      created_at: new Date().toISOString()
+    };
 
-    const nextGame = appendMove(game, coordinates, game.current_turn);
+    const nextGame = {
+      ...game,
+      moves: [...game.moves, move],
+      current_turn: game.current_turn === 'B' ? 'R' : 'B'
+    };
+
     mockGames.set(nextGame._id, nextGame);
-
     return HttpResponse.json(nextGame, { status: 201 });
   }),
 
+  /** POST /games/:id/undo - Remove the last move from a game */
+  http.post('*/games/:id/undo', ({ params, request }) => {
+    const userId = extractUserId(request);
+    if (!userId) {
+      return HttpResponse.json({ error: 'No token provided' }, { status: 401 });
+    }
+
+    const game = getGameForUser(String(params.id), userId);
+    if (!game) {
+      return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
+
+    if (game.moves.length === 0) {
+      return HttpResponse.json({ error: 'No move to undo' }, { status: 400 });
+    }
+
+    const nextGame = {
+      ...game,
+      moves: game.moves.slice(0, -1),
+      current_turn: game.moves.length % 2 === 1 ? 'R' : 'B'
+    };
+
+    mockGames.set(nextGame._id, nextGame);
+    return HttpResponse.json(nextGame);
+  }),
+
+  /** GET /games/:id/play - Simulate bot's turn (just flip turn to Blue) */
   http.get('*/games/:id/play', ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -537,49 +351,16 @@ export const handlers = [
       return HttpResponse.json({ error: 'Bot move is not available right now' }, { status: 400 });
     }
 
-    const free = getFreeCoordinates(game);
-    if (free.length === 0) {
-      const finished = { ...game, status: 'FINISHED' as const, result: 'CANCELED' as const };
-      mockGames.set(finished._id, finished);
-      return HttpResponse.json(finished);
-    }
-
-    const botCoordinates = free[0];
-    const nextGame = appendMove(game, botCoordinates, 'R');
-    mockGames.set(nextGame._id, nextGame);
-
-    return HttpResponse.json(nextGame);
-  }),
-
-  http.post('*/games/:id/undo', ({ params, request }) => {
-    const userId = extractUserId(request);
-    if (!userId) {
-      return HttpResponse.json({ error: 'No token provided' }, { status: 401 });
-    }
-
-    const game = getGameForUser(String(params.id), userId);
-    if (!game) {
-      return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
-    }
-
-    if (game.moves.length === 0) {
-      return HttpResponse.json({ error: 'No move to undo' }, { status: 400 });
-    }
-
-    const nextMoves = game.moves.slice(0, game.moves.length - 1);
-    const nextGame: GameRecord = {
+    const nextGame = {
       ...game,
-      moves: nextMoves,
-      yen_final_state: nextMoves.at(-1)?.yen_state ?? buildEmptyYenState(game.board_size),
-      current_turn: nextMoves.length % 2 === 0 ? 'B' : 'R',
-      status: 'IN_PROGRESS',
-      result: null
+      current_turn: 'B' as const
     };
 
     mockGames.set(nextGame._id, nextGame);
     return HttpResponse.json(nextGame);
   }),
 
+  /** PUT /games/:id/finish - Mark game as finished with result (WIN/LOSS/SURRENDERED) */
   http.put('*/games/:id/finish', async ({ params, request }) => {
     const userId = extractUserId(request);
     if (!userId) {
@@ -591,16 +372,15 @@ export const handlers = [
       return HttpResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    const body = (await request.json()) as { result?: 'WIN' | 'LOSS' | 'CANCELED'; duration_seconds?: number };
+    const body = (await request.json()) as { result?: string; duration_seconds?: number };
     if (!body.result) {
       return HttpResponse.json({ error: 'result is required' }, { status: 400 });
     }
 
-    const nextGame: GameRecord = {
+    const nextGame = {
       ...game,
-      status: 'FINISHED',
-      result: body.result,
-      yen_final_state: game.moves.at(-1)?.yen_state ?? game.yen_final_state ?? null,
+      status: 'FINISHED' as const,
+      result: body.result as any,
       duration_seconds: body.duration_seconds ?? game.duration_seconds
     };
 

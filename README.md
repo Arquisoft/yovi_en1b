@@ -10,10 +10,10 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Arquisoft_yovi_en1b&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Arquisoft_yovi_en1b)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Arquisoft_yovi_en1b&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Arquisoft_yovi_en1b)
 
-🌐 **Play now:** [http://4.233.184.98](http://4.233.184.98)  
+🌐 **Play now:** [https://yovi.alejandrosanclaudio.com/](https://yovi.alejandrosanclaudio.com/)  
 📝 **Documentation:** [https://arquisoft.github.io/yovi_en1b/](https://arquisoft.github.io/yovi_en1b/)  
-⛓ **API documentation:** [http://4.233.184.98:3000/api-docs/](http://4.233.184.98:3000/api-docs/)  
-💻 **Presentation:** [TODO](TODO)
+⛓ **API documentation:** [https://yovi.alejandrosanclaudio.com/api-docs/](https://yovi.alejandrosanclaudio.com/api-docs/)  
+💻 **Presentation:** [https://www.canva.com/design/DAHH-F-XS9Y/tjusDRBiVaNG9RQPut5GLA/view](https://www.canva.com/design/DAHH-F-XS9Y/tjusDRBiVaNG9RQPut5GLA/view)
 
 </div>
 
