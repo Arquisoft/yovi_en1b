@@ -1291,4 +1291,130 @@ mod tests {
         let bot_with_key = pick_bot(Some("generativeai"), None);
         assert_eq!(bot_with_key.name(), "gemini");
     }
+
+    // ========================================================================
+    // Tests for turn-override logic (new code in today's commit)
+    // ========================================================================
+
+    /// /play without yen_state and turn=1 should make the bot play as Red.
+    #[tokio::test]
+    async fn test_play_new_game_with_turn_1_red_starts() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: Some(1), // Red starts
+        });
+        let res = play(req).await;
+        assert!(res.is_ok(), "play with turn=1 should succeed");
+        let resp = res.unwrap().0;
+        // Bot played as Red — R count should be 1
+        let r_count = resp.yen_state.chars().filter(|c| *c == 'R').count();
+        let r_won = resp.winner == Some("R".to_string());
+        assert!(r_count >= 1 || r_won, "with turn=1, bot must play as Red");
+    }
+
+    /// /play without yen_state and turn=0 (default) — bot plays as Blue.
+    #[tokio::test]
+    async fn test_play_new_game_with_turn_0_blue_starts() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: Some(0),
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+        let resp = res.unwrap().0;
+        let b_count = resp.yen_state.chars().filter(|c| *c == 'B').count();
+        let b_won = resp.winner == Some("B".to_string());
+        assert!(b_count >= 1 || b_won, "with turn=0, bot must play as Blue");
+    }
+
+    /// /play without yen_state, turn=None (should default to 0=Blue).
+    #[tokio::test]
+    async fn test_play_new_game_default_turn() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 3,
+            variants: vec![],
+            explosives: None,
+            turn: None,
+        });
+        let res = play(req).await;
+        assert!(res.is_ok());
+    }
+
+    /// /compute without yen_state_prev and turn=1 — human places as Red.
+    #[tokio::test]
+    async fn test_compute_new_game_with_turn_1() {
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: None,
+            coordinates: Coordinates::new(2, 0, 0), // size = 2+0+0+1 = 3
+            variants: vec![],
+            explosives: None,
+            turn: Some(1), // Red starts
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok(), "compute with turn=1 should succeed");
+        let resp = res.unwrap().0;
+        // Piece placed as Red
+        let r_count = resp.yen_state.chars().filter(|c| *c == 'R').count();
+        assert!(r_count >= 1, "with turn=1, piece should be placed as Red");
+    }
+
+    /// /compute without yen_state_prev and default turn — places as Blue.
+    #[tokio::test]
+    async fn test_compute_new_game_default_turn() {
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: None,
+            coordinates: Coordinates::new(2, 0, 0),
+            variants: vec![],
+            explosives: None,
+            turn: None,
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok());
+        let resp = res.unwrap().0;
+        let b_count = resp.yen_state.chars().filter(|c| *c == 'B').count();
+        assert!(b_count >= 1, "default turn should place as Blue");
+    }
+
+    /// /play new game with variants and turn=1.
+    #[tokio::test]
+    async fn test_play_new_game_with_variants_and_turn_1() {
+        let req = axum::Json(PlayRequest {
+            yen_state: None,
+            strategy: Some("random".to_string()),
+            difficulty_level: None,
+            board_size: 7,
+            variants: vec!["DoubleTurn".to_string()],
+            explosives: None,
+            turn: Some(1),
+        });
+        let res = play(req).await;
+        assert!(res.is_ok(), "play with DoubleTurn + turn=1 should succeed");
+    }
+
+    /// /compute new game with variants and turn=1.
+    #[tokio::test]
+    async fn test_compute_new_game_with_variants_and_turn_1() {
+        let req = axum::Json(ComputeRequest {
+            yen_state_prev: None,
+            coordinates: Coordinates::new(6, 0, 0), // size = 6+0+0+1 = 7
+            variants: vec!["DoubleTurn".to_string()],
+            explosives: None,
+            turn: Some(1),
+        });
+        let res = compute(req).await;
+        assert!(res.is_ok(), "compute with DoubleTurn + turn=1 should succeed");
+    }
 }

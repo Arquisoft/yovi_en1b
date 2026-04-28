@@ -714,5 +714,58 @@ mod tests {
         let result = run_simulation(3, vec![], &bot, &bot, 0);
         assert!(result.is_ok());
     }
-}
 
+    // ========================================================================
+    // Tests for build_bot_registry 
+    // ========================================================================
+
+    #[test]
+    fn test_build_bot_registry_has_default_bots() {
+        let registry = build_bot_registry();
+        assert!(registry.find("random_bot").is_some());
+        assert!(registry.find("medium").is_some());
+        assert!(registry.find("hard").is_some());
+    }
+
+    #[test]
+    fn test_build_bot_registry_gemini_when_key_set() {
+        unsafe { std::env::set_var("GEMINI_API_KEY", "mock_key_cli") };
+        let registry = build_bot_registry();
+        assert!(registry.find("gemini").is_some());
+        unsafe { std::env::remove_var("GEMINI_API_KEY") };
+    }
+
+    // ========================================================================
+    // Tests for run_simulation 
+    // ========================================================================
+
+    #[test]
+    fn test_run_simulation_with_different_bots() {
+        let bot1 = crate::RandomBot;
+        let bot2 = crate::DefensiveBot;
+        let result = run_simulation(3, vec![], &bot1, &bot2, 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_simulation_with_explosions_variant() {
+        let bot = crate::RandomBot;
+        let result = run_simulation(5, vec![crate::GameVariant::Explosions], &bot, &bot, 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_simulation_size_1() {
+        // Size-1 board: one cell, first bot wins immediately
+        let bot = crate::RandomBot;
+        let result = run_simulation(1, vec![], &bot, &bot, 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_simulation_size_2() {
+        let bot = crate::RandomBot;
+        let result = run_simulation(2, vec![], &bot, &bot, 0);
+        assert!(result.is_ok());
+    }
+}
