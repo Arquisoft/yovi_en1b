@@ -24,6 +24,7 @@ export function NewGamePage() {
     let mounted = true;
 
     async function loadOptions() {
+      // Load strategies and variants once; they drive the rest of the form.
       try {
         const options = await getGameOptions();
         if (!mounted) return;
@@ -61,6 +62,7 @@ export function NewGamePage() {
       return variants;
     }
 
+    // Empty allowed_strategies means the variant is available to every bot.
     return variants.filter((variant) => {
       if (!variant.allowed_strategies?.length) {
         return true;
@@ -79,6 +81,7 @@ export function NewGamePage() {
   };
 
   useEffect(() => {
+    // Drop variants that are no longer legal after a strategy change.
     setSelectedVariants((current) => current.filter((name) => visibleVariants.some((variant) => variant.name === name)));
   }, [visibleVariants]);
 
@@ -100,6 +103,7 @@ export function NewGamePage() {
     setLoading(true);
 
     try {
+      // Build the payload from the active form mode so BOT and PLAYER stay aligned with the API contract.
       const payload: CreateGamePayload = {
         board_size: boardSize,
         game_type: gameType,
@@ -111,6 +115,7 @@ export function NewGamePage() {
       }
 
       if (gameType === 'BOT' && selectedStrategy) {
+        // The backend stores the selected bot in strategy.
         payload.strategy = selectedStrategy.name;
       }
 

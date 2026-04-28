@@ -8,6 +8,7 @@ import type {
   SubmitMovePayload
 } from '../types/games';
 
+// Thin wrappers keep the API contract in one place and avoid repeating fetch details in pages.
 export async function createGame(payload: CreateGamePayload): Promise<GameRecord> {
   return requestJson<GameRecord>('/games', {
     method: 'POST',

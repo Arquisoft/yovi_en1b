@@ -38,6 +38,7 @@ function getEnemyLabel(game: GameHistoryItem, username: string | null): string {
   }
 
   const enemy = game.name_of_enemy?.trim();
+  // Older records may still use the placeholder name instead of the real player name.
   if (!enemy || enemy.toLowerCase() === 'local opponent') {
     return username ?? 'Player';
   }
@@ -58,6 +59,7 @@ export function GameHistoryPage() {
     let alive = true;
 
     async function loadHistory() {
+      // Ignore late responses after the component unmounts or reloads.
       if (!userId) {
         if (alive) {
           setError('Missing user id in session. Please sign in again.');
@@ -74,6 +76,7 @@ export function GameHistoryPage() {
       try {
         const history = await getUserHistory(userId);
         const moveEntries = await Promise.all(
+          // The summary endpoint omits moves, so count them per game on demand.
           history.map(async (game) => {
             try {
               const moves = await getMoves(game._id);
@@ -106,6 +109,7 @@ export function GameHistoryPage() {
   }, [userId, reloadKey]);
 
   const sortedGames = useMemo(
+    // Keep the newest entries first even if the API changes its ordering.
     () => [...games].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()),
     [games]
   );

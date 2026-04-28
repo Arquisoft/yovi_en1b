@@ -42,6 +42,7 @@ interface MoveHistoryProps {
 }
 
 function buildBoard(size: number): HexCell[][] {
+  // Build the triangular coordinate layout used by the board renderer.
   return Array.from({ length: size }, (_, row) =>
     Array.from({ length: row + 1 }, (_, col) => ({
       coordinates: { x: size - 1 - row, y: col, z: row - col }
@@ -50,10 +51,12 @@ function buildBoard(size: number): HexCell[][] {
 }
 
 function rowOffset(size: number, rowLen: number): number {
+  // Center each shorter row so the triangle stays visually balanced.
   return ((size - rowLen) * COL_STEP) / 2;
 }
 
 function formatDuration(seconds: number): string {
+  // Normalize invalid input before formatting the elapsed time.
   const safe = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safe / 60);
   const rest = safe % 60;
@@ -66,6 +69,7 @@ function isInProgress(game: GameRecord | null): game is GameRecord {
 
 function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
   if (game.status === 'FINISHED') {
+    // Finished games show the final result instead of the live turn.
     return game.result ?? 'FINISHED';
   }
 
@@ -79,6 +83,7 @@ function getTurnStatusText(game: GameRecord, botThinking: boolean): string {
 
 function getEnemyTitle(game: GameRecord): string {
   if (game.game_type === 'BOT') {
+    // BOT games intentionally collapse the opponent label to a single UI name.
     return 'Bot';
   }
 
@@ -87,6 +92,7 @@ function getEnemyTitle(game: GameRecord): string {
 
 function getWinnerTitle(game: GameRecord): string {
   if (game.result === 'WIN') {
+    // A win always means the current player won, regardless of opponent type.
     return 'You';
   }
 
@@ -159,6 +165,7 @@ function Board({
               const isHighlighted = highlightedCellKey === key;
               const isNeighborPreview = previewNeighborKeys.has(key);
               const isExploding = explodingCellKeys.has(key);
+              // Compose state classes in one place so the CSS stays declarative.
               const cellClass = `hex-wrap${ownerClass}${disabled ? ' hex-wrap--disabled' : ''}${isHighlighted ? ' hex-wrap--history-highlight' : ''}${hasMine ? ' hex-wrap--mine' : ''}${isNeighborPreview ? ' hex-wrap--mine-neighbor' : ''}${isExploding ? ' hex-wrap--exploding' : ''} turn-indicator-${visualTurn}`;
 
               return (
@@ -191,6 +198,7 @@ function Board({
 }
 
 function MoveHistory({ moves, bluePlayerName, redPlayerName, onMoveHover }: MoveHistoryProps) {
+  // Newest move first keeps the active part of the match visible at the top.
   const orderedMoves = useMemo(() => [...moves].reverse(), [moves]);
 
   if (moves.length === 0) {
@@ -233,10 +241,11 @@ function MoveHistory({ moves, bluePlayerName, redPlayerName, onMoveHover }: Move
   );
 }
 
-function getLegacyCellStateFromMoves(moves: Move[]): Map<string, YenCellState> {
+function buildCellStateFromMoves(moves: Move[]): Map<string, YenCellState> {
   const map = new Map<string, YenCellState>();
 
   for (const move of moves) {
+    // Legacy games may not have a parsed Yen snapshot, so reconstruct ownership from moves.
     map.set(coordinateKey(move.coordinates), {
       owner: move.player,
       hasMine: false
@@ -270,6 +279,7 @@ export function GamePage() {
     let mounted = true;
 
     const load = async () => {
+      // Keep the page responsive while the current game is fetched.
       setLoading(true);
       setError(null);
 
@@ -304,6 +314,7 @@ export function GamePage() {
 
     const created = new Date(game.created_at).getTime();
     const updateElapsed = () => {
+      // Prefer the server duration, but keep counting locally while the match is active.
       const timeFromStart = Math.floor((Date.now() - created) / 1000);
       const safeElapsed = Number.isNaN(created)
         ? game.duration_seconds
@@ -320,6 +331,7 @@ export function GamePage() {
   }, [game]);
 
   useEffect(() => {
+    // Bot turns are triggered only after a player move on BOT games.
     if (!id || !isInProgress(game) || game.game_type !== 'BOT' || game.current_turn !== 'R') {
       return;
     }
@@ -342,6 +354,7 @@ export function GamePage() {
   }, [id, game]);
 
   useEffect(() => {
+    // Clear any pending explosion animation when the page unmounts.
     return () => {
       if (explosionResetTimeoutRef.current !== null) {
         globalThis.clearTimeout(explosionResetTimeoutRef.current);
@@ -355,10 +368,7 @@ export function GamePage() {
     setHighlightedCellKey(null);
   }, [game?.moves]);
 
-  // Prefer the latest move's state; before any move is made, fall back to the
-  // initial state Gamey produced at game creation (so pre-placed bombs for the
-  // Explosions variant are visible immediately). After the game finishes we
-  // display the final state.
+  // Prefer the newest available board snapshot so pre-placed variant effects render immediately.
   const latestYenState =
     game?.moves.at(-1)?.yen_state
     ?? game?.yen_final_state
@@ -374,7 +384,7 @@ export function GamePage() {
       return parseYenState(game.board_size, latestYenState);
     }
 
-    return getLegacyCellStateFromMoves(game.moves);
+    return buildCellStateFromMoves(game.moves);
   }, [game, latestYenState]);
 
   const minePreviewNeighbors = useMemo(() => {
@@ -383,6 +393,7 @@ export function GamePage() {
     }
 
     const hoveredCell = cellStateByKey.get(hoveredCellKey);
+    // Only show mine neighbors when the hovered cell is an actual mine.
     if (!hoveredCell?.hasMine || hoveredCell.owner) {
       return new Set<string>();
     }
@@ -404,15 +415,18 @@ export function GamePage() {
     && !actionLoading
     && !botThinking
     && (game.game_type === 'PLAYER' || game.current_turn === 'B');
+  // BOT games are read-only while the bot is resolving its move.
   const visualTurn: 'B' | 'R' = botThinking ? 'R' : (game?.current_turn ?? 'B');
 
   const playMoveAt = async (coordinates: Coordinates) => {
+    // Ignore invalid clicks before touching the API.
     if (!id || !canPlay) {
       return;
     }
 
     const key = coordinateKey(coordinates);
     const currentCell = cellStateByKey.get(key);
+    // The UI already disables occupied cells, but keep the guard at the action boundary too.
     if (currentCell?.owner) {
       return;
     }
@@ -427,6 +441,7 @@ export function GamePage() {
       setGame(next);
 
       if (shouldAnimateExplosion && game) {
+        // The animation is driven from the previous board snapshot.
         const blastKeys = new Set<string>([key]);
         for (const neighbor of getNeighborCoordinates(game.board_size, coordinates)) {
           blastKeys.add(coordinateKey(neighbor));
@@ -450,6 +465,7 @@ export function GamePage() {
   };
 
   const handleUndo = async () => {
+    // Undo is only available while the game is still active.
     if (!id || game?.status !== 'IN_PROGRESS') {
       return;
     }
@@ -468,6 +484,7 @@ export function GamePage() {
   };
 
   const handleFinish = async () => {
+    // Surrender uses the same finish endpoint as the backend contract.
     if (!id || game?.status !== 'IN_PROGRESS') {
       return;
     }
@@ -510,6 +527,7 @@ export function GamePage() {
   const statusText = getTurnStatusText(game, botThinking);
 
   const getResultBoxClass = (): string => {
+    // Result color follows the final outcome so the summary is readable at a glance.
     if (game.result === 'WIN') return 'blue';
     if (game.result === 'LOSS') return 'red';
     return 'surrendered';
@@ -517,6 +535,7 @@ export function GamePage() {
 
   const getResultText = (): string => {
     if (game.result === 'SURRENDERED') {
+      // Surrender is a separate terminal state from win/loss.
       return `Surrendered`;
     }
 

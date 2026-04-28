@@ -36,7 +36,26 @@ function renderNewGamePage() {
   );
 }
 
-// ─── rendering ────────────────────────────────────────────────────────────────
+function buildGameResponse(overrides: Record<string, unknown>) {
+  return {
+    _id: NEW_GAME_TEST_DATA.gameIdOne,
+    player_id: NEW_GAME_TEST_DATA.userId,
+    game_type: 'BOT',
+    name_of_enemy: 'Defensive',
+    board_size: 5,
+    strategy: 'defensive',
+    variants: [],
+    difficulty_level: 'medium',
+    rule_set: 'normal',
+    current_turn: 'B',
+    status: 'IN_PROGRESS',
+    result: null,
+    duration_seconds: 0,
+    created_at: new Date().toISOString(),
+    moves: [],
+    ...overrides
+  };
+}
 
 describe('NewGamePage — rendering', () => {
   test('shows page heading and Start Game button', async () => {
@@ -56,7 +75,6 @@ describe('NewGamePage — rendering', () => {
   test('shows only strategy-allowed variants for BOT games', async () => {
     renderNewGamePage();
 
-    // Random is selected by default in mocks; Explosions allows only AI.
     expect(screen.queryByLabelText(/explosions/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/double turn/i)).not.toBeInTheDocument();
 
@@ -77,8 +95,6 @@ describe('NewGamePage — rendering', () => {
     expect(slider).toHaveValue('5');
   });
 });
-
-// ─── validation ───────────────────────────────────────────────────────────────
 
 describe('NewGamePage — validation', () => {
   test('submitting Player mode without opponent name shows error', async () => {
@@ -103,8 +119,6 @@ describe('NewGamePage — validation', () => {
   });
 });
 
-// ─── game creation ────────────────────────────────────────────────────────────
-
 describe('NewGamePage — game creation', () => {
   test('successful BOT game creation submits selected variants', async () => {
     let receivedBody: any = null;
@@ -112,23 +126,10 @@ describe('NewGamePage — game creation', () => {
     server.use(
       http.post('*/games', async ({ request }) => {
         receivedBody = (await request.json()) as { variants?: string[] };
-        return HttpResponse.json({
-          _id: NEW_GAME_TEST_DATA.gameIdOne,
-          player_id: NEW_GAME_TEST_DATA.userId,
-          game_type: 'BOT',
-          name_of_enemy: 'Defensive',
-          board_size: 5,
-          strategy: 'defensive',
-          variants: receivedBody?.variants ?? [],
-          difficulty_level: 'medium',
-          rule_set: 'normal',
-          current_turn: 'B',
-          status: 'IN_PROGRESS',
-          result: null,
-          duration_seconds: 0,
-          created_at: new Date().toISOString(),
-          moves: []
-        }, { status: 201 });
+        return HttpResponse.json(
+          buildGameResponse({ variants: receivedBody?.variants ?? [] }),
+          { status: 201 }
+        );
       })
     );
 
@@ -150,13 +151,16 @@ describe('NewGamePage — game creation', () => {
         if (!receivedBody.name_of_enemy) {
           return HttpResponse.json({ error: 'name_of_enemy is required' }, { status: 400 });
         }
-        return HttpResponse.json({
-          _id: NEW_GAME_TEST_DATA.gameIdTwo, player_id: NEW_GAME_TEST_DATA.userId, game_type: 'PLAYER',
-          name_of_enemy: receivedBody.name_of_enemy, board_size: 5,
-          strategy: 'random', variants: receivedBody.variants ?? [], difficulty_level: 'medium', rule_set: 'normal',
-          current_turn: 'B', status: 'IN_PROGRESS', result: null,
-          duration_seconds: 0, created_at: new Date().toISOString(), moves: []
-        }, { status: 201 });
+        return HttpResponse.json(
+          buildGameResponse({
+            _id: NEW_GAME_TEST_DATA.gameIdTwo,
+            game_type: 'PLAYER',
+            name_of_enemy: receivedBody.name_of_enemy,
+            strategy: 'random',
+            variants: receivedBody.variants ?? []
+          }),
+          { status: 201 }
+        );
       })
     );
 

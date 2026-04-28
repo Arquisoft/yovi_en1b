@@ -7,6 +7,7 @@ export function TopBar() {
   const { isLoggedIn, username, signOut } = useAuth();
 
   if (!isLoggedIn) {
+    // Logged-out screens intentionally keep the top bar hidden to reduce noise.
     return null;
   }
 
@@ -18,6 +19,7 @@ export function TopBar() {
       </Link>
 
       <div className="topbar-actions">
+        {/* Username is the only identity hint; the rest of the app lives behind route guards. */}
         <Link to="/profile" className="topbar-profile-link">
           {username}
         </Link>

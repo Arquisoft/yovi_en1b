@@ -19,8 +19,6 @@ const GAME_TEST_DATA = {
   enemyName: faker.person.firstName(),
 } as const;
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
 const BASE_GAME: GameRecord = {
   _id: GAME_TEST_DATA.gameId,
   player_id: GAME_TEST_DATA.userId,
@@ -65,8 +63,6 @@ function renderFinishedGamePage(game: GameRecord) {
   renderGamePage();
 }
 
-// ─── loading ──────────────────────────────────────────────────────────────────
-
 describe('GamePage — loading', () => {
   test('shows loading indicator initially', () => {
     server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
@@ -108,8 +104,6 @@ describe('GamePage — loading', () => {
     expect(hexes).toHaveLength(6);
   });
 });
-
-// ─── move ─────────────────────────────────────────────────────────────────────
 
 describe('GamePage — move', () => {
   beforeEach(() => {
@@ -194,8 +188,6 @@ describe('GamePage — move', () => {
   });
 });
 
-// ─── undo ─────────────────────────────────────────────────────────────────────
-
 describe('GamePage — undo', () => {
   test('undo button is disabled when there are no moves', async () => {
     server.use(http.get(`*/games/${GAME_TEST_DATA.gameId}`, () => HttpResponse.json(BASE_GAME)));
@@ -231,8 +223,6 @@ describe('GamePage — undo', () => {
     expect(screen.getByText(/no moves yet/i)).toBeInTheDocument();
   });
 });
-
-// ─── finish ───────────────────────────────────────────────────────────────────
 
 describe('GamePage — finish', () => {
   test('finish button sends SURRENDERED result and shows surrendered status in UI', async () => {
