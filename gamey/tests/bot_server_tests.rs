@@ -384,7 +384,7 @@ async fn test_mcts_empty_board_size3() {
 /// MCTS on an empty board — larger size.
 #[tokio::test]
 async fn test_mcts_empty_board_size5() {
-    assert_valid_move("hard", 5, 0, "./../.././../..../.....").await;
+    assert_valid_move("hard", 5, 0, "./../.../..../.....").await;
 }
 
 /// MCTS when only one move is left — must not panic or return None.
