@@ -97,14 +97,18 @@ async function fetchInitialYenState(board_size, variants) {
  * @param {string|null} yen_state_prev - The YEN state before the move, or null for an empty board.
  * @param {object} coordinates         - Move coordinates { x, y, z }.
  * @param {string[]} [variants=[]]     - Active variant names to forward to Gamey.
+ * @param {number} [turn=0]            - Turn index (0 = Blue, 1 = Red); decisive when yen_state_prev is null.
  * @returns {Promise<object>} Gamey response containing yen_state, winner, variants, and explosives.
  * @throws {Error} With status 502 if Gamey returns a non-OK response.
  */
-async function computeYenState(yen_state_prev, coordinates, variants = []) {
+async function computeYenState(yen_state_prev, coordinates, variants = [], turn = 0) {
     const gameyResponse = await fetch(`${GAMEY_URL}/compute`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ yen_state_prev, coordinates, variants })
+        // `turn` is only decisive when yen_state_prev is null (first human
+        // move on a fresh board) — for all subsequent moves the t{n}| prefix
+        // embedded in yen_state_prev already carries the authoritative turn.
+        body: JSON.stringify({ yen_state_prev, coordinates, variants, turn })
     });
 
     if (!gameyResponse.ok) {
@@ -299,7 +303,12 @@ module.exports = function gameRoutes(repository) {
 
         let gameyResult;
         try {
-            gameyResult = await computeYenState(yen_state_prev, coordinates, game.variants ?? []);
+            gameyResult = await computeYenState(
+                yen_state_prev,
+                coordinates,
+                game.variants ?? [],
+                game.current_turn === 'R' ? 1 : 0
+            );
         } catch (err) {
             return res.status(err.status || 503).json({ error: err.message });
         }
@@ -354,7 +363,13 @@ module.exports = function gameRoutes(repository) {
                     strategy:         game.strategy,
                     difficulty_level: game.difficulty_level,
                     board_size:       game.board_size,
-                    variants:         game.variants
+                    variants:         game.variants,
+                    // Tell Gamey whose turn it is so the first bot move is
+                    // placed with the correct colour when the game started
+                    // with Red (current_turn = 'R') as the first mover.
+                    // Without this, Gamey defaults to Blue on an empty board,
+                    // causing a colour mismatch between the DB and the board.
+                    turn: game.current_turn === 'R' ? 1 : 0
                 })
             });
         } catch {
