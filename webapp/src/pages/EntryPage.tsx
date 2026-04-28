@@ -18,6 +18,7 @@ export function EntryPage() {
   const confirmPasswordInputRef = useRef<HTMLInputElement | null>(null);
 
   const checkUsername = async () => {
+    // The first stage only decides whether we sign in or create a new account.
     if (!username.trim()) {
       setError('Username is required');
       return;
@@ -38,6 +39,7 @@ export function EntryPage() {
   };
 
   const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Enter on the username step just advances the flow.
     if (e.key === 'Enter') {
       e.preventDefault();
       void checkUsername();
@@ -45,6 +47,7 @@ export function EntryPage() {
   };
 
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Let Enter continue the flow once the password field is valid.
     if (e.key !== 'Enter' || !password) {
       return;
     }
@@ -60,6 +63,7 @@ export function EntryPage() {
   };
 
   const handleConfirmPasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Registration submits only when both passwords are present.
     if (e.key === 'Enter' && password && confirmPassword) {
       e.preventDefault();
       handleSubmit(new Event('submit') as unknown as React.FormEvent);
@@ -69,6 +73,7 @@ export function EntryPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Username lookup is the gate between sign-in and registration.
     if (stage === 'username') {
       await checkUsername();
       return;
@@ -79,11 +84,13 @@ export function EntryPage() {
 
     try {
       if (usernameExists) {
+        // Existing accounts only need credentials.
         await auth.signIn({ username, password });
       } else {
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
         }
+        // New accounts reuse the same form, including the test-user marker.
         await auth.signUp({ 
           username, 
           password, 
@@ -99,6 +106,7 @@ export function EntryPage() {
   };
 
   const handleBack = () => {
+    // Reset the second step completely so username lookup can be repeated cleanly.
     setUsernameExists(null);
     setPassword('');
     setConfirmPassword('');

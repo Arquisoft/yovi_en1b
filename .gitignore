@@ -8,3 +8,5 @@ webapp/.env
 .DS_Store
 .vscode/
 .idea/
+".idea/" 
+".vscode/" 

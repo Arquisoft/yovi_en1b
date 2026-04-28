@@ -47,10 +47,10 @@ describe('ProfilePage', () => {
             total_surrendered: 2,
             vs_player: { wins: 2, losses: 1, surrendered: 1 },
             vs_bots: [
-              { name: 'random', difficulty: 'easy', wins: 1, losses: 0, surrendered: 0 },
-              { name: 'ai', difficulty: 'medium', wins: 1, losses: 1, surrendered: 1 },
-              { name: 'dijkstra', difficulty: 'hard', wins: 1, losses: 1, surrendered: 0 },
-              { name: 'minimax', difficulty: 'hard', wins: 0, losses: 1, surrendered: 0 }
+              { name: 'Random', difficulty: 'Easy 😄', wins: 1, losses: 0, surrendered: 0 },
+              { name: 'Defensive', difficulty: 'Medium 😐', wins: 1, losses: 1, surrendered: 1 },
+              { name: 'Monte Carlo', difficulty: 'Hard 😈', wins: 1, losses: 1, surrendered: 0 },
+              { name: 'AI (Gemini)', difficulty: 'Medium 🤖', wins: 0, losses: 1, surrendered: 0 }
             ]
           }
         })
@@ -71,9 +71,9 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('img', { name: /vs player win rate/i })).toBeInTheDocument();
     expect(screen.getByText('4 games')).toBeInTheDocument();
     expect(screen.getByText('Random')).toBeInTheDocument();
-    expect(screen.getByText('Minimax')).toBeInTheDocument();
+    expect(screen.getByText('Defensive')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /overall result split/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /ai win rate/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /gemini.*win rate/i })).toBeInTheDocument();
   });
 
   test('shows backend error message', async () => {

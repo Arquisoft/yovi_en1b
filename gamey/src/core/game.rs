@@ -60,6 +60,25 @@ impl GameY {
         }
     }
 
+    /// Builder: overrides the starting player on a freshly created game.
+    ///
+    /// Call this immediately after [`GameY::new`] or [`GameY::new_with_variants`]
+    /// **before** any moves are made, e.g. when the caller knows the first move
+    /// belongs to Red (`player_id = 1`).
+    ///
+    /// # Panics
+    /// Panics if any moves have already been recorded (i.e. `history` is non-empty).
+    pub fn with_starting_player(mut self, player_id: u32) -> Self {
+        assert!(
+            self.history.is_empty(),
+            "with_starting_player must be called before any moves are made"
+        );
+        self.status = GameStatus::Ongoing {
+            next_player: PlayerId::new(player_id),
+        };
+        self
+    }
+
     /// Returns the number of bombs to place for a given board size in the
     /// Explosions variant.
     ///
@@ -1141,5 +1160,41 @@ mod tests {
         let game = GameY::try_from(yen).unwrap();
         let bombs = game.bomb_positions();
         assert_eq!(bombs.len(), 2, "should union layout bomb + explosives bomb");
+    }
+
+    // ========================================================================
+    // Tests for with_starting_player
+    // ========================================================================
+
+    #[test]
+    fn test_with_starting_player_sets_red() {
+        let game = GameY::new(5).with_starting_player(1);
+        assert_eq!(game.next_player(), Some(PlayerId::new(1)));
+    }
+
+    #[test]
+    fn test_with_starting_player_identity_blue() {
+        let game = GameY::new(5).with_starting_player(0);
+        assert_eq!(game.next_player(), Some(PlayerId::new(0)));
+    }
+
+    #[test]
+    fn test_with_starting_player_with_variants() {
+        let game = GameY::new_with_variants(7, vec![GameVariant::DoubleTurn])
+            .with_starting_player(1);
+        assert_eq!(game.next_player(), Some(PlayerId::new(1)));
+        assert!(game.variants().contains(&GameVariant::DoubleTurn));
+    }
+
+    #[test]
+    #[should_panic(expected = "with_starting_player must be called before any moves are made")]
+    fn test_with_starting_player_panics_after_move() {
+        let mut game = GameY::new(5);
+        game.add_move(Movement::Placement {
+            player: PlayerId::new(0),
+            coords: Coordinates::new(0, 0, 4),
+        }).unwrap();
+        // This should panic because a move has been made
+        let _ = game.with_starting_player(1);
     }
 }

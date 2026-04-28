@@ -8,6 +8,7 @@ export type YenCellState = {
 };
 
 const HEX_DIRECTIONS: Coordinates[] = [
+  // Axial neighbors for a hex grid.
   { x: 1, y: -1, z: 0 },
   { x: 1, y: 0, z: -1 },
   { x: 0, y: 1, z: -1 },
@@ -21,6 +22,7 @@ export function coordinateKey(c: Coordinates): string {
 }
 
 export function isOnBoard(size: number, coordinates: Coordinates): boolean {
+  // Yen boards are triangular: every valid coordinate lies on x + y + z = size - 1.
   return (
     coordinates.x >= 0
     && coordinates.y >= 0
@@ -48,6 +50,7 @@ export function buildEmptyYenState(size: number): string {
 }
 
 function symbolToState(symbol: string): YenCellState {
+  // The wire format is intentionally tiny: one character per cell.
   if (symbol === 'B') {
     return { owner: 'B', hasMine: false };
   }
@@ -72,6 +75,7 @@ export function parseYenState(size: number, yenState: string | null | undefined)
 
   let normalizedState = yenState;
   if (yenState?.startsWith('t0|') || yenState?.startsWith('t1|')) {
+    // Older snapshots may include a turn prefix; strip it before decoding cells.
     normalizedState = yenState.slice(3);
   }
 
@@ -81,6 +85,7 @@ export function parseYenState(size: number, yenState: string | null | undefined)
     const rowState = rows[row] ?? '';
 
     for (let col = 0; col <= row; col += 1) {
+      // Reconstruct the triangular board from row/column positions.
       const coordinates: Coordinates = { x: size - 1 - row, y: col, z: row - col };
       board.set(coordinateKey(coordinates), symbolToState(rowState[col] ?? '.'));
     }
@@ -96,6 +101,7 @@ export function serializeYenState(size: number, stateByKey: Map<string, YenCellS
     const symbols: string[] = [];
 
     for (let col = 0; col <= row; col += 1) {
+      // Serialize the same coordinate layout used by parseYenState.
       const coordinates: Coordinates = { x: size - 1 - row, y: col, z: row - col };
       const cell = stateByKey.get(coordinateKey(coordinates));
 

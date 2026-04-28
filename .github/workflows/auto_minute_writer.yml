@@ -26,20 +26,25 @@ on:
         required: false
         default: 'Finish high priority tasks'
 
+permissions:
+  contents: write
+
 jobs:
   create-minute:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Create Minute Document
+      - name: Resolve minute metadata
         run: |
           mkdir -p wiki
-          
+
           if [ -z "${{ github.event.inputs.meeting_number }}" ]; then
-            touch wiki/.keep
-            MEETING_NUMBER=$(($(ls wiki | grep -c "Minute-") + 1))
+            LAST=$(ls wiki/Minute-*.md 2>/dev/null | grep -oP '(?<=Minute-)\d+' | sort -n | tail -1)
+            MEETING_NUMBER=$(( ${LAST:-0} + 1 ))
             DATE=$(date +"%d %m %Y")
             TIME="11:30-12:00"
             WRITER="Auto Minute Writer"
@@ -53,35 +58,56 @@ jobs:
             DECISIONS="${{ github.event.inputs.decisions }}"
             PRIORITIES="${{ github.event.inputs.priorities }}"
           fi
-          
+
+          echo "MEETING_NUMBER=${MEETING_NUMBER}" >> "$GITHUB_ENV"
+          echo "DATE=${DATE}"                     >> "$GITHUB_ENV"
+          echo "TIME=${TIME}"                     >> "$GITHUB_ENV"
+          echo "WRITER=${WRITER}"                 >> "$GITHUB_ENV"
+          echo "DECISIONS=${DECISIONS}"           >> "$GITHUB_ENV"
+          echo "PRIORITIES=${PRIORITIES}"         >> "$GITHUB_ENV"
+
+      - name: Create Minute Document
+        run: |
           FILE_PATH="wiki/Minute-${MEETING_NUMBER} ${DATE}.md"
-          
-          # Use printf to format the markdown document
-          printf "Minute‐${MEETING_NUMBER} ${DATE}               # ${MEETING_NUMBER}th Meeting\n" > "$FILE_PATH"
-          printf "${DATE// //}, ${TIME}, written by ${WRITER}\n\n" >> "$FILE_PATH"
-          
-          printf "## Participants\n" >> "$FILE_PATH"
-          printf "- [ ] [Ahmet Bilal Yazıcıoğlu](https://github.com/bilalyazicioglu)\n" >> "$FILE_PATH"
-          printf "- [ ] [Tobias Navrat](https://github.com/Th0be)\n" >> "$FILE_PATH"
-          printf "- [ ] [Ignacio Hoyos Diego](https://github.com/nacho50900)\n" >> "$FILE_PATH"
-          printf "- [ ] [Alejandro de San Claudio Mesa](https://github.com/UO300896)\n\n" >> "$FILE_PATH"
-          
-          printf "## Taken decisions\n\n" >> "$FILE_PATH"
-          printf "${DECISIONS}\n\n" >> "$FILE_PATH"
-          
-          printf "## Priorities\n\n" >> "$FILE_PATH"
-          printf "${PRIORITIES}\n\n" >> "$FILE_PATH"
-          
-          printf "## New tasks/issues\n" >> "$FILE_PATH"
-          printf "- Add tasks here...\n\n" >> "$FILE_PATH"
-          
-          printf "## Closed Tasks/Issues\n" >> "$FILE_PATH"
-          printf "- Add closed tasks here...\n" >> "$FILE_PATH"
-          
+
+          {
+            echo "# ${MEETING_NUMBER}. Meeting - ${DATE}"
+            echo ""
+            echo "${DATE// //}, ${TIME}, written by ${WRITER}"
+            echo ""
+            echo "## Participants"
+            echo "- [ ] [Ahmet Bilal Yazicioglu](https://github.com/bilalyazicioglu)"
+            echo "- [ ] [Tobias Navrat](https://github.com/Th0be)"
+            echo "- [ ] [Ignacio Hoyos Diego](https://github.com/nacho50900)"
+            echo "- [ ] [Alejandro de San Claudio Mesa](https://github.com/UO300896)"
+            echo ""
+            echo "## Taken decisions"
+            echo ""
+            echo "${DECISIONS}"
+            echo ""
+            echo "## Priorities"
+            echo ""
+            echo "${PRIORITIES}"
+            echo ""
+            echo "## New tasks/issues"
+            echo "- Add tasks here..."
+            echo ""
+            echo "## Closed Tasks/Issues"
+            echo "- Add closed tasks here..."
+          } > "$FILE_PATH"
+
+          echo "Created: $FILE_PATH"
+          cat "$FILE_PATH"
+
       - name: Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add wiki/
-          git commit -m "docs: Add minute ${MEETING_NUMBER:-auto}" || echo "No changes to commit"
-          git push
+          if git diff --cached --quiet; then
+            echo "Nothing to commit — file already exists with identical content."
+            exit 0
+          fi
+          git commit -m "docs: Add minute ${MEETING_NUMBER}"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin ${{ github.ref_name }}

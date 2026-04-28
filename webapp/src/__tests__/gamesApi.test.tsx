@@ -51,7 +51,7 @@ describe('gamesApi', () => {
   it('getGameOptions calls the options endpoint', async () => {
     requestJsonMock.mockResolvedValueOnce({
       strategies: [],
-      variants: [{ name: 'Explosions', description: 'TODO', allowed_strategies: ['ai'] }],
+      variants: [{ name: 'Explosions', description: 'A bomb appears at game start.', allowed_strategies: ['ai'] }],
     });
 
     await getGameOptions();

@@ -16,6 +16,7 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   const token = localStorage.getItem(TOKEN_KEY);
 
   if (token && !headers.has('Authorization')) {
+    // Allow callers to override auth explicitly, but default to the stored session token.
     headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -24,6 +25,7 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
     headers
   });
 
+  // Some endpoints return structured JSON errors, but others may return empty bodies.
   let data: unknown = null;
   try {
     data = await response.json();
@@ -32,6 +34,7 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   }
 
   if (!response.ok) {
+    // Prefer backend error messages, then fall back to a generic HTTP status label.
     const message =
       typeof data === 'object' && data !== null && 'error' in data
         ? String((data as { error?: unknown }).error)

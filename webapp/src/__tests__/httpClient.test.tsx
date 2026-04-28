@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, requestJson } from '../api/httpClient';
 
 faker.seed(20260318);
@@ -25,10 +25,6 @@ function createResponse(data: unknown, ok = true, status = 200): MockResponse {
 describe('httpClient.requestJson', () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
     vi.restoreAllMocks();
   });
 

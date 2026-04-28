@@ -18,6 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
+      // Persist the returned token before refreshing context from storage.
       const nextSession = await login(payload);
       saveSession(nextSession);
       setSession(readSession());
@@ -35,7 +36,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
+      // Register first, then log in because the register endpoint does not create session state.
       await register(payload);
+      // Reuse the same login persistence path as sign-in.
       const nextSession = await login(payload);
       saveSession(nextSession);
       setSession(readSession());

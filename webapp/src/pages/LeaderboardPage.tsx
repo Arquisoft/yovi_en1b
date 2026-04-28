@@ -13,6 +13,7 @@ export function LeaderboardPage() {
 
   useEffect(() => {
     async function loadLeaderboard() {
+      // Keep the view optimistic on refresh by resetting error and loading together.
       try {
         setError(null);
         setLoading(true);
@@ -28,7 +29,9 @@ export function LeaderboardPage() {
     loadLeaderboard();
   }, []);
 
+  // Bot tabs are derived from the payload so the UI automatically follows new strategies.
   const botStrategies = leaderboard ? Object.keys(leaderboard.vs_bots) : [];
+  // Normalize the 'overall' tab into a falsy value so the lower render branch stays simple.
   const currentTab = activeTab === 'overall' ? null : activeTab;
 
   return (
@@ -58,6 +61,7 @@ export function LeaderboardPage() {
                 onClick={() => setActiveTab(strategy)}
                 type="button"
               >
+                {/* The tab label uses the display name, not the internal strategy id. */}
                 vs {formatGameLabel(strategy)}
               </button>
             ))}
@@ -85,6 +89,7 @@ export function LeaderboardPage() {
                       </tr>
                     ) : (
                       leaderboard.overall.map((entry, index) => {
+                        // Rank is derived from the array order, so the API can stay compact.
                         const winRate =
                           entry.total_games > 0
                             ? Math.round((entry.total_wins / entry.total_games) * 100)
@@ -123,6 +128,7 @@ export function LeaderboardPage() {
                         </td>
                       </tr>
                     ) : (
+                      // The bot-specific table is intentionally smaller because it only tracks wins.
                       leaderboard.vs_bots[currentTab].map((entry, index) => (
                         <tr key={entry.username}>
                           <td className="leaderboard-rank">{index + 1}</td>
