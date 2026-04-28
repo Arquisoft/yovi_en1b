@@ -6,6 +6,7 @@ export function ProtectedRoute() {
   const location = useLocation();
 
   if (!isLoggedIn) {
+    // Preserve the target path so login can send the user back where they came from.
     return <Navigate to="/" replace state={{ from: location.pathname }} />;
   }
 

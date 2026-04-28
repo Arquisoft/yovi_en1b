@@ -28,10 +28,6 @@ describe('httpClient.requestJson', () => {
     vi.restoreAllMocks();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('calls default API url and returns parsed JSON', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

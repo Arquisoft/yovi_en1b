@@ -5,6 +5,7 @@ import './HomePage.css';
 export function HomePage() {
   return (
     <section className="home-card">
+      {/* Decorative background layers keep the landing page from feeling flat. */}
       <div className="home-background-orb home-background-orb--one" aria-hidden="true" />
       <div className="home-background-orb home-background-orb--two" aria-hidden="true" />
 
@@ -20,6 +21,7 @@ export function HomePage() {
       </header>
 
       <section className="home-actions" aria-label="Quick actions">
+        {/* The home screen is just a launcher, so every action goes to a primary flow. */}
         <Link to="/games/new" className="home-action home-action--primary">
           <span className="home-action-icon" aria-hidden="true">➕</span>
           <span className="home-action-label">Create New Game</span>
