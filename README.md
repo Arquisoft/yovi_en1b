@@ -72,12 +72,10 @@ docker-compose up --build
 
 | Service | URL |
 |---|---|
-| 🌍 Web App | http://4.233.184.98 |
-| 🔌 Users API | http://4.233.184.98:3000 |
-| 🧭 Swagger Docs | http://4.233.184.98:3000/api-docs |
-| 🧠 Gamey Engine | http://4.233.184.98:4000 |
-| 🗃️ Database | mongodb://127.0.0.1:27017/app_database |
-(Change 4.233.184.98 by localhost if you have it in local)
+| 🌍 Web App | [http://localhost](http://localhost) |
+| 🔌 Users API | [http://localhost:3000](http://localhost:3000) |
+| 🧠 Gamey Engine | [http://localhost:4000](http://localhost:4000) |
+| 🗃️ Database | [mongodb://localhost:27017/app_database](mongodb://localhost:27017/app_database) |
 
 ### 🛠️ Local (no Docker)
 
