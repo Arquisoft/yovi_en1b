@@ -14,6 +14,7 @@ import './App.css';
 
 function RootPage() {
   const { isLoggedIn } = useAuth();
+  // Keep the landing route in one place so the router does not need auth branching logic.
   return isLoggedIn ? <HomePage /> : <EntryPage />;
 }
 

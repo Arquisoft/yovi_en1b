@@ -1,19 +1,6 @@
 /**
- * MSW (Mock Service Worker) Handlers for Frontend Testing
- * 
- * This file defines HTTP request handlers that intercept API calls during development
- * and testing. Handlers are lightweight and return static mock data (not game logic).
- * 
- * Purpose:
- * - Enable testing without a backend server
- * - Provide consistent, predictable API responses
- * - Support development with `npm run dev:mock`
- * 
- * Architecture:
- * - In-memory storage (mockUsers, mockGames)
- * - Simple CRUD operations only
- * - No game state evaluation (board logic, winning conditions)
- * - Static test data from mockFixtures
+ * MSW handlers for frontend development and tests.
+ * They keep the mock API predictable and intentionally avoid game-state logic.
  */
 
 import { http, HttpResponse } from 'msw';
@@ -25,41 +12,37 @@ import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
 // ─── In-Memory Storage ─────────────────────────────────────────────────────────
 // Maps that simulate a simple database for testing
 
-/** Test user credentials (username: 'user', password: 'user') */
+/** Seed user used across the mock API. */
 const mockUsers = new Map<string, { password: string; userId: string }>([
   [DEFAULT_MOCK_USER.username, { password: DEFAULT_MOCK_USER.password, userId: DEFAULT_MOCK_USER.userId }]
 ]);
 
-/** Game records seeded with test data (4 pre-made finished games) */
+/** Seeded finished games used by profile and history views. */
 const mockGames = new Map<string, GameRecord>(
   SEEDED_DEFAULT_USER_GAMES.map((game) => [game._id, game])
 );
 
-/** Counter for generating unique game IDs */
+/** Simple ID counter for newly created mock games. */
 let gameCounter = 1;
 
-// ─── Helper Functions ──────────────────────────────────────────────────────────
-
-/** Extract user ID from Authorization token (format: "Bearer mock-token-<userId>") */
+/** Extract user ID from the mock bearer token. */
 function extractUserId(request: Request): string | null {
+  // The mock token encodes the user id so the handlers can stay stateless.
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   return authHeader.replace('Bearer mock-token-', '');
 }
 
-/** Retrieve a game if it belongs to the requesting user, else null (authorization check) */
+/** Return a game only when it belongs to the authenticated user. */
 function getGameForUser(gameId: string, userId: string): GameRecord | null {
   const game = mockGames.get(gameId);
   return game?.player_id === userId ? game : null;
 }
 
-// ─── HTTP Handlers ────────────────────────────────────────────────────────────
-// Simple CRUD operations with static responses, no game logic evaluation
+// Simple CRUD-only HTTP handlers.
 
 export const handlers = [
-  // ──── AUTHENTICATION ────────────────────────────────────────────────────────
-  
-  /** POST /exists/:username - Check if username is available */
+  /** GET /exists/:username - Check whether a username is already taken. */
   http.get('*/exists/:username', ({ params }) => {
     return HttpResponse.json({ exists: mockUsers.has(String(params.username)) });
   }),
@@ -99,8 +82,6 @@ export const handlers = [
     return HttpResponse.json({ message: `User ${username} created`, userId }, { status: 201 });
   }),
 
-  // ──── USER PROFILE & STATISTICS ────────────────────────────────────────────
-
   /** GET /users/:id - Fetch user profile with static statistics */
   http.get('*/users/:id', ({ params, request }) => {
     const tokenUserId = extractUserId(request);
@@ -118,6 +99,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Keep bot stats aligned with the real backend labels shown in the UI.
     const profile: UserProfile = {
       _id: requestedUserId,
       username: usernameEntry[0],
@@ -155,15 +137,15 @@ export const handlers = [
     const history = [...mockGames.values()]
       .filter((game) => game.player_id === requestedUserId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .map(({ moves, ...rest }) => rest); // Remove moves for history
+      // The list endpoint returns summaries only; move details are loaded separately.
+      .map(({ moves, ...rest }) => rest);
 
     return HttpResponse.json(history);
   }),
 
-  // ──── LEADERBOARD & OPTIONS ────────────────────────────────────────────────
-
   /** GET /leaderboard - Return static mock leaderboard data */
   http.get('*/leaderboard', () => {
+    // The leaderboard uses the same display names as the profile view.
     const leaderboard: Leaderboard = {
       overall: [
         { username: 'user', total_wins: 2, total_games: 4 },
@@ -181,6 +163,7 @@ export const handlers = [
 
   /** GET /games/options - Return available strategies and game variants */
   http.get('*/games/options', () => {
+    // Strategy ids match the backend, while names are what the UI renders.
     return HttpResponse.json({
       strategies: [
         { id: 'random', name: 'Random', difficulty: 'Easy 😄' },
@@ -191,9 +174,6 @@ export const handlers = [
       variants: [{ name: 'Explosions', description: 'Mines are your favorite, right?', allowed_strategies: ['ai'] }]
     });
   }),
-
-  // ──── GAME CRUD OPERATIONS ─────────────────────────────────────────────────
-  // Simple store/retrieve without game logic evaluation
 
   /** POST /games - Create a new game */
   http.post('*/games', async ({ request }) => {
@@ -211,10 +191,13 @@ export const handlers = [
       return HttpResponse.json({ error: 'name_of_enemy is required for PLAYER games' }, { status: 400 });
     }
 
+    // BOT games keep the selected bot label in name_of_enemy for the UI.
+    // This mirrors the backend shape used by the frontend labels and history view.
     const game: GameRecord = {
       _id: `game-${gameCounter++}`,
       player_id: userId,
       game_type: body.game_type,
+      // BOT games keep the selected bot label in name_of_enemy for the UI.
       name_of_enemy: body.game_type === 'BOT' ? body.strategy : (body.name_of_enemy ?? null),
       board_size: body.board_size,
       strategy: body.strategy ?? 'random',
@@ -287,7 +270,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
     }
 
-    // Simple mutation: just add the move, flip turn
+    // Keep the mock deterministic: record the move and flip the turn only.
     const move = {
       move_number: game.moves.length + 1,
       player: game.current_turn,
@@ -351,6 +334,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'Bot move is not available right now' }, { status: 400 });
     }
 
+    // The mock only advances turn state; it does not simulate bot decision making.
     const nextGame = {
       ...game,
       current_turn: 'B' as const
@@ -377,6 +361,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'result is required' }, { status: 400 });
     }
 
+    // Finishing the match is a pure status update with no extra game logic.
     const nextGame = {
       ...game,
       status: 'FINISHED' as const,

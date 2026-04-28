@@ -13,6 +13,7 @@ const USERNAME_KEY = 'auth_username';
 const USER_ID_KEY = 'auth_user_id';
 
 export async function checkUsernameExists(username: string): Promise<ExistsResponse> {
+  // Username lookup drives the split between sign-in and registration.
   return requestJson<ExistsResponse>(`/exists/${encodeURIComponent(username)}`);
 }
 
@@ -33,18 +34,21 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 }
 
 export function saveSession(session: LoginResponse): void {
+  // Session fields are stored separately because the UI reads them individually.
   localStorage.setItem(TOKEN_KEY, session.token);
   localStorage.setItem(USERNAME_KEY, session.username);
   localStorage.setItem(USER_ID_KEY, session.userId);
 }
 
 export function clearSession(): void {
+  // Logging out is just clearing the persisted session contract.
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USERNAME_KEY);
   localStorage.removeItem(USER_ID_KEY);
 }
 
 export function readSession(): AuthSession {
+  // Reading from storage keeps the provider and the HTTP client in sync.
   return {
     token: localStorage.getItem(TOKEN_KEY),
     username: localStorage.getItem(USERNAME_KEY),

@@ -23,6 +23,7 @@ function percent(value: number, total: number): number {
 }
 
 function getWinRateTone(winRate: number): 'profile-kpi--rate-low' | 'profile-kpi--rate-mid' | 'profile-kpi--rate-high' {
+  // The thresholds mirror the visual emphasis used in the profile cards.
   if (winRate >= 70) return 'profile-kpi--rate-high';
   if (winRate >= 40) return 'profile-kpi--rate-mid';
   return 'profile-kpi--rate-low';
@@ -81,6 +82,7 @@ export function ProfilePage() {
     }
 
     const stats = profile.statistics;
+    // The API already separates finished games from per-opponent breakdowns.
     const totalGames = stats.total_games;
     const totalWins = stats.total_wins;
     const totalLosses = stats.total_losses;
@@ -94,6 +96,7 @@ export function ProfilePage() {
     };
 
     const playerGames = playerCategoryBase.wins + playerCategoryBase.losses + playerCategoryBase.surrendered;
+    // Use one calculated base so the displayed split and the rates stay in sync.
     const playerCategory = {
       ...playerCategoryBase,
       games: playerGames,
@@ -114,6 +117,7 @@ export function ProfilePage() {
       lossRate: number;
       surrenderedRate: number;
       tone: 'profile-kpi--rate-low' | 'profile-kpi--rate-mid' | 'profile-kpi--rate-high';
+    // Keep the bot list data-driven so newly added strategies show up without UI changes.
     }> = stats.vs_bots.map((item) => {
       const wins = item.wins;
       const losses = item.losses;
@@ -142,6 +146,7 @@ export function ProfilePage() {
       totalWins,
       totalLosses,
       totalSurrendered,
+      // completedGames excludes in-progress games, which keeps the split bar honest.
       completedGames: totalWins + totalLosses + totalSurrendered,
       overallWinRate: percent(totalWins, totalGames),
       playerCategory,
