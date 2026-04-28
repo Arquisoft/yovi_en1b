@@ -36,9 +36,126 @@ endif::arc42help[]
 |===
 |Term |Definition
 
-|<Term-1>
-|<definition-1>
+|ADR (Architecture Decision Record)
+|A short document that captures an important architectural decision, the context that motivated it, and its consequences. Used in this project to track key design choices such as the technology stack and communication protocols.
 
-|<Term-2>
-|<definition-2>
+|arc42
+|A template for documenting software and system architecture. Provides a standardised structure of 12 sections covering goals, constraints, building blocks, runtime behaviour, deployment, and quality requirements.
+
+|ASW (Arquitectura del Software)
+|Software Architecture course at the Universidad de Oviedo in which this project (YOVI_EN1B) was developed.
+
+|Authorization Header
+|An HTTP request header used to transmit authentication credentials. In this system, it carries the JWT token in the format `Bearer <token>` and is required on all protected endpoints.
+
+|bcrypt
+|A password hashing algorithm used in the Users service to store user credentials securely. Passwords are never stored in plain text; bcrypt applies a salt and a configurable cost factor before storing the hash.
+
+|Bot
+|An automated player controlled by the Gamey engine. The system supports four bot strategies: `random` (Random — picks any valid cell), `defensive` (Defensive — path-aware strategy), `ai` (AI powered by Gemini), and `mcts` (Monte Carlo tree search). Exposed publicly via `GET /play`.
+
+|bot_id
+|The public-facing identifier for a bot strategy used in the external API (`GET /play`). Maps to internal Gamey strategy names: `random` → Random, `defensive` → Defensive, `ai` → AI (Gemini), `mcts` → Monte Carlo.
+
+|CI/CD
+|Continuous Integration / Continuous Deployment. Automated pipelines (GitHub Actions) that build, test, and deploy the application on every push to the repository.
+
+|coordinates
+|A pair `[row, col]` identifying a cell on the triangular Game Y board, where `row` ranges from `0` to `size-1` and `col` ranges from `0` to `row`. Returned by Gamey after every bot move.
+
+|CORS (Cross-Origin Resource Sharing)
+|An HTTP mechanism that controls which origins are permitted to call the Users service API from a browser. Configured in the Users service middleware to allow requests from the frontend origin.
+
+|crypto.randomInt
+|A Node.js built-in cryptographically secure random integer generator. Used in the Users service to assign the starting turn (B or R) at the beginning of each game.
+
+|current_turn
+|A field stored on each game document in MongoDB indicating whose turn it is (`"B"` or `"R"`). Updated by the Users service after every valid move; the frontend reads it to determine which player should act next.
+
+|difficulty_level
+|A label derived from the bot strategy that describes the challenge level presented to the player: `random` → Random, `defensive` → Defensive, `ai` → AI (Gemini), `mcts` → Monte Carlo.
+
+|Docker Compose
+|A tool for defining and running multi-container Docker applications using a single `docker-compose.yml` configuration file. Used in this project to orchestrate the `webapp`, `users`, `gamey`, and `mongodb` containers.
+
+|DFS (Depth-First Search)
+|A graph traversal algorithm used by the Gamey engine to detect win conditions. After each move it traverses the board from a player's pieces to determine whether they form a connected chain touching all required edges of the triangular board.
+
+|Express
+|A minimal Node.js web framework used to build the Users service REST API. Routes are organised into separate modules (authRoutes, userRoutes, gameRoutes, playRoute, leaderBoardRoute).
+
+|Gamey
+|The Rust-based game engine service running on port 4000. Responsible for all game logic: move computation, win detection, bot strategy execution, and YEN state management. Has no database connection; all state is in memory during a match.
+
+|game_type
+|A field on the game document indicating whether the game is played against another human (`"PLAYER"`) or against a bot (`"BOT"`). Determines which branch of `updateStats` is executed when the game finishes.
+
+|GitHub Actions
+|The CI/CD platform used to automate testing and deployment of the YOVI_EN1B project on every push to the repository.
+
+|Grafana
+|A monitoring and visualisation tool connected to Prometheus. Used to display real-time dashboards of system health and performance metrics for the YOVI platform.
+
+|JWT (JSON Web Token)
+|A compact, self-contained token used for authentication. Issued by the Users service on login and sent by the client as a Bearer token on all protected requests. Contains the user ID and expires after 24 hours.
+
+|leaderboard
+|A ranked list of players by performance. The Users service exposes `GET /leaderboard` returning an `overall` ranking by total wins and three `vs_bots` rankings (one per bot strategy).
+
+|lean()
+|A Mongoose method that returns plain JavaScript objects (POJOs) instead of full Mongoose documents. Used in `getLeaderboard` for performance; requires optional chaining (`?.`) because subdocuments may be absent on older records.
+
+|MongoDB
+|A document-oriented NoSQL database used for persistent storage of user accounts, authentication credentials, statistics, and game history. Accessed exclusively by the Users service via Mongoose.
+
+|Mongoose
+|An ODM (Object Document Mapper) library for MongoDB and Node.js. Provides schema definitions, validation, and query helpers used throughout the Users service.
+
+|mongo-data
+|The named Docker volume that persists MongoDB data across container restarts. Removed with `docker compose down -v`.
+
+|move
+|A single action taken by a player during a game, identified by coordinates `[row, col]` on the triangular board. Stored in the `moves` array of the game document along with the resulting `yen_state`.
+
+|nock
+|A Node.js HTTP interception library used in tests to mock outgoing HTTP calls from the Users service to Gamey, without requiring a real Gamey instance to be running.
+
+|Prometheus
+|A time-series monitoring system that scrapes metrics from the Users service. Works alongside Grafana to provide operational visibility into request rates, error rates, and response times.
+
+|repository pattern
+|An architectural pattern used in the Users service to abstract database access. `MongoUserRepository` implements `UserRepository`, making it easy to swap the storage backend (e.g., for testing with an in-memory store).
+
+|result
+|The outcome of a finished game from the perspective of the human player: `"WIN"`, `"LOSS"`, or `"SURRENDER"`. `SURRENDER` (user surrendered) does not update statistics.
+
+|SonarCloud
+|A static analysis service used to enforce code quality standards on the repository. Acts as a quality gate requiring ≥80% coverage on new code and zero critical issues before merging.
+
+|SPA (Single Page Application)
+|A web application architecture where the browser loads a single HTML page and dynamically updates content via JavaScript. The YOVI frontend is a React SPA built with Vite and TypeScript, served on port 80.
+
+|strategy
+|The internal Gamey identifier for a bot algorithm. Valid values are `random` (Random), `defensive` (Defensive), `ai` (AI powered by Gemini), and `mcts` (Monte Carlo). Stored on the game document and used as the key in `statistics.vs_bot`.
+
+|triangular board
+|The Game Y playing surface. For board size `n`, it contains `n*(n+1)/2` cells arranged in rows of increasing length (row `r` has `r+1` cells). Encoded in YEN layout notation using `/` as row separators.
+
+|Users service
+|The Node.js/Express backend service running on port 3000. Responsible for user registration, authentication, game management, statistics tracking, leaderboard, and the public bot API (`GET /play`).
+
+|VM (Virtual Machine)
+|The Azure cloud virtual machine (IP `4.233.184.98`) hosting all Docker containers for the YOVI platform in production.
+
+|winner
+|A field returned by Gamey's `/compute` and `/play` endpoints after every move. Contains `"B"`, `"R"`, or `null`. When non-null, the Users service automatically finishes the game and updates statistics.
+
+|yen_state
+|The serialized board state in YEN (Yovi Extended Notation) format. Stored with each move and passed between the frontend, Users service, and Gamey to reconstruct the board at any point in time.
+
+|YEN (Yovi Extended Notation)
+|The notation format used to encode Game Y board states. A layout string where rows are separated by `/`, each row has `r+1` characters (`.` for empty, `B` or `R` for pieces), and the full position is represented as a JSON object with `size`, `turn`, `players`, and `layout` fields.
+
+|YGN (Yovi Game Notation)
+|A notation format supported by Gamey for encoding full move sequences, enabling game export and replay functionality.
 |===
