@@ -4,7 +4,7 @@
  */
 
 import { http, HttpResponse } from 'msw';
-import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
+// import type { ExistsResponse, LoginResponse, RegisterResponse } from '../types/auth';
 import type { Coordinates, CreateGamePayload, GameRecord } from '../types/games';
 import type { UserProfile, Leaderboard } from '../types/users';
 import { DEFAULT_MOCK_USER, SEEDED_DEFAULT_USER_GAMES } from './mockFixtures';
@@ -198,7 +198,7 @@ export const handlers = [
       player_id: userId,
       game_type: body.game_type,
       // BOT games keep the selected bot label in name_of_enemy for the UI.
-      name_of_enemy: body.game_type === 'BOT' ? body.strategy : (body.name_of_enemy ?? null),
+      name_of_enemy: body.game_type === 'BOT' ? (body.strategy ?? null) : (body.name_of_enemy ?? null),
       board_size: body.board_size,
       strategy: body.strategy ?? 'random',
       variants: body.variants ?? [],
@@ -278,7 +278,7 @@ export const handlers = [
       created_at: new Date().toISOString()
     };
 
-    const nextGame = {
+    const nextGame: GameRecord = {
       ...game,
       moves: [...game.moves, move],
       current_turn: game.current_turn === 'B' ? 'R' : 'B'
@@ -304,7 +304,7 @@ export const handlers = [
       return HttpResponse.json({ error: 'No move to undo' }, { status: 400 });
     }
 
-    const nextGame = {
+    const nextGame: GameRecord = {
       ...game,
       moves: game.moves.slice(0, -1),
       current_turn: game.moves.length % 2 === 1 ? 'R' : 'B'
