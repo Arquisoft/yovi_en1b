@@ -208,10 +208,21 @@ pub async fn play(
                 .filter_map(|v| GameVariant::from_name(v))
                 .collect();
 
-            if variants.is_empty() {
+            // When creating a brand-new game (no prior yen_state) we must
+            // honour the `turn` field so that the caller can designate Red
+            // as the first mover.  Without this, Gamey always defaults to
+            // Blue (player 0), which causes a colour mismatch in the webapp
+            // when the DB assigned `current_turn = 'R'` at game creation.
+            let starting_player = req.turn.unwrap_or(0);
+            let game = if variants.is_empty() {
                 GameY::new(req.board_size)
             } else {
                 GameY::new_with_variants(req.board_size, variants)
+            };
+            if starting_player != 0 {
+                game.with_starting_player(starting_player)
+            } else {
+                game
             }
         }
     };
@@ -310,10 +321,19 @@ pub async fn compute(
                 .iter()
                 .filter_map(|v| GameVariant::from_name(v))
                 .collect();
-            if !variants.is_empty() {
+            // Same turn-override logic as in /play: honour the explicit
+            // `turn` field so the first human move is placed with the
+            // correct colour when the game was not started as Blue-first.
+            let starting_player = req.turn.unwrap_or(0);
+            let game = if !variants.is_empty() {
                 GameY::new_with_variants(board_size, variants)
             } else {
                 GameY::new(board_size)
+            };
+            if starting_player != 0 {
+                game.with_starting_player(starting_player)
+            } else {
+                game
             }
         }
     };

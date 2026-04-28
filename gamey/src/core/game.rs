@@ -60,6 +60,25 @@ impl GameY {
         }
     }
 
+    /// Builder: overrides the starting player on a freshly created game.
+    ///
+    /// Call this immediately after [`GameY::new`] or [`GameY::new_with_variants`]
+    /// **before** any moves are made, e.g. when the caller knows the first move
+    /// belongs to Red (`player_id = 1`).
+    ///
+    /// # Panics
+    /// Panics if any moves have already been recorded (i.e. `history` is non-empty).
+    pub fn with_starting_player(mut self, player_id: u32) -> Self {
+        assert!(
+            self.history.is_empty(),
+            "with_starting_player must be called before any moves are made"
+        );
+        self.status = GameStatus::Ongoing {
+            next_player: PlayerId::new(player_id),
+        };
+        self
+    }
+
     /// Returns the number of bombs to place for a given board size in the
     /// Explosions variant.
     ///
