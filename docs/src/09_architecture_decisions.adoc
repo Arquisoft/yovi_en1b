@@ -32,6 +32,9 @@ Various options:
 
 See https://docs.arc42.org/section-9/[Architecture Decisions] in the arc42 documentation.
 There you will find links and examples about ADR.
+All project-specific architecture decisions are collected in one place.
+You can find them all in the wiki here: link:https://github.com/Arquisoft/yovi_en1b/wiki/Architectural-decisions[Architectural decisions].
+This page is the central reference for decisions made in the project.
 
 ****
 endif::arc42help[]
