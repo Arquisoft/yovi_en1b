@@ -162,6 +162,7 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           command: |
             echo "DEPLOY_DOMAIN=${{ secrets.DEPLOY_DOMAIN }}" > .env
+            echo "GRAFANA_URL=https://${{ secrets.DEPLOY_DOMAIN }}/grafana/" >> .env
             
             BASE_URL="https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.sha }}"
             
