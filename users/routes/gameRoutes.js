@@ -75,11 +75,14 @@ async function fetchInitialYenState(board_size, variants) {
 // an Explosions game (when yen_state_prev is null) and so subsequent parses
 // keep the Explosions variant active. Without this, bombs would never be
 // placed and the frontend never saw a mine (issue #203, frontend visibility).
-async function computeYenState(yen_state_prev, coordinates, variants = []) {
+async function computeYenState(yen_state_prev, coordinates, variants = [], turn = 0) {
     const gameyResponse = await fetch(`${GAMEY_URL}/compute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yen_state_prev, coordinates, variants })
+        // `turn` is only decisive when yen_state_prev is null (first human
+        // move on a fresh board) — for all subsequent moves the t{n}| prefix
+        // embedded in yen_state_prev already carries the authoritative turn.
+        body: JSON.stringify({ yen_state_prev, coordinates, variants, turn })
     });
 
     if (!gameyResponse.ok) {
@@ -222,7 +225,12 @@ module.exports = function gameRoutes(repository) {
 
         let gameyResult;
         try {
-            gameyResult = await computeYenState(yen_state_prev, coordinates, game.variants ?? []);
+            gameyResult = await computeYenState(
+                yen_state_prev,
+                coordinates,
+                game.variants ?? [],
+                game.current_turn === 'R' ? 1 : 0
+            );
         } catch (err) {
             return res.status(err.status || 503).json({ error: err.message });
         }
@@ -271,7 +279,13 @@ module.exports = function gameRoutes(repository) {
                     strategy:         game.strategy,
                     difficulty_level: game.difficulty_level,
                     board_size:       game.board_size,
-                    variants:         game.variants
+                    variants:         game.variants,
+                    // Tell Gamey whose turn it is so the first bot move is
+                    // placed with the correct colour when the game started
+                    // with Red (current_turn = 'R') as the first mover.
+                    // Without this, Gamey defaults to Blue on an empty board,
+                    // causing a colour mismatch between the DB and the board.
+                    turn: game.current_turn === 'R' ? 1 : 0
                 })
             });
         } catch {

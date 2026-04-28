@@ -3,7 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-concepts]]
 == Cross-cutting Concepts
 
-
 ifdef::arc42help[]
 [role="arc42help"]
 ****
@@ -18,57 +17,216 @@ They can include many different topics, such as
 * principal, often technical decisions of an overarching (= cross-cutting) nature
 * implementation rules
 
-
-.Motivation
-Concepts form the basis for _conceptual integrity_ (consistency, homogeneity) of the architecture. 
-Thus, they are an important contribution to achieve inner qualities of your system.
-
-Some of these concepts cannot be assigned to individual building blocks, e.g. security or safety. 
-
-
-.Form
-The form can be varied:
-
-* concept papers with any kind of structure
-* cross-cutting model excerpts or scenarios using notations of the architecture views
-* sample implementations, especially for technical concepts
-* reference to typical usage of standard frameworks (e.g. using Hibernate for object/relational mapping)
-
-.Structure
-A potential (but not mandatory) structure for this section could be:
-
-* Domain concepts
-* User Experience concepts (UX)
-* Safety and security concepts
-* Architecture and design patterns
-* "Under-the-hood"
-* development concepts
-* operational concepts
-
-Note: it might be difficult to assign individual concepts to one specific topic
-on this list.
-
 image::08-concepts-EN.drawio.png["Possible topics for crosscutting concepts"]
-
-
-.Further Information
 
 See https://docs.arc42.org/section-8/[Concepts] in the arc42 documentation.
 ****
 endif::arc42help[]
 
-=== _<Concept 1>_
+=== Domain Model: Barycentric Coordinate System
 
-_<explanation>_
+The Game Y board is a **triangle** subdivided into hexagonal cells. Every cell is uniquely addressed by a triple of non-negative integers *(x, y, z)* — barycentric coordinates — that satisfy the invariant:
 
+----
+x + y + z = board_size − 1
+----
 
+Each coordinate component encodes the cell's distance from one of the three sides of the triangle:
 
-=== _<Concept 2>_
+* *x = 0* → cell touches side **A** (bottom edge)
+* *y = 0* → cell touches side **B** (left edge)
+* *z = 0* → cell touches side **C** (right edge)
 
-_<explanation>_
+Corner cells touch exactly two sides (e.g. `(0, 0, n)` touches both A and B); interior cells touch none. A board of size _N_ contains exactly _N(N+1)/2_ cells in total.
 
-...
+Adjacency is defined as any coordinate reachable by incrementing one component by 1 and decrementing another by 1, keeping the sum constant. Interior cells have six neighbours; edge cells have four; corner cells have two. This model is implemented in `gamey/src/core/coord.rs` and is the authoritative coordinate representation used throughout the entire system.
 
-=== _<Concept n>_
+[plantuml, "domain-model", png]
+----
+@startuml
+!theme plain
+skinparam classAttributeIconSize 0
 
-_<explanation>_
+class Coordinates {
+  +x: u32
+  +y: u32
+  +z: u32
+  --
+  +is_valid(board_size): bool
+  +neighbors(board_size): Vec<Coordinates>
+  +touches_side_a(): bool
+  +touches_side_b(): bool
+  +touches_side_c(): bool
+  +sides(): Vec<BoardSide>
+  +to_index(board_size): u32
+  +from_index(index, board_size): Coordinates
+}
+
+enum BoardSide {
+  A
+  B
+  C
+}
+
+class Board {
+  +board_size: u32
+  --
+  +place_piece(player, coords): bool
+  +is_empty_at(coords): bool
+  +get_cell(coords): Option<PlayerId>
+  +available_cells(): Vec<u32>
+  +is_full(): bool
+}
+
+class Game {
+  +board: Board
+  +players: Vec<Player>
+  --
+  +apply_action(action): Result
+  +current_player(): Player
+  +winner(): Option<PlayerId>
+}
+
+Game "1" *-- "1" Board
+Board "1" *-- "*" Coordinates
+Coordinates "*" -- "*" BoardSide : sides
+@enduml
+----
+
+=== Game State Serialization: YEN (Y Exchange Notation)
+
+All game states exchanged between the Users Service and the Gamey engine are encoded as **YEN (Y Exchange Notation)** — a compact, JSON-serializable format inspired by FEN (Forsyth-Edwards Notation) used in chess. YEN is the single wire format for game state across the entire system (constraint TC-03).
+
+A YEN document contains four mandatory fields and two optional ones:
+
+[options="header",cols="1,2,3"]
+|===
+|Field|Type|Description
+|`size`|integer|Side length of the triangular board (e.g. 5 for a 5×5 board with 15 cells).
+|`turn`|integer (0 or 1)|Index of the player whose turn it is next.
+|`players`|array of chars|Symbol for each player, e.g. `["B", "R"]` for Blue and Red.
+|`layout`|string|Compact board encoding: rows separated by `/`, each cell represented by its player symbol or `.` for an empty cell. Rows are ordered from the top vertex downward.
+|`variants`|array of strings _(optional)_|Active game variant names, e.g. `["Explosions"]`.
+|`e`|string _(optional)_|Comma-separated flat cell indices of bomb positions, e.g. `"3,14"`.
+|===
+
+Example YEN for a board of size 3 where Blue has claimed the top vertex:
+
+[source,json]
+----
+{
+  "size": 3,
+  "turn": 1,
+  "players": ["B", "R"],
+  "layout": "B/../.."
+}
+----
+
+The `layout` string encodes rows from top to bottom: row 0 has 1 cell, row 1 has 2, row _r_ has _r+1_. An empty board of size 3 is `"./../.."` (or equivalently `"..."`with the `/` separators omitted for a flat representation; the Gamey parser handles both). YEN is generated and consumed exclusively by `gamey/src/notation/yen.rs`.
+
+=== Win Detection: Union-Find with Side-Touching Flags
+
+Win detection is a cross-cutting concern executed by the Gamey engine after every move and returned to the Users Service as a `winner` field. A player wins when their occupied cells form a single connected component that **simultaneously touches all three sides** of the triangular board.
+
+The Gamey engine implements this with an **incremental Union-Find (Disjoint Set Union)** data structure augmented with three boolean flags per set root: `touches_side_a`, `touches_side_b`, and `touches_side_c`.
+
+The algorithm works as follows:
+
+1. When a cell is placed, a new singleton set is created for it with the side-touching flags derived from its coordinates.
+2. The cell's neighbors already owned by the same player are merged into the new set using `union()` with path compression.
+3. During `union()`, the merged root inherits the bitwise OR of both roots' side-touching flags.
+4. If the merged root has all three flags set (`touches_side_a ∧ touches_side_b ∧ touches_side_c`), `place_piece()` returns `true` — the placing player wins immediately.
+
+This approach runs in near-constant time per move (amortized O(α(n)) with path compression), replacing the need for a full DFS/BFS traversal after each move. The implementation lives in `gamey/src/core/board.rs`.
+
+[source]
+----
+Win condition check per move:
+  1. create set S for new cell C with flags {a=touches_A?, b=touches_B?, c=touches_C?}
+  2. for each neighbor N of C owned by same player:
+       root_S ← find(S),  root_N ← find(N)
+       merge(root_S, root_N): root.flags |= merged.flags
+  3. if root.touches_a AND root.touches_b AND root.touches_c → winner!
+----
+
+After a bomb detonation (Explosions variant), the union-find structure is fully rebuilt from the surviving pieces to prevent stale side-touching flags from leaked orphaned sets causing phantom wins.
+
+=== Security Concepts
+
+Security concerns are handled uniformly across all endpoints that require an authenticated user. The following mechanisms are in place:
+
+*Password Storage*: Passwords are never stored in plain text. When a user registers, the password is hashed using **bcrypt** with 10 salt rounds before it is written to MongoDB. On login, `bcrypt.compare()` is used to verify the supplied password against the stored hash. The plain-text password is never logged or retained.
+
+*Session Authentication (JWT)*: Upon successful login, the Users Service signs a **JSON Web Token (JWT)** with a 24-hour expiry. The token is returned to the client and must be included as a `Authorization: Bearer <token>` header on all protected API calls. The server validates the signature and expiry on every request before processing it.
+
+*Username Uniqueness*: A unique index on the `username` field in MongoDB enforces that no two accounts can share the same username, even under concurrent registration requests.
+
+*Input Validation*: All incoming JSON payloads are validated for required fields and correct types before any business logic is executed. Invalid requests are rejected with a 400 response before they reach the database or the game engine.
+
+The Gamey engine itself does not perform authentication — it is an internal service reachable only within the Docker Compose network, not directly exposed to the public internet.
+
+=== Inter-service Communication
+
+All three services communicate exclusively via **synchronous HTTP REST** with **JSON payloads** (constraint TC-02). No message broker, shared memory, or direct database access across services is used.
+
+[options="header",cols="1,2,3"]
+|===
+|Direction|Protocol|Purpose
+|Browser → webapp|HTTPS/HTTP (port 80)|Serves the React SPA to the client.
+|webapp → users|HTTP REST (port 3000)|User registration, login, game creation, move submission, history retrieval.
+|webapp → gamey|HTTP REST (port 4000)|_Not used directly by the frontend in production._ Gamey is called internally by the users service.
+|users → gamey|HTTP REST (port 4000)|`POST /compute` to validate a move and get the new YEN state; `POST /play` to get a bot move.
+|External bots → gamey|HTTP REST (port 4000)|Third-party automated agents may call `/compute` and `/play` directly (constraint TC-05).
+|users → MongoDB|MongoDB Wire Protocol (port 27017)|All persistence operations — user accounts, game records, move histories.
+|===
+
+The users service acts as an **orchestrator**: it receives a player move from the frontend, delegates the state computation to Gamey, persists the result in MongoDB, and returns the updated game to the frontend. The frontend never calls Gamey directly during a live game session.
+
+=== Persistence Model
+
+Persistent state is owned exclusively by the Users Service and stored in MongoDB. MongoDB's document model was chosen because game states and move histories have a variable, nested structure that maps naturally to JSON documents (see deployment decision in Section 4).
+
+The database contains two collections:
+
+*`players` collection*: Each document represents a registered user and stores the username, the bcrypt-hashed password, and aggregated statistics (wins, losses, games played). A unique index on `username` ensures account integrity.
+
+*`games` collection*: Each document represents a single game session. It stores the participants, the board size, the game type (PLAYER or BOT), the current status (IN_PROGRESS or FINISHED), the final result (WIN, LOSS, or DRAW), and an embedded array of **moves**. Each move document records the player who moved, the coordinates chosen, the resulting YEN state, and a sequential move number. This embedded design allows the full game to be retrieved and replayed in a single query.
+
+The `gamey` engine intentionally has no database connection. Active game state lives in the Rust process memory for the duration of a match. When a game concludes, the result is propagated back through the users service, which writes it to MongoDB. This clear ownership boundary avoids write conflicts and keeps the data model simple.
+
+=== Bot AI Strategy Pattern
+
+The bot AI system in Gamey is structured around the **Strategy pattern**. All bots implement the `YBot` trait, which exposes a single method: given a board state (as a YEN document), return the chosen coordinates. This interface decouples the bot selection logic from the game engine core and makes it trivial to add new strategies without modifying existing code.
+
+The following bot strategies are registered in the `YBotRegistry` at startup:
+
+[options="header",cols="1,2,2"]
+|===
+|Strategy|Difficulty|Description
+|`RandomBot`|Easy|Selects a uniformly random empty cell. Used as a baseline and for testing.
+|`DefensiveBot`|Medium|Identifies and blocks the cell adjacent to the opponent's most recent move, prioritising defence over offence.
+|`HardBot`|Hard|Implements **Monte Carlo Tree Search (MCTS)** — simulates many random playouts from the current position to estimate the value of each candidate move and selects the highest-value option.
+|`GenerativeAIBot`|Variable|Delegates move selection to the **Google Gemini API** via `GEMINI_API_KEY`. The model receives the current YEN state and responds with coordinates. Used for experimental AI integration.
+|===
+
+The strategy and difficulty level are selected by the frontend when creating a bot game and passed to Gamey on each `POST /play` call. The registry looks up the matching `YBot` implementation and invokes it, returning the coordinates to the users service.
+
+=== Game Variants
+
+Game variants are optional rule modifiers that extend the standard Y game. They are represented as an enum (`GameVariant`) in the Rust engine and encoded in the `variants` array of the YEN state. Both variants require a minimum board size of 7.
+
+*Explosions (Bomb Mode)*: At game initialization, one or more bomb cells are randomly placed on the board. Their positions are encoded in the YEN `e` field as a comma-separated list of flat cell indices. A bomb cell looks empty to players — they can choose it as a move. When a player lands on a bomb cell: (1) the player's piece is placed normally, (2) the bomb is consumed, and (3) all occupied neighbour cells are cleared back to empty via a BFS chain-detonation (adjacent bombs also detonate). After detonation, the union-find structure is fully rebuilt from surviving pieces to maintain win-detection integrity. Chain detonation means a cluster of adjacent bombs all explode together when the first one is triggered.
+
+*Double Turn*: Each player places **two pieces per turn** instead of one. The `turn` field in YEN advances only after both moves of a turn are submitted. This variant changes the pace of the game significantly — players can build connected chains faster, requiring the opponent to respond more aggressively.
+
+Both variants can be active simultaneously, creating a "CHAOS" mode that combines the explosive board and the accelerated turn structure.
+
+=== Error Handling
+
+Error handling follows a **centralized, typed model** in the Rust engine and a **consistent HTTP status code** convention in the Node.js service.
+
+In Gamey, all possible failure modes are expressed as variants of a single `GamyError` enum (defined in `gamey/src/gamey_error.rs`). This enum is used throughout the engine and the HTTP handlers, and maps to appropriate HTTP status codes (e.g. 400 for invalid moves, 404 for unknown games, 500 for internal failures). This avoids stringly-typed errors and ensures all error paths are handled exhaustively.
+
+In the Users Service, errors are caught at the controller layer and returned as JSON responses with a standard shape: `{ "error": "<message>" }`. HTTP status codes follow REST conventions: 201 for resource creation, 200 for retrieval, 400 for validation failures, 401 for authentication errors, 404 for not-found resources, and 500 for unexpected failures.
+
+The frontend displays error messages returned from the API directly to the user where relevant (e.g. "Username already taken" during registration, "Invalid move" during gameplay).
