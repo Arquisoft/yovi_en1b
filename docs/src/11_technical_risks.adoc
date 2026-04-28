@@ -76,7 +76,7 @@ The frontend URL for the Users service API is embedded at Docker image build tim
 
 |*1 — High*
 |*Legacy bot strategy keys in MongoDB*
-Early versions of the application stored bot strategy results under the keys `easy`, `medium`, and `hard` in the `statistics.vs_bot` subdocument. Current code uses `random`, `ai`, and `dijkstra`. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).
+Early versions of the application stored bot strategy results under the keys `easy`, `medium`, and `hard` in the `statistics.vs_bot` subdocument. Current code uses `random`, `defensive`, `ai`, and `mcts`. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).
 |Run the provided migration script (`migrate-vs-bot-keys.js`) on the production database, or wipe the database with `docker compose down -v` to start clean. Add a schema version field to user documents to detect and auto-migrate stale records on first access.
 
 |*2 — High*

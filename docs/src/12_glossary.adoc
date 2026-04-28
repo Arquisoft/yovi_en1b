@@ -52,10 +52,10 @@ endif::arc42help[]
 |A password hashing algorithm used in the Users service to store user credentials securely. Passwords are never stored in plain text; bcrypt applies a salt and a configurable cost factor before storing the hash.
 
 |Bot
-|An automated player controlled by the Gamey engine. The system supports three bot strategies: `random` (picks any valid cell), `dijkstra` (path-aware strategy), and `ai` (advanced strategy). Exposed publicly via `GET /play`.
+|An automated player controlled by the Gamey engine. The system supports four bot strategies: `random` (Random — picks any valid cell), `defensive` (Defensive — path-aware strategy), `ai` (AI powered by Gemini), and `mcts` (Monte Carlo tree search). Exposed publicly via `GET /play`.
 
 |bot_id
-|The public-facing identifier for a bot strategy used in the external API (`GET /play`). Maps to internal Gamey strategy names: `random` → random, `mcts` → ai, `defensive` → dijkstra.
+|The public-facing identifier for a bot strategy used in the external API (`GET /play`). Maps to internal Gamey strategy names: `random` → Random, `defensive` → Defensive, `ai` → AI (Gemini), `mcts` → Monte Carlo.
 
 |CI/CD
 |Continuous Integration / Continuous Deployment. Automated pipelines (GitHub Actions) that build, test, and deploy the application on every push to the repository.
@@ -73,7 +73,7 @@ endif::arc42help[]
 |A field stored on each game document in MongoDB indicating whose turn it is (`"B"` or `"R"`). Updated by the Users service after every valid move; the frontend reads it to determine which player should act next.
 
 |difficulty_level
-|A label derived from the bot strategy that describes the challenge level presented to the player: `random` → Easy, `dijkstra` → Medium, `ai` → Hard.
+|A label derived from the bot strategy that describes the challenge level presented to the player: `random` → Random, `defensive` → Defensive, `ai` → AI (Gemini), `mcts` → Monte Carlo.
 
 |Docker Compose
 |A tool for defining and running multi-container Docker applications using a single `docker-compose.yml` configuration file. Used in this project to orchestrate the `webapp`, `users`, `gamey`, and `mongodb` containers.
@@ -127,7 +127,7 @@ endif::arc42help[]
 |An architectural pattern used in the Users service to abstract database access. `MongoUserRepository` implements `UserRepository`, making it easy to swap the storage backend (e.g., for testing with an in-memory store).
 
 |result
-|The outcome of a finished game from the perspective of the human player: `"WIN"`, `"LOSS"`, or `"DRAW"`. `DRAW` (user quit) does not update statistics.
+|The outcome of a finished game from the perspective of the human player: `"WIN"`, `"LOSS"`, or `"SURRENDER"`. `SURRENDER` (user surrendered) does not update statistics.
 
 |SonarCloud
 |A static analysis service used to enforce code quality standards on the repository. Acts as a quality gate requiring ≥80% coverage on new code and zero critical issues before merging.
@@ -136,7 +136,7 @@ endif::arc42help[]
 |A web application architecture where the browser loads a single HTML page and dynamically updates content via JavaScript. The YOVI frontend is a React SPA built with Vite and TypeScript, served on port 80.
 
 |strategy
-|The internal Gamey identifier for a bot algorithm. Valid values are `random`, `dijkstra`, and `ai`. Stored on the game document and used as the key in `statistics.vs_bot`.
+|The internal Gamey identifier for a bot algorithm. Valid values are `random` (Random), `defensive` (Defensive), `ai` (AI powered by Gemini), and `mcts` (Monte Carlo). Stored on the game document and used as the key in `statistics.vs_bot`.
 
 |triangular board
 |The Game Y playing surface. For board size `n`, it contains `n*(n+1)/2` cells arranged in rows of increasing length (row `r` has `r+1` cells). Encoded in YEN layout notation using `/` as row separators.
