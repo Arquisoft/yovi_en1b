@@ -13,7 +13,8 @@
 🌐 **Play now:** [https://yovi.alejandrosanclaudio.com/](https://yovi.alejandrosanclaudio.com/)  
 📝 **Documentation:** [https://arquisoft.github.io/yovi_en1b/](https://arquisoft.github.io/yovi_en1b/)  
 ⛓ **API documentation:** [https://yovi.alejandrosanclaudio.com/api-docs/](https://yovi.alejandrosanclaudio.com/api-docs/)  
-💻 **Presentation:** [https://www.canva.com/design/DAHH-F-XS9Y/tjusDRBiVaNG9RQPut5GLA/view](https://www.canva.com/design/DAHH-F-XS9Y/tjusDRBiVaNG9RQPut5GLA/view)
+💻 **Presentation:** [https://canva.link/lxpjjo2vbixes10](https://canva.link/lxpjjo2vbixes10)
+
 
 </div>
 
