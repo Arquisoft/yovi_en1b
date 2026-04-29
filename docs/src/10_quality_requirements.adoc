@@ -7,7 +7,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 The following mind map illustrates the primary quality goals for YOVI, breaking them down into concrete quality scenarios (S1 to S8) strictly based on the system's actual architecture and testing capabilities.
 
-[plantuml, "quality-tree", svg]
+[plantuml, quality_tree, png]
 ----
 @startmindmap
 * Quality
