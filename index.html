@@ -494,9 +494,15 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#section-concepts">8. Cross-cutting Concepts</a>
 <ul class="sectlevel2">
-<li><a href="#_concept_1">8.1. <em>&lt;Concept 1&gt;</em></a></li>
-<li><a href="#_concept_2">8.2. <em>&lt;Concept 2&gt;</em></a></li>
-<li><a href="#_concept_n">8.3. <em>&lt;Concept n&gt;</em></a></li>
+<li><a href="#_domain_model_barycentric_coordinate_system">8.1. Domain Model: Barycentric Coordinate System</a></li>
+<li><a href="#_game_state_serialization_yen_y_exchange_notation">8.2. Game State Serialization: YEN (Y Exchange Notation)</a></li>
+<li><a href="#_win_detection_union_find_with_side_touching_flags">8.3. Win Detection: Union-Find with Side-Touching Flags</a></li>
+<li><a href="#_security_concepts">8.4. Security Concepts</a></li>
+<li><a href="#_inter_service_communication">8.5. Inter-service Communication</a></li>
+<li><a href="#_persistence_model">8.6. Persistence Model</a></li>
+<li><a href="#_bot_ai_strategy_pattern">8.7. Bot AI Strategy Pattern</a></li>
+<li><a href="#_game_variants">8.8. Game Variants</a></li>
+<li><a href="#_error_handling">8.9. Error Handling</a></li>
 </ul>
 </li>
 <li><a href="#section-design-decisions">9. Architecture Decisions</a></li>
@@ -506,7 +512,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_quality_scenarios">10.2. Quality Scenarios</a></li>
 </ul>
 </li>
-<li><a href="#section-technical-risks">11. Risks and Technical Debts</a></li>
+<li><a href="#section-technical-risks">11. Risks and Technical Debts</a>
+<ul class="sectlevel2">
+<li><a href="#_technical_risks">11.1. Technical Risks</a></li>
+<li><a href="#_technical_debts">11.2. Technical Debts</a></li>
+</ul>
+</li>
 <li><a href="#section-glossary">12. Glossary</a></li>
 </ul>
 </div>
@@ -593,14 +604,17 @@ These include</p>
 <div class="sect2">
 <h3 id="_requirements_overview">1.1. Requirements Overview</h3>
 <div class="paragraph">
-<p>The <strong>YOVI_EN1B</strong> project represents an evolving multi service platform developed for the Software Architecture course at the University of Oviedo. It serves as a fundamental benchmark for the construction of scalable, maintainable, and observable distributed systems, with a specific focus on turn based game logic.</p>
+<p>The <strong>YOVI_EN1B</strong> project is a multi-service platform for playing the abstract board game <strong>Game Y</strong> (also known as the Y connection game), developed as part of the Software Architecture course at the University of Oviedo. It serves as a practical benchmark for the construction of scalable, maintainable, and well-tested distributed systems, with a specific focus on turn-based game logic and polyglot service integration.</p>
+</div>
+<div class="paragraph">
+<p>Game Y is played on a triangular board composed of hexagonal cells. Each cell is uniquely identified by <strong>barycentric coordinates</strong> (x, y, z) where x + y + z = board_size − 1. Two players — Blue (B) and Red &#174; — take turns claiming cells. A player wins when their occupied cells form a single connected chain that touches all three sides of the triangle simultaneously. The board size is configurable (e.g. 5×5, 7×7, 11×11), and optional game variants such as <strong>Explosions</strong> (bomb cells) and <strong>Double Turn</strong> (two moves per turn) are available for boards of size 7 and above.</p>
 </div>
 <div class="paragraph">
 <p>The following context diagram illustrates the primary boundaries of the system and its interactions with external actors and infrastructure:</p>
 </div>
 <div class="imageblock">
 <div class="content">
-<img src="./images/context_diagram.png" alt="context diagram" width="736" height="352">
+<img src="./images/context_diagram.png" alt="context diagram" width="775" height="506">
 </div>
 </div>
 <div class="paragraph">
@@ -609,16 +623,22 @@ These include</p>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>User Identity Management</strong>: A centralized system for registration and authentication, providing secure access to the platform ecosystem. This component ensures the integrity of user credentials and session management.</p>
+<p><strong>User Identity Management</strong>: A centralized service built with Node.js and Express, responsible for registration, authentication (JWT + bcrypt), session management, and persistent user statistics. It is the single gateway to MongoDB and owns all persistence concerns.</p>
 </li>
 <li>
-<p><strong>Hexagonal Game Logic Engine</strong>: A high performance application core, implemented in Rust, that governs spatial operations on a triangular board consisting of hexagonal cells. This includes move validation based on spatial adjacency, distributed state synchronization, and win condition detection via specialized graph traversal algorithms such as Depth First Search.</p>
+<p><strong>Hexagonal Game Logic Engine</strong>: A high-performance application core implemented in Rust, governing spatial operations on a triangular board of hexagonal cells. This includes move validation, win condition detection via a Union-Find algorithm over barycentric coordinates, bot AI strategy dispatch, and YEN (Y Exchange Notation) game state serialization.</p>
 </li>
 <li>
-<p><strong>State Persistence and Resilience</strong>: Integration with MongoDB to ensure that all game sessions are preserved. This mechanism enables the system to survive service interruptions and allows participants to resume active sessions without loss of progress. It is a critical component for maintaining system availability and reliability.</p>
+<p><strong>AI Opponent System</strong>: A pluggable bot registry offering multiple difficulty levels: a Random bot for basic play, a Defensive bot that mirrors opponent threats, a Hard bot powered by Monte Carlo Tree Search (MCTS), and an optional GenerativeAI bot driven by the Google Gemini API. All bots implement a common <code>YBot</code> trait, making them interchangeable at runtime.</p>
 </li>
 <li>
-<p><strong>Operational Intelligence</strong>: A comprehensive monitoring infrastructure using Prometheus and Grafana to provide real time visibility into system health and performance metrics. This allows for automated alerting and detailed analysis of system behavior under load.</p>
+<p><strong>Game Variants</strong>: Optional rule modifiers that extend standard gameplay. The <strong>Explosions</strong> variant places a hidden bomb cell on the board; landing on it clears all neighbouring pieces via chain-detonation. The <strong>Double Turn</strong> variant lets each player place two pieces per round. Both require a minimum board size of 7.</p>
+</li>
+<li>
+<p><strong>State Persistence and Resilience</strong>: Integration with MongoDB to record all game sessions, move histories, and player statistics. The persistence model ensures that completed games can be replayed move-by-move and that user records survive service restarts.</p>
+</li>
+<li>
+<p><strong>Third-party Bot API</strong>: The Gamey engine exposes a documented public HTTP API (<code>POST /compute</code>, <code>POST /play</code>) that allows external automated agents to participate in the game, fulfilling the course constraint for open extensibility.</p>
 </li>
 </ul>
 </div>
@@ -626,7 +646,15 @@ These include</p>
 <div class="sect2">
 <h3 id="_quality_goals">1.2. Quality Goals</h3>
 <div class="paragraph">
-<p>The architecture of YOVI_EN1B is governed by a technical quality tree rooted in the ISO 25010 standard. These high priority requirements ensure the technical integrity and operational success of the platform:</p>
+<p>The architecture of YOVI_EN1B is governed by a technical quality tree rooted in the ISO 25010 standard. The following image shows the ISO 25010 quality model used as a reference:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/01_2_iso-25010-topics-EN.drawio.png" alt="ISO 25010 quality model">
+</div>
+</div>
+<div class="paragraph">
+<p>These high-priority requirements ensure the technical integrity and operational success of the platform:</p>
 </div>
 <table class="tableblock frame-all grid-all stretch">
 <colgroup>
@@ -648,31 +676,31 @@ These include</p>
 <td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Modularity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The system architecture facilitates the replacement of individual components, such as the user service, without necessitating modifications to the web application or the game engine core. This decoupling ensures long term project sustainability.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system is decomposed into three independent services (webapp, users, gamey) communicating only via HTTP/JSON. Replacing or upgrading one service — for example, swapping the Rust engine for a new version — requires no changes to the other services, ensuring long-term project sustainability.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Fault Tolerance</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The persistence layer ensures that in the event of a service restart, the complete game state is recovered from the database within two seconds, ensuring zero data loss for active sessions.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All game sessions, moves, and user statistics are persisted in MongoDB by the users service. In the event of a service restart, the full game history is recoverable from the database; active sessions are not lost.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Efficiency</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The core game logic executes spatial analysis and win condition detection in under two milliseconds. This performance target must be maintained even as the triangular grid size increases, ensuring immediate system response times.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The Gamey Rust engine executes move validation and win detection in under two milliseconds, even on large boards. The Union-Find algorithm with path compression guarantees near-constant-time connectivity checks regardless of board size.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Data Integrity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The platform enforces strict validation of all incoming requests to prevent unauthorized actions. Every transaction is recorded to maintain a full audit trail for accountability and evaluation purposes.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All protected API endpoints require a valid JWT Bearer token issued at login (24-hour expiry). Passwords are never stored in plain text — they are hashed with bcrypt (salt rounds 10). All incoming request parameters are validated before processing.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Usability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Accessibility</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The user interface provides immediate clarity regarding system state and gameplay progression. It adheres to modern standards to ensure that the complex hexagonal grid remains intuitive for all users.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The React frontend renders the triangular hexagonal board with clear visual feedback of the current game state. The interface communicates move outcomes and win conditions immediately, and a replay feature lets players review past games move by move.</p></td>
 </tr>
 </tbody>
 </table>
@@ -692,49 +720,49 @@ These include</p>
 <tr>
 <th class="tableblock halign-left valign-top">Role or Name</th>
 <th class="tableblock halign-left valign-top">Contact</th>
-<th class="tableblock halign-left valign-top">Job Definition</th>
+<th class="tableblock halign-left valign-top">Expectations</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Jose Emilio Labra Gayo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Course Professor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Evaluates architectural decisions, documentation quality, and adherence to arc42 and ADR standards.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Pablo Gonzalez</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Course Instructor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reviews technical implementation, testing coverage, and CI/CD pipeline.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Diego Martín Fernández</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Course Instructor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Assesses system deployment, scalability decisions, and Docker containerization.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Celia Melendi Lavandera</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Investor 4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Course Instructor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reviews quality requirements, observability, and monitoring implementation.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">bilalyazicioglu</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">GameY(Rust) Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements and maintains the Gamey Rust engine: game logic, bot AI, YEN notation, and the public bot API.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">UO300896</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Database Engineer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Designs and maintains the MongoDB schema, data persistence strategy, and database initialization.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Th0be</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Builds and maintains the React/TypeScript frontend: UI components, board rendering, and end-to-end user flows.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">nacho50900</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Backend Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">University of Oviedo, Developer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Develops and maintains the Node.js/Express users service: authentication, game orchestration, and REST API.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1729,97 +1757,339 @@ They can include many different topics, such as</p>
 </li>
 </ul>
 </div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Concepts form the basis for <em>conceptual integrity</em> (consistency, homogeneity) of the architecture.
-Thus, they are an important contribution to achieve inner qualities of your system.</p>
-</div>
-<div class="paragraph">
-<p>Some of these concepts cannot be assigned to individual building blocks, e.g. security or safety.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>The form can be varied:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>concept papers with any kind of structure</p>
-</li>
-<li>
-<p>cross-cutting model excerpts or scenarios using notations of the architecture views</p>
-</li>
-<li>
-<p>sample implementations, especially for technical concepts</p>
-</li>
-<li>
-<p>reference to typical usage of standard frameworks (e.g. using Hibernate for object/relational mapping)</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Structure</div>
-<p>A potential (but not mandatory) structure for this section could be:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Domain concepts</p>
-</li>
-<li>
-<p>User Experience concepts (UX)</p>
-</li>
-<li>
-<p>Safety and security concepts</p>
-</li>
-<li>
-<p>Architecture and design patterns</p>
-</li>
-<li>
-<p>"Under-the-hood"</p>
-</li>
-<li>
-<p>development concepts</p>
-</li>
-<li>
-<p>operational concepts</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p>Note: it might be difficult to assign individual concepts to one specific topic
-on this list.</p>
-</div>
 <div class="imageblock">
 <div class="content">
 <img src="./images/08-concepts-EN.drawio.png" alt="Possible topics for crosscutting concepts">
 </div>
 </div>
 <div class="paragraph">
-<div class="title">Further Information</div>
 <p>See <a href="https://docs.arc42.org/section-8/">Concepts</a> in the arc42 documentation.</p>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_concept_1">8.1. <em>&lt;Concept 1&gt;</em></h3>
+<h3 id="_domain_model_barycentric_coordinate_system">8.1. Domain Model: Barycentric Coordinate System</h3>
 <div class="paragraph">
-<p><em>&lt;explanation&gt;</em></p>
+<p>The Game Y board is a <strong>triangle</strong> subdivided into hexagonal cells. Every cell is uniquely addressed by a triple of non-negative integers <strong>(x, y, z)</strong> — barycentric coordinates — that satisfy the invariant:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>x + y + z = board_size − 1</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Each coordinate component encodes the cell&#8217;s distance from one of the three sides of the triangle:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>x = 0</strong> → cell touches side <strong>A</strong> (bottom edge)</p>
+</li>
+<li>
+<p><strong>y = 0</strong> → cell touches side <strong>B</strong> (left edge)</p>
+</li>
+<li>
+<p><strong>z = 0</strong> → cell touches side <strong>C</strong> (right edge)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Corner cells touch exactly two sides (e.g. <code>(0, 0, n)</code> touches both A and B); interior cells touch none. A board of size <em>N</em> contains exactly <em>N(N+1)/2</em> cells in total.</p>
+</div>
+<div class="paragraph">
+<p>Adjacency is defined as any coordinate reachable by incrementing one component by 1 and decrementing another by 1, keeping the sum constant. Interior cells have six neighbours; edge cells have four; corner cells have two. This model is implemented in <code>gamey/src/core/coord.rs</code> and is the authoritative coordinate representation used throughout the entire system.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/domain-model.png" alt="domain model" width="352" height="753">
+</div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_concept_2">8.2. <em>&lt;Concept 2&gt;</em></h3>
+<h3 id="_game_state_serialization_yen_y_exchange_notation">8.2. Game State Serialization: YEN (Y Exchange Notation)</h3>
 <div class="paragraph">
-<p><em>&lt;explanation&gt;</em></p>
+<p>All game states exchanged between the Users Service and the Gamey engine are encoded as <strong>YEN (Y Exchange Notation)</strong> — a compact, JSON-serializable format inspired by FEN (Forsyth-Edwards Notation) used in chess. YEN is the single wire format for game state across the entire system (constraint TC-03).</p>
 </div>
 <div class="paragraph">
-<p>&#8230;&#8203;</p>
+<p>A YEN document contains four mandatory fields and two optional ones:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 33.3333%;">
+<col style="width: 50.0001%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Field</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Side length of the triangular board (e.g. 5 for a 5×5 board with 15 cells).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>turn</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (0 or 1)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Index of the player whose turn it is next.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>players</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">array of chars</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Symbol for each player, e.g. <code>["B", "R"]</code> for Blue and Red.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>layout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Compact board encoding: rows separated by <code>/</code>, each cell represented by its player symbol or <code>.</code> for an empty cell. Rows are ordered from the top vertex downward.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>variants</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">array of strings <em>(optional)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Active game variant names, e.g. <code>["Explosions"]</code>.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>e</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string <em>(optional)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Comma-separated flat cell indices of bomb positions, e.g. <code>"3,14"</code>.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Example YEN for a board of size 3 where Blue has claimed the top vertex:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-json" data-lang="json">{
+  "size": 3,
+  "turn": 1,
+  "players": ["B", "R"],
+  "layout": "B/../.."
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>layout</code> string encodes rows from top to bottom: row 0 has 1 cell, row 1 has 2, row <em>r</em> has <em>r+1</em>. An empty board of size 3 is <code>"./../.."</code> (or equivalently <code>"&#8230;&#8203;"`with the `/</code> separators omitted for a flat representation; the Gamey parser handles both). YEN is generated and consumed exclusively by <code>gamey/src/notation/yen.rs</code>.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_concept_n">8.3. <em>&lt;Concept n&gt;</em></h3>
+<h3 id="_win_detection_union_find_with_side_touching_flags">8.3. Win Detection: Union-Find with Side-Touching Flags</h3>
 <div class="paragraph">
-<p><em>&lt;explanation&gt;</em></p>
+<p>Win detection is a cross-cutting concern executed by the Gamey engine after every move and returned to the Users Service as a <code>winner</code> field. A player wins when their occupied cells form a single connected component that <strong>simultaneously touches all three sides</strong> of the triangular board.</p>
+</div>
+<div class="paragraph">
+<p>The Gamey engine implements this with an <strong>incremental Union-Find (Disjoint Set Union)</strong> data structure augmented with three boolean flags per set root: <code>touches_side_a</code>, <code>touches_side_b</code>, and <code>touches_side_c</code>.</p>
+</div>
+<div class="paragraph">
+<p>The algorithm works as follows:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>When a cell is placed, a new singleton set is created for it with the side-touching flags derived from its coordinates.</p>
+</li>
+<li>
+<p>The cell&#8217;s neighbors already owned by the same player are merged into the new set using <code>union()</code> with path compression.</p>
+</li>
+<li>
+<p>During <code>union()</code>, the merged root inherits the bitwise OR of both roots' side-touching flags.</p>
+</li>
+<li>
+<p>If the merged root has all three flags set (<code>touches_side_a ∧ touches_side_b ∧ touches_side_c</code>), <code>place_piece()</code> returns <code>true</code> — the placing player wins immediately.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>This approach runs in near-constant time per move (amortized O(α(n)) with path compression), replacing the need for a full DFS/BFS traversal after each move. The implementation lives in <code>gamey/src/core/board.rs</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>Win condition check per move:
+  1. create set S for new cell C with flags {a=touches_A?, b=touches_B?, c=touches_C?}
+  2. for each neighbor N of C owned by same player:
+       root_S ← find(S),  root_N ← find(N)
+       merge(root_S, root_N): root.flags |= merged.flags
+  3. if root.touches_a AND root.touches_b AND root.touches_c → winner!</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After a bomb detonation (Explosions variant), the union-find structure is fully rebuilt from the surviving pieces to prevent stale side-touching flags from leaked orphaned sets causing phantom wins.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_security_concepts">8.4. Security Concepts</h3>
+<div class="paragraph">
+<p>Security concerns are handled uniformly across all endpoints that require an authenticated user. The following mechanisms are in place:</p>
+</div>
+<div class="paragraph">
+<p><strong>Password Storage</strong>: Passwords are never stored in plain text. When a user registers, the password is hashed using <strong>bcrypt</strong> with 10 salt rounds before it is written to MongoDB. On login, <code>bcrypt.compare()</code> is used to verify the supplied password against the stored hash. The plain-text password is never logged or retained.</p>
+</div>
+<div class="paragraph">
+<p><strong>Session Authentication (JWT)</strong>: Upon successful login, the Users Service signs a <strong>JSON Web Token (JWT)</strong> with a 24-hour expiry. The token is returned to the client and must be included as a <code>Authorization: Bearer &lt;token&gt;</code> header on all protected API calls. The server validates the signature and expiry on every request before processing it.</p>
+</div>
+<div class="paragraph">
+<p><strong>Username Uniqueness</strong>: A unique index on the <code>username</code> field in MongoDB enforces that no two accounts can share the same username, even under concurrent registration requests.</p>
+</div>
+<div class="paragraph">
+<p><strong>Input Validation</strong>: All incoming JSON payloads are validated for required fields and correct types before any business logic is executed. Invalid requests are rejected with a 400 response before they reach the database or the game engine.</p>
+</div>
+<div class="paragraph">
+<p>The Gamey engine itself does not perform authentication — it is an internal service reachable only within the Docker Compose network, not directly exposed to the public internet.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_inter_service_communication">8.5. Inter-service Communication</h3>
+<div class="paragraph">
+<p>All three services communicate exclusively via <strong>synchronous HTTP REST</strong> with <strong>JSON payloads</strong> (constraint TC-02). No message broker, shared memory, or direct database access across services is used.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 33.3333%;">
+<col style="width: 50.0001%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Direction</th>
+<th class="tableblock halign-left valign-top">Protocol</th>
+<th class="tableblock halign-left valign-top">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Browser → webapp</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTPS/HTTP (port 80)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Serves the React SPA to the client.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">webapp → users</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP REST (port 3000)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">User registration, login, game creation, move submission, history retrieval.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">webapp → gamey</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP REST (port 4000)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Not used directly by the frontend in production.</em> Gamey is called internally by the users service.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">users → gamey</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP REST (port 4000)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>POST /compute</code> to validate a move and get the new YEN state; <code>POST /play</code> to get a bot move.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">External bots → gamey</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HTTP REST (port 4000)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Third-party automated agents may call <code>/compute</code> and <code>/play</code> directly (constraint TC-05).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">users → MongoDB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB Wire Protocol (port 27017)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All persistence operations — user accounts, game records, move histories.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The users service acts as an <strong>orchestrator</strong>: it receives a player move from the frontend, delegates the state computation to Gamey, persists the result in MongoDB, and returns the updated game to the frontend. The frontend never calls Gamey directly during a live game session.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_persistence_model">8.6. Persistence Model</h3>
+<div class="paragraph">
+<p>Persistent state is owned exclusively by the Users Service and stored in MongoDB. MongoDB&#8217;s document model was chosen because game states and move histories have a variable, nested structure that maps naturally to JSON documents (see deployment decision in Section 4).</p>
+</div>
+<div class="paragraph">
+<p>The database contains two collections:</p>
+</div>
+<div class="paragraph">
+<p><strong><code>players</code> collection</strong>: Each document represents a registered user and stores the username, the bcrypt-hashed password, and aggregated statistics (wins, losses, games played). A unique index on <code>username</code> ensures account integrity.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>games</code> collection</strong>: Each document represents a single game session. It stores the participants, the board size, the game type (PLAYER or BOT), the current status (IN_PROGRESS or FINISHED), the final result (WIN, LOSS, or DRAW), and an embedded array of <strong>moves</strong>. Each move document records the player who moved, the coordinates chosen, the resulting YEN state, and a sequential move number. This embedded design allows the full game to be retrieved and replayed in a single query.</p>
+</div>
+<div class="paragraph">
+<p>The <code>gamey</code> engine intentionally has no database connection. Active game state lives in the Rust process memory for the duration of a match. When a game concludes, the result is propagated back through the users service, which writes it to MongoDB. This clear ownership boundary avoids write conflicts and keeps the data model simple.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bot_ai_strategy_pattern">8.7. Bot AI Strategy Pattern</h3>
+<div class="paragraph">
+<p>The bot AI system in Gamey is structured around the <strong>Strategy pattern</strong>. All bots implement the <code>YBot</code> trait, which exposes a single method: given a board state (as a YEN document), return the chosen coordinates. This interface decouples the bot selection logic from the game engine core and makes it trivial to add new strategies without modifying existing code.</p>
+</div>
+<div class="paragraph">
+<p>The following bot strategies are registered in the <code>YBotRegistry</code> at startup:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Strategy</th>
+<th class="tableblock halign-left valign-top">Difficulty</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>RandomBot</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Easy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a uniformly random empty cell. Used as a baseline and for testing.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>DefensiveBot</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Identifies and blocks the cell adjacent to the opponent&#8217;s most recent move, prioritising defence over offence.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>HardBot</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hard</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implements <strong>Monte Carlo Tree Search (MCTS)</strong> — simulates many random playouts from the current position to estimate the value of each candidate move and selects the highest-value option.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>GenerativeAIBot</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Variable</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Delegates move selection to the <strong>Google Gemini API</strong> via <code>GEMINI_API_KEY</code>. The model receives the current YEN state and responds with coordinates. Used for experimental AI integration.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The strategy and difficulty level are selected by the frontend when creating a bot game and passed to Gamey on each <code>POST /play</code> call. The registry looks up the matching <code>YBot</code> implementation and invokes it, returning the coordinates to the users service.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_game_variants">8.8. Game Variants</h3>
+<div class="paragraph">
+<p>Game variants are optional rule modifiers that extend the standard Y game. They are represented as an enum (<code>GameVariant</code>) in the Rust engine and encoded in the <code>variants</code> array of the YEN state. Both variants require a minimum board size of 7.</p>
+</div>
+<div class="paragraph">
+<p><strong>Explosions (Bomb Mode)</strong>: At game initialization, one or more bomb cells are randomly placed on the board. Their positions are encoded in the YEN <code>e</code> field as a comma-separated list of flat cell indices. A bomb cell looks empty to players — they can choose it as a move. When a player lands on a bomb cell: (1) the player&#8217;s piece is placed normally, (2) the bomb is consumed, and (3) all occupied neighbour cells are cleared back to empty via a BFS chain-detonation (adjacent bombs also detonate). After detonation, the union-find structure is fully rebuilt from surviving pieces to maintain win-detection integrity. Chain detonation means a cluster of adjacent bombs all explode together when the first one is triggered.</p>
+</div>
+<div class="paragraph">
+<p><strong>Double Turn</strong>: Each player places <strong>two pieces per turn</strong> instead of one. The <code>turn</code> field in YEN advances only after both moves of a turn are submitted. This variant changes the pace of the game significantly — players can build connected chains faster, requiring the opponent to respond more aggressively.</p>
+</div>
+<div class="paragraph">
+<p>Both variants can be active simultaneously, creating a "CHAOS" mode that combines the explosive board and the accelerated turn structure.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_error_handling">8.9. Error Handling</h3>
+<div class="paragraph">
+<p>Error handling follows a <strong>centralized, typed model</strong> in the Rust engine and a <strong>consistent HTTP status code</strong> convention in the Node.js service.</p>
+</div>
+<div class="paragraph">
+<p>In Gamey, all possible failure modes are expressed as variants of a single <code>GamyError</code> enum (defined in <code>gamey/src/gamey_error.rs</code>). This enum is used throughout the engine and the HTTP handlers, and maps to appropriate HTTP status codes (e.g. 400 for invalid moves, 404 for unknown games, 500 for internal failures). This avoids stringly-typed errors and ensures all error paths are handled exhaustively.</p>
+</div>
+<div class="paragraph">
+<p>In the Users Service, errors are caught at the controller layer and returned as JSON responses with a standard shape: <code>{ "error": "&lt;message&gt;" }</code>. HTTP status codes follow REST conventions: 201 for resource creation, 200 for retrieval, 400 for validation failures, 401 for authentication errors, 404 for not-found resources, and 500 for unexpected failures.</p>
+</div>
+<div class="paragraph">
+<p>The frontend displays error messages returned from the API directly to the user where relevant (e.g. "Username already taken" during registration, "Invalid move" during gameplay).</p>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
@@ -1868,7 +2138,10 @@ Refer to section 4, where you already captured the most important decisions of y
 <div class="paragraph">
 <div class="title">Further Information</div>
 <p>See <a href="https://docs.arc42.org/section-9/">Architecture Decisions</a> in the arc42 documentation.
-There you will find links and examples about ADR.</p>
+There you will find links and examples about ADR.
+All project-specific architecture decisions are collected in one place.
+You can find them all in the wiki here: <a href="https://github.com/Arquisoft/yovi_en1b/wiki/Architectural-decisions">Architectural decisions</a>.
+This page is the central reference for decisions made in the project.</p>
 </div>
 </div>
 </div>
@@ -1878,100 +2151,88 @@ There you will find links and examples about ADR.</p>
 <div class="sect1">
 <h2 id="section-quality-scenarios">10. Quality Requirements</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<div class="title">Content</div>
-<p>This section contains all quality requirements as quality tree with scenarios. The most important ones have already been described in section 1.2. (quality goals)</p>
-</div>
-<div class="paragraph">
-<p>Here you can also capture quality requirements with lesser priority,
-which will not create high risks when they are not fully achieved.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Since quality requirements will have a lot of influence on architectural
-decisions you should know for every stakeholder what is really important to them,
-concrete and measurable.</p>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-10/">Quality Requirements</a> in the arc42 documentation.</p>
-</div>
-</div>
-</div>
 <div class="sect2">
 <h3 id="_quality_tree">10.1. Quality Tree</h3>
-<div class="sidebarblock arc42help">
+<div class="paragraph">
+<p>The following mind map illustrates the primary quality goals for YOVI, breaking them down into concrete quality scenarios (S1 to S8) strictly based on the system&#8217;s actual architecture and testing capabilities.</p>
+</div>
+<div class="imageblock">
 <div class="content">
-<div class="paragraph">
-<div class="title">Content</div>
-<p>The quality tree (as defined in ATAM – Architecture Tradeoff Analysis Method) with quality/evaluation scenarios as leafs.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>The tree structure with priorities provides an overview for a sometimes large number of quality requirements.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>The quality tree is a high-level overview of the quality goals and requirements:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>tree-like refinement of the term "quality". Use "quality" or "usefulness" as a root</p>
-</li>
-<li>
-<p>a mind map with quality categories as main branches</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<p>In any case the tree should include links to the scenarios of the following section.</p>
-</div>
+<img src="./images/quality_tree.png" alt="quality tree" width="538" height="580">
 </div>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_quality_scenarios">10.2. Quality Scenarios</h3>
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Concretization of (sometimes vague or implicit) quality requirements using (quality) scenarios.</p>
+<p>The table below describes the specific scenarios derived from the quality tree, providing concrete and measurable situations to evaluate the architecture based on the defined goals and the actual test suites present in the repository.</p>
 </div>
-<div class="paragraph">
-<p>These scenarios describe what should happen when a stimulus arrives at the system.</p>
-</div>
-<div class="paragraph">
-<p>For architects, two kinds of scenarios are important:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>Usage scenarios (also called application scenarios or use case scenarios) describe the system’s runtime reaction to a certain stimulus. This also includes scenarios that describe the system’s efficiency or performance. Example: The system reacts to a user’s request within one second.</p>
-</li>
-<li>
-<p>Change scenarios describe a modification of the system or of its immediate environment. Example: Additional functionality is implemented or requirements for a quality attribute change.</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Scenarios make quality requirements concrete and allow to
-more easily measure or decide whether they are fulfilled.</p>
-</div>
-<div class="paragraph">
-<p>Especially when you want to assess your architecture using methods like
-ATAM you need to describe your quality goals (from section 1.2)
-more precisely down to a level of scenarios that can be discussed and evaluated.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Tabular or free form text.</p>
-</div>
-</div>
-</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 55.5555%;">
+<col style="width: 11.1112%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Ref</th>
+<th class="tableblock halign-left valign-top">Quality Attribute</th>
+<th class="tableblock halign-left valign-top">Scenario Description</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maintainability (Modularity)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Updating the Rust engine or Node API can be done independently without affecting the WebApp, as long as the REST HTTP/JSON contracts remain unchanged.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Reliability (Fault Tolerance)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If the Users service restarts unexpectedly, active players can resume their games seamlessly since all moves and states are immediately persisted to MongoDB.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance (Efficiency)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The Gamey engine computes move validation and win conditions using Union-Find in under 2ms per request, ensuring rapid turn-based responses.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S4</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Performance (Scalability)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">During automated load testing (e.g., using Artillery), the system is capable of sustaining peak loads of up to 15 concurrent complete user lifecycles per second without dropping requests.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S5</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security (Data Integrity)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unauthenticated requests to modify game state are blocked (401 Unauthorized), and database dumps cannot reveal passwords because they are salted and hashed via bcrypt (10 rounds).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Usability (Accessibility)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Players are provided with immediate visual feedback on invalid moves in the React interface, and can use the history replay feature to review past matches step-by-step.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S7</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Testability (E2E Automation)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Critical user journeys (register, login, play against bots) are continuously verified in the CI/CD pipeline using Playwright and Cucumber against a full containerized environment.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">S8</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Testability (State Isolation)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Automated test suites can clean up their own database footprint after execution using test-specific endpoints (like <code>DELETE /deleteuser</code>), ensuring tests are idempotent and repeatable.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">High</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -1987,14 +2248,14 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 </div>
 <div class="paragraph">
 <div class="title">Motivation</div>
-<p>“Risk management is project management for grown-ups” (Tim Lister, Atlantic Systems Guild.)</p>
+<p>"Risk management is project management for grown-ups" (Tim Lister, Atlantic Systems Guild.)</p>
 </div>
 <div class="paragraph">
 <p>This should be your motto for systematic detection and evaluation of risks and technical debts in the architecture, which will be needed by management stakeholders (e.g. project managers, product owners) as part of the overall risk analysis and measurement planning.</p>
 </div>
 <div class="paragraph">
 <div class="title">Form</div>
-<p>List of risks and/or technical debts, probably including suggested measures to minimize, mitigate or avoid risks or reduce technical debts.</p>
+<p>List of risks and/or technical debts, probably including suggested measures to minimize, mitigate or avoided risks or reduce technical debts.</p>
 </div>
 <div class="paragraph">
 <div class="title">Further Information</div>
@@ -2002,7 +2263,119 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_technical_risks">11.1. Technical Risks</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 14.2857%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5715%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Risk</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>1 — Critical</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Gamey service instability under load</strong>
+The Rust game engine has no persistent state and manages active game sessions in memory. Under concurrent load it has shown connection resets and crashes, requiring a full container restart to recover.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Total service unavailability for all active games. Users lose their current game session with no recovery path.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add a health-check endpoint to Gamey and configure Docker Compose <code>restart: always</code>. Implement a timeout (5 s) and circuit breaker in the Users service fetch calls to Gamey so that a crash returns a clean 503 rather than hanging.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — High</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Single point of failure: Users service and MongoDB on one VM</strong>
+The entire backend (Users service, MongoDB, Gamey) runs on a single Azure VM (IP 4.233.184.98). No redundancy or failover exists.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A VM outage, network issue, or resource exhaustion takes down the entire platform simultaneously.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Document the risk explicitly. For the scope of this course, accept it. For production, migrate to a managed service (e.g., MongoDB Atlas) and deploy behind a load balancer with at least two VM instances.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 — High</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>JWT secret not rotated; hardcoded fallback in code</strong>
+The JWT signing secret is loaded from an environment variable but falls back to a hardcoded default if unset. A leaked or default secret allows token forgery for any user.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Full authentication bypass — an attacker could forge tokens and impersonate any user including administrators.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Enforce the environment variable as mandatory (throw on startup if unset). Rotate the secret and redeploy. Store it in a secrets manager rather than a <code>.env</code> file committed to the repo.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>4 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No input sanitization on board coordinates</strong>
+The Users service forwards coordinates received from the frontend directly to Gamey without validating that they are integers within the valid triangular board range.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Malformed input could crash Gamey or cause undefined behaviour in the Rust engine, triggering a full service restart.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add a validation middleware in the Users service that rejects moves where <code>col &gt; row</code> or <code>row &gt;= board_size</code> before forwarding to Gamey.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>5 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Grafana excessive disk I/O degrading VM performance</strong>
+Grafana has been observed causing high disk I/O on the shared VM, slowing down all co-located services including the Users service and MongoDB.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Increased response latency across the entire platform, potential timeout cascades under normal load.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tune Grafana&#8217;s retention policy and reduce scrape frequency in Prometheus. Consider moving monitoring to a separate lightweight instance or disabling Grafana between demos.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>6 — Low</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>VITE_API_URL baked at build time</strong>
+The frontend URL for the Users service API is embedded at Docker image build time via a Vite build argument. Changing the VM IP or adding a domain requires a full image rebuild and redeploy.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Any infrastructure change (IP rotation, domain migration) breaks the frontend without a rebuild.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use a runtime configuration file (e.g., <code>/config.js</code> served by nginx) instead of a build-time variable, so the URL can be changed without rebuilding the image.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_technical_debts">11.2. Technical Debts</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Debt</th>
+<th class="tableblock halign-left valign-top">Remediation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>1 — High</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Legacy bot strategy keys in MongoDB</strong>
+Early versions of the application stored bot strategy results under the keys <code>easy</code>, <code>medium</code>, and <code>hard</code> in the <code>statistics.vs_bot</code> subdocument. Current code uses <code>random</code>, <code>defensive</code>, <code>ai</code>, and <code>mcts</code>. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Run the provided migration script (<code>migrate-vs-bot-keys.js</code>) on the production database, or wipe the database with <code>docker compose down -v</code> to start clean. Add a schema version field to user documents to detect and auto-migrate stale records on first access.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — High</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Section 8 (Cross-cutting Concepts) not documented</strong>
+The arc42 cross-cutting concepts section remains empty. Security strategy, error handling conventions, logging approach, and the JWT authentication flow are implemented but not documented.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Document at minimum: authentication/authorisation flow, error handling conventions (HTTP status codes used), CORS policy, and the monitoring stack (Prometheus + Grafana metrics exposed).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No rate limiting on public endpoints</strong>
+The public <code>GET /play</code> endpoint and the <code>POST /createuser</code> endpoint have no rate limiting. A single client can flood the service with requests, exhausting Gamey connections or enabling user enumeration.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Integrate <code>express-rate-limit</code> middleware on unauthenticated routes. Apply stricter limits to <code>/createuser</code> (e.g., 10 req/min per IP) and <code>/play</code> (e.g., 60 req/min per IP).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>4 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Game moves array not excluded from history endpoint</strong>
+<code>GET /games/:id</code> returns the full game document including the <code>moves</code> array, which can be very large for long games and is not needed for listing purposes.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Already partially addressed: <code>findGamesByPlayer</code> uses <code>.select('-moves')</code>. Verify all listing endpoints consistently exclude <code>moves</code> and only expose them via the dedicated <code>GET /games/:id/moves</code> endpoint.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>5 — Low</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>arc42 sections 9, 10, 11, 12 incomplete</strong>
+Architecture Decision Records (ADRs), quality scenarios, risks, and the glossary were not populated during early development sprints.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Complete sections 9 and 10 before the final course submission. Document at minimum: the decision to use Rust for the game engine, the MongoDB schema design choice, and the JWT authentication approach as ADRs.</p></td>
+</tr>
+</tbody>
+</table>
 <div style="page-break-after: always;"></div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -2057,12 +2430,168 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-1&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-1&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>ADR (Architecture Decision Record)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A short document that captures an important architectural decision, the context that motivated it, and its consequences. Used in this project to track key design choices such as the technology stack and communication protocols.</em></p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;Term-2&gt;</em></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><em>&lt;definition-2&gt;</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>arc42</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A template for documenting software and system architecture. Provides a standardised structure of 12 sections covering goals, constraints, building blocks, runtime behaviour, deployment, and quality requirements.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>ASW (Arquitectura del Software)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Software Architecture course at the Universidad de Oviedo in which this project (YOVI_EN1B) was developed.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Authorization Header</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>An HTTP request header used to transmit authentication credentials. In this system, it carries the JWT token in the format <code>Bearer &lt;token&gt;</code> and is required on all protected endpoints.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>bcrypt</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A password hashing algorithm used in the Users service to store user credentials securely. Passwords are never stored in plain text; bcrypt applies a salt and a configurable cost factor before storing the hash.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Bot</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>An automated player controlled by the Gamey engine. The system supports four bot strategies: <code>random</code> (Random — picks any valid cell), <code>defensive</code> (Defensive — path-aware strategy), <code>ai</code> (AI powered by Gemini), and <code>mcts</code> (Monte Carlo tree search). Exposed publicly via <code>GET /play</code>.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>bot_id</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The public-facing identifier for a bot strategy used in the external API (<code>GET /play</code>). Maps to internal Gamey strategy names: <code>random</code> → Random, <code>defensive</code> → Defensive, <code>ai</code> → AI (Gemini), <code>mcts</code> → Monte Carlo.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>CI/CD</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Continuous Integration / Continuous Deployment. Automated pipelines (GitHub Actions) that build, test, and deploy the application on every push to the repository.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>coordinates</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A pair <code>[row, col]</code> identifying a cell on the triangular Game Y board, where <code>row</code> ranges from <code>0</code> to <code>size-1</code> and <code>col</code> ranges from <code>0</code> to <code>row</code>. Returned by Gamey after every bot move.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>CORS (Cross-Origin Resource Sharing)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>An HTTP mechanism that controls which origins are permitted to call the Users service API from a browser. Configured in the Users service middleware to allow requests from the frontend origin.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>crypto.randomInt</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A Node.js built-in cryptographically secure random integer generator. Used in the Users service to assign the starting turn (B or R) at the beginning of each game.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>current_turn</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A field stored on each game document in MongoDB indicating whose turn it is (<code>"B"</code> or <code>"R"</code>). Updated by the Users service after every valid move; the frontend reads it to determine which player should act next.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>difficulty_level</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A label derived from the bot strategy that describes the challenge level presented to the player: <code>random</code> → Random, <code>defensive</code> → Defensive, <code>ai</code> → AI (Gemini), <code>mcts</code> → Monte Carlo.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Docker Compose</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A tool for defining and running multi-container Docker applications using a single <code>docker-compose.yml</code> configuration file. Used in this project to orchestrate the <code>webapp</code>, <code>users</code>, <code>gamey</code>, and <code>mongodb</code> containers.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>DFS (Depth-First Search)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A graph traversal algorithm used by the Gamey engine to detect win conditions. After each move it traverses the board from a player&#8217;s pieces to determine whether they form a connected chain touching all required edges of the triangular board.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Express</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A minimal Node.js web framework used to build the Users service REST API. Routes are organised into separate modules (authRoutes, userRoutes, gameRoutes, playRoute, leaderBoardRoute).</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Gamey</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The Rust-based game engine service running on port 4000. Responsible for all game logic: move computation, win detection, bot strategy execution, and YEN state management. Has no database connection; all state is in memory during a match.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>game_type</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A field on the game document indicating whether the game is played against another human (<code>"PLAYER"</code>) or against a bot (<code>"BOT"</code>). Determines which branch of <code>updateStats</code> is executed when the game finishes.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>GitHub Actions</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The CI/CD platform used to automate testing and deployment of the YOVI_EN1B project on every push to the repository.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Grafana</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A monitoring and visualisation tool connected to Prometheus. Used to display real-time dashboards of system health and performance metrics for the YOVI platform.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>JWT (JSON Web Token)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A compact, self-contained token used for authentication. Issued by the Users service on login and sent by the client as a Bearer token on all protected requests. Contains the user ID and expires after 24 hours.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>leaderboard</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A ranked list of players by performance. The Users service exposes <code>GET /leaderboard</code> returning an <code>overall</code> ranking by total wins and three <code>vs_bots</code> rankings (one per bot strategy).</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>lean()</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A Mongoose method that returns plain JavaScript objects (POJOs) instead of full Mongoose documents. Used in <code>getLeaderboard</code> for performance; requires optional chaining (<code>?.</code>) because subdocuments may be absent on older records.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>MongoDB</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A document-oriented NoSQL database used for persistent storage of user accounts, authentication credentials, statistics, and game history. Accessed exclusively by the Users service via Mongoose.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Mongoose</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>An ODM (Object Document Mapper) library for MongoDB and Node.js. Provides schema definitions, validation, and query helpers used throughout the Users service.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>mongo-data</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The named Docker volume that persists MongoDB data across container restarts. Removed with <code>docker compose down -v</code>.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>move</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A single action taken by a player during a game, identified by coordinates <code>[row, col]</code> on the triangular board. Stored in the <code>moves</code> array of the game document along with the resulting <code>yen_state</code>.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>nock</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A Node.js HTTP interception library used in tests to mock outgoing HTTP calls from the Users service to Gamey, without requiring a real Gamey instance to be running.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Prometheus</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A time-series monitoring system that scrapes metrics from the Users service. Works alongside Grafana to provide operational visibility into request rates, error rates, and response times.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>repository pattern</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>An architectural pattern used in the Users service to abstract database access. <code>MongoUserRepository</code> implements <code>UserRepository</code>, making it easy to swap the storage backend (e.g., for testing with an in-memory store).</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>result</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The outcome of a finished game from the perspective of the human player: <code>"WIN"</code>, <code>"LOSS"</code>, or <code>"SURRENDER"</code>. <code>SURRENDER</code> (user surrendered) does not update statistics.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>SonarCloud</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A static analysis service used to enforce code quality standards on the repository. Acts as a quality gate requiring ≥80% coverage on new code and zero critical issues before merging.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>SPA (Single Page Application)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A web application architecture where the browser loads a single HTML page and dynamically updates content via JavaScript. The YOVI frontend is a React SPA built with Vite and TypeScript, served on port 80.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>strategy</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The internal Gamey identifier for a bot algorithm. Valid values are <code>random</code> (Random), <code>defensive</code> (Defensive), <code>ai</code> (AI powered by Gemini), and <code>mcts</code> (Monte Carlo). Stored on the game document and used as the key in <code>statistics.vs_bot</code>.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>triangular board</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The Game Y playing surface. For board size <code>n</code>, it contains <code>n*(n+1)/2</code> cells arranged in rows of increasing length (row <code>r</code> has <code>r+1</code> cells). Encoded in YEN layout notation using <code>/</code> as row separators.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>Users service</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The Node.js/Express backend service running on port 3000. Responsible for user registration, authentication, game management, statistics tracking, leaderboard, and the public bot API (<code>GET /play</code>).</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>VM (Virtual Machine)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The Azure cloud virtual machine (IP <code>4.233.184.98</code>) hosting all Docker containers for the YOVI platform in production.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>winner</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A field returned by Gamey&#8217;s <code>/compute</code> and <code>/play</code> endpoints after every move. Contains <code>"B"</code>, <code>"R"</code>, or <code>null</code>. When non-null, the Users service automatically finishes the game and updates statistics.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>yen_state</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The serialized board state in YEN (Yovi Extended Notation) format. Stored with each move and passed between the frontend, Users service, and Gamey to reconstruct the board at any point in time.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>YEN (Yovi Extended Notation)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>The notation format used to encode Game Y board states. A layout string where rows are separated by <code>/</code>, each row has <code>r+1</code> characters (<code>.</code> for empty, <code>B</code> or <code>R</code> for pieces), and the full position is represented as a JSON object with <code>size</code>, <code>turn</code>, <code>players</code>, and <code>layout</code> fields.</em></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>YGN (Yovi Game Notation)</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><em>A notation format supported by Gamey for encoding full move sequences, enabling game export and replay functionality.</em></p></td>
 </tr>
 </tbody>
 </table>
@@ -2072,7 +2601,7 @@ more precisely down to a level of scenarios that can be discussed and evaluated.
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-04-12 22:22:26 +0200
+Last updated 2026-03-16 10:40:01 +0100
 </div>
 </div>
 </body>
