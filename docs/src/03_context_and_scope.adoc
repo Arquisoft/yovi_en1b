@@ -28,8 +28,8 @@ user --> system : Registers in the system, interacts with the game
 | Communication Partner | Inputs (to the System) | Outputs (from the System)
 
 | *User / Player*
-| Username for registration (RegisterForm), game actions.
-| Welcome messages, UI rendering.
+| Registration credentials, login credentials, game moves, game configuration (board size, strategy).
+| Board rendering, game state updates, move results, statistics, match history, leaderboard.
 |===
 
 
@@ -62,6 +62,6 @@ webapp --> gamey : HTTP (Port 4000)
 | Communication Partner | I/O | Channel / Protocol
 
 | *User (Client Device)*
-| UI interactions, form submissions (e.g., sending username).
-| *HTTP* for fetching the SPA from the webapp service (Port 80). Once loaded, the browser communicates via *HTTP POST* with the users service API (/createuser on Port 3000) and the gamey engine (Port 4000).
+| UI interactions, form submissions, game moves, board configuration.
+| *HTTP* for fetching the SPA from the webapp service (Port 80). Once loaded, the browser communicates via *HTTP REST* with the users service API (Port 3000) for all operations — authentication, game management, statistics, and history. The users service internally delegates game logic to the gamey engine (Port 4000); the frontend does not call gamey directly.
 |===

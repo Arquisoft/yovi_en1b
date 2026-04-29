@@ -74,15 +74,15 @@ The frontend URL for the Users service API is embedded at Docker image build tim
 |===
 |Priority |Debt |Remediation
 
-|*1 — High*
-|*Legacy bot strategy keys in MongoDB*
-Early versions of the application stored bot strategy results under the keys `easy`, `medium`, and `hard` in the `statistics.vs_bot` subdocument. Current code uses `random`, `defensive`, `ai`, and `mcts`. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).
-|Run the provided migration script (`migrate-vs-bot-keys.js`) on the production database, or wipe the database with `docker compose down -v` to start clean. Add a schema version field to user documents to detect and auto-migrate stale records on first access.
+|*1 — Resolved*
+|*Legacy bot strategy keys in MongoDB* (Fixed)
+Early versions stored bot results under `easy`, `medium`, `hard` in `statistics.vs_bot`. Current code uses `random`, `defensive`, `ai`, and `mcts`. The schema migration has been applied and the database is now consistent.
+|Resolved. The migration script was run and the production database was wiped and restarted with `docker compose down -v`. No further action required.
 
-|*2 — High*
-|*Section 8 (Cross-cutting Concepts) not documented*
-The arc42 cross-cutting concepts section remains empty. Security strategy, error handling conventions, logging approach, and the JWT authentication flow are implemented but not documented.
-|Document at minimum: authentication/authorisation flow, error handling conventions (HTTP status codes used), CORS policy, and the monitoring stack (Prometheus + Grafana metrics exposed).
+|*2 — Resolved*
+|*Section 8 (Cross-cutting Concepts) not documented* (Fixed)
+The arc42 cross-cutting concepts section is now fully documented, covering the domain model, YEN notation, win detection algorithm, security concepts, inter-service communication, persistence model, bot AI strategy pattern, game variants, and error handling.
+|Resolved.
 
 |*3 — Medium*
 |*No rate limiting on public endpoints*
@@ -94,8 +94,8 @@ The public `GET /play` endpoint and the `POST /createuser` endpoint have no rate
 `GET /games/:id` returns the full game document including the `moves` array, which can be very large for long games and is not needed for listing purposes.
 |Already partially addressed: `findGamesByPlayer` uses `.select('-moves')`. Verify all listing endpoints consistently exclude `moves` and only expose them via the dedicated `GET /games/:id/moves` endpoint.
 
-|*5 — Low*
-|*arc42 sections 9, 10, 11, 12 incomplete*
-Architecture Decision Records (ADRs), quality scenarios, risks, and the glossary were not populated during early development sprints.
-|Complete sections 9 and 10 before the final course submission. Document at minimum: the decision to use Rust for the game engine, the MongoDB schema design choice, and the JWT authentication approach as ADRs.
+|*5 — Resolved*
+|*arc42 sections 9, 10, 11, 12 incomplete* (Fixed)
+Architecture Decision Records, quality scenarios, risks, and the glossary have been completed. ADRs covering MongoDB, Azure, and JWT are documented in the project wiki.
+|Resolved.
 |===

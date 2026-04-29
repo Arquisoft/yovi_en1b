@@ -21,7 +21,7 @@ endif::arc42help[]
 
 The **YOVI_EN1B** project is a multi-service platform for playing the abstract board game **Game Y** (also known as the Y connection game), developed as part of the Software Architecture course at the University of Oviedo. It serves as a practical benchmark for the construction of scalable, maintainable, and well-tested distributed systems, with a specific focus on turn-based game logic and polyglot service integration.
 
-Game Y is played on a triangular board composed of hexagonal cells. Each cell is uniquely identified by **barycentric coordinates** (x, y, z) where x + y + z = board_size − 1. Two players — Blue (B) and Red (R) — take turns claiming cells. A player wins when their occupied cells form a single connected chain that touches all three sides of the triangle simultaneously. The board size is configurable (e.g. 5×5, 7×7, 11×11), and optional game variants such as **Explosions** (bomb cells) and **Double Turn** (two moves per turn) are available for boards of size 7 and above.
+Game Y is played on a triangular board composed of hexagonal cells. Each cell is uniquely identified by **barycentric coordinates** (x, y, z) where x + y + z = board_size − 1. Two players — Blue (B) and Red (R) — take turns claiming cells. A player wins when their occupied cells form a single connected chain that touches all three sides of the triangle simultaneously. The board size is configurable (e.g. 5×5, 7×7, 11×11), and optional game variants such as **Explosions** (bomb cells) and **Double Turn** _(coming soon)_ are available for boards of size 7 and above.
 
 The following context diagram illustrates the primary boundaries of the system and its interactions with external actors and infrastructure:
 
@@ -73,11 +73,11 @@ These high-priority requirements ensure the technical integrity and operational 
 [options="header",cols="1,2,3,4"]
 |===
 |Priority|Goal|Architectural Attribute|Operational Scenario
-|1|**Maintainability**|Modularity|The system is decomposed into three independent services (webapp, users, gamey) communicating only via HTTP/JSON. Replacing or upgrading one service — for example, swapping the Rust engine for a new version — requires no changes to the other services, ensuring long-term project sustainability.
-|2|**Reliability**|Fault Tolerance|All game sessions, moves, and user statistics are persisted in MongoDB by the users service. In the event of a service restart, the full game history is recoverable from the database; active sessions are not lost.
-|3|**Performance**|Efficiency|The Gamey Rust engine executes move validation and win detection in under two milliseconds, even on large boards. The Union-Find algorithm with path compression guarantees near-constant-time connectivity checks regardless of board size.
-|4|**Security**|Data Integrity|All protected API endpoints require a valid JWT Bearer token issued at login (24-hour expiry). Passwords are never stored in plain text — they are hashed with bcrypt (salt rounds 10). All incoming request parameters are validated before processing.
-|5|**Usability**|Accessibility|The React frontend renders the triangular hexagonal board with clear visual feedback of the current game state. The interface communicates move outcomes and win conditions immediately, and a replay feature lets players review past games move by move.
+|1|**Maintainability**|Modularity|The system is decomposed into three independent services (webapp, users, gamey) communicating only via HTTP/JSON. Replacing or upgrading one service — for example, swapping the Rust engine for a new version — requires no changes to the other services. SonarCloud quality gate enforces ≥80% coverage on new code and 0 critical issues.
+|2|**Reliability**|Fault Tolerance|All game sessions, moves, and user statistics are persisted in MongoDB by the users service. In the event of a service restart, the full game history is recoverable from the database; active sessions are not lost. Full environment is reproducible with a single `docker compose up` on any machine with Docker.
+|3|**Performance**|Efficiency|The Gamey Rust engine executes move validation and win detection in under two milliseconds, even on large boards. Bot move response (`POST /play`) returns in under 500ms for board size ≤ 7 under normal load.
+|4|**Security**|Data Integrity|All protected API endpoints require a valid JWT Bearer token issued at login (24-hour expiry). Passwords are never stored in plain text — they are hashed with bcrypt (salt rounds 10). All protected endpoints return 401 within 50ms when no token is provided.
+|5|**Usability**|Accessibility|The React frontend renders the triangular hexagonal board with clear visual feedback of the current game state. WCAG 2.0 AAA compliance verified via Web Accessibility Checker with 0 known issues. A replay feature lets players review past games move by move.
 |===
 
 === Stakeholders

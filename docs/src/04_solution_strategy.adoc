@@ -3,48 +3,21 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-solution-strategy]]
 == Solution Strategy
 
-The GameY project follows a layered structured divided into UI, game logic and backend user handling
+The GameY project follows a layered architecture divided into UI, game logic, and backend user handling. Each layer is independently deployable and communicates exclusively via HTTP/JSON.
 
 === Technology decisions
 
-* The UI will be develop using React, due to one of the members already knowing it; Vite and TypeScript due to constraints
-* The logic will consist of a Rust application due to constraints
-* The users will be handle by a MongoDB database because we believe it is a very powerful database and would be great to know for our careers.
-* Github will be used as the cloud platform to work due to constraints
-* Docker will be used to deploy the application due to constraints
+* The UI is built with *React*, *Vite*, and *TypeScript*; React was chosen due to team familiarity, Vite and TypeScript are course requirements.
+* The game logic is implemented in *Rust* (course requirement), providing high performance for move validation, win detection, and bot AI.
+* User data and game history are persisted in *MongoDB*, whose document-oriented model fits naturally with the nested, variable-length structure of game states and move histories. It also integrates well with the Node.js ecosystem via Mongoose. See ADR for full rationale.
+* *GitHub* is used for version control and CI/CD (course requirement).
+* *Docker Compose* is used for local and production deployment, orchestrating all four containers with a single command (course requirement).
+* *Microsoft Azure* (Azure VM) hosts the production environment, chosen for its "Azure for Students" credits and native GitHub Actions integration. See ADR for full rationale.
 
 === Quality goals
 
-* Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project
-* Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it
-* Security will be handled through strict user validation during the login
-* Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-A short summary and explanation of the fundamental decisions and solution strategies, that shape system architecture. It includes
-
-* technology decisions
-* decisions about the top-level decomposition of the system, e.g. usage of an architectural pattern or design pattern
-* decisions on how to achieve key quality goals
-* relevant organizational decisions, e.g. selecting a development process or delegating certain tasks to third parties.
-
-.Motivation
-These decisions form the cornerstones for your architecture. They are the foundation for many other detailed decisions or implementation rules.
-
-.Form
-Keep the explanations of such key decisions short.
-
-Motivate what was decided and why it was decided that way,
-based upon problem statement, quality goals and key constraints.
-Refer to details in the following sections.
-
-
-.Further Information
-
-See https://docs.arc42.org/section-4/[Solution Strategy] in the arc42 documentation.
-
-****
-endif::arc42help[]
+* *Maintainability* is achieved by decomposing the system into three independent services (webapp, users, gamey) that communicate only via HTTP/JSON contracts, allowing each to be updated independently.
+* *Reliability* is ensured by the MongoDB persistence layer — all game sessions and moves are persisted immediately, so the system can recover from service restarts without data loss.
+* *Performance* is handled by the Rust engine, which runs move validation and win detection in under 2ms using a Union-Find algorithm with path compression.
+* *Security* is enforced through bcrypt password hashing, JWT authentication with 24-hour expiry, and input validation on all endpoints.
+* *Usability* is achieved through a clear React UI with immediate visual feedback, a replay feature for past games, and accessible design.
