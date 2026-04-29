@@ -607,7 +607,7 @@ These include</p>
 <p>The <strong>YOVI_EN1B</strong> project is a multi-service platform for playing the abstract board game <strong>Game Y</strong> (also known as the Y connection game), developed as part of the Software Architecture course at the University of Oviedo. It serves as a practical benchmark for the construction of scalable, maintainable, and well-tested distributed systems, with a specific focus on turn-based game logic and polyglot service integration.</p>
 </div>
 <div class="paragraph">
-<p>Game Y is played on a triangular board composed of hexagonal cells. Each cell is uniquely identified by <strong>barycentric coordinates</strong> (x, y, z) where x + y + z = board_size − 1. Two players — Blue (B) and Red &#174; — take turns claiming cells. A player wins when their occupied cells form a single connected chain that touches all three sides of the triangle simultaneously. The board size is configurable (e.g. 5×5, 7×7, 11×11), and optional game variants such as <strong>Explosions</strong> (bomb cells) and <strong>Double Turn</strong> (two moves per turn) are available for boards of size 7 and above.</p>
+<p>Game Y is played on a triangular board composed of hexagonal cells. Each cell is uniquely identified by <strong>barycentric coordinates</strong> (x, y, z) where x + y + z = board_size − 1. Two players — Blue (B) and Red &#174; — take turns claiming cells. A player wins when their occupied cells form a single connected chain that touches all three sides of the triangle simultaneously. The board size is configurable (e.g. 5×5, 7×7, 11×11), and optional game variants such as <strong>Explosions</strong> (bomb cells) and <strong>Double Turn</strong> <em>(coming soon)</em> are available for boards of size 7 and above.</p>
 </div>
 <div class="paragraph">
 <p>The following context diagram illustrates the primary boundaries of the system and its interactions with external actors and infrastructure:</p>
@@ -676,31 +676,31 @@ These include</p>
 <td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Modularity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The system is decomposed into three independent services (webapp, users, gamey) communicating only via HTTP/JSON. Replacing or upgrading one service — for example, swapping the Rust engine for a new version — requires no changes to the other services, ensuring long-term project sustainability.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The system is decomposed into three independent services (webapp, users, gamey) communicating only via HTTP/JSON. Replacing or upgrading one service — for example, swapping the Rust engine for a new version — requires no changes to the other services. SonarCloud quality gate enforces ≥80% coverage on new code and 0 critical issues.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Fault Tolerance</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">All game sessions, moves, and user statistics are persisted in MongoDB by the users service. In the event of a service restart, the full game history is recoverable from the database; active sessions are not lost.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All game sessions, moves, and user statistics are persisted in MongoDB by the users service. In the event of a service restart, the full game history is recoverable from the database; active sessions are not lost. Full environment is reproducible with a single <code>docker compose up</code> on any machine with Docker.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Efficiency</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The Gamey Rust engine executes move validation and win detection in under two milliseconds, even on large boards. The Union-Find algorithm with path compression guarantees near-constant-time connectivity checks regardless of board size.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The Gamey Rust engine executes move validation and win detection in under two milliseconds, even on large boards. Bot move response (<code>POST /play</code>) returns in under 500ms for board size ≤ 7 under normal load.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">4</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Security</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Data Integrity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">All protected API endpoints require a valid JWT Bearer token issued at login (24-hour expiry). Passwords are never stored in plain text — they are hashed with bcrypt (salt rounds 10). All incoming request parameters are validated before processing.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All protected API endpoints require a valid JWT Bearer token issued at login (24-hour expiry). Passwords are never stored in plain text — they are hashed with bcrypt (salt rounds 10). All protected endpoints return 401 within 50ms when no token is provided.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Usability</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Accessibility</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The React frontend renders the triangular hexagonal board with clear visual feedback of the current game state. The interface communicates move outcomes and win conditions immediately, and a replay feature lets players review past games move by move.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The React frontend renders the triangular hexagonal board with clear visual feedback of the current game state. WCAG 2.0 AAA compliance verified via Web Accessibility Checker with 0 known issues. A replay feature lets players review past games move by move.</p></td>
 </tr>
 </tbody>
 </table>
@@ -964,8 +964,8 @@ If needed you can subdivide them into technical constraints, organizational and 
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>User / Player</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Username for registration (RegisterForm), game actions.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Welcome messages, UI rendering.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Registration credentials, login credentials, game moves, game configuration (board size, strategy).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Board rendering, game state updates, move results, statistics, match history, leaderboard.</p></td>
 </tr>
 </tbody>
 </table>
@@ -999,8 +999,8 @@ If needed you can subdivide them into technical constraints, organizational and 
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>User (Client Device)</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UI interactions, form submissions (e.g., sending username).</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HTTP</strong> for fetching the SPA from the webapp service (Port 80). Once loaded, the browser communicates via <strong>HTTP POST</strong> with the users service API (/createuser on Port 3000) and the gamey engine (Port 4000).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UI interactions, form submissions, game moves, board configuration.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>HTTP</strong> for fetching the SPA from the webapp service (Port 80). Once loaded, the browser communicates via <strong>HTTP REST</strong> with the users service API (Port 3000) for all operations — authentication, game management, statistics, and history. The users service internally delegates game logic to the gamey engine (Port 4000); the frontend does not call gamey directly.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1012,26 +1012,29 @@ If needed you can subdivide them into technical constraints, organizational and 
 <h2 id="section-solution-strategy">4. Solution Strategy</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>The GameY project follows a layered structured divided into UI, game logic and backend user handling</p>
+<p>The GameY project follows a layered architecture divided into UI, game logic, and backend user handling. Each layer is independently deployable and communicates exclusively via HTTP/JSON.</p>
 </div>
 <div class="sect2">
 <h3 id="_technology_decisions">4.1. Technology decisions</h3>
 <div class="ulist">
 <ul>
 <li>
-<p>The UI will be develop using React, due to one of the members already knowing it; Vite and TypeScript due to constraints</p>
+<p>The UI is built with <strong>React</strong>, <strong>Vite</strong>, and <strong>TypeScript</strong>; React was chosen due to team familiarity, Vite and TypeScript are course requirements.</p>
 </li>
 <li>
-<p>The logic will consist of a Rust application due to constraints</p>
+<p>The game logic is implemented in <strong>Rust</strong> (course requirement), providing high performance for move validation, win detection, and bot AI.</p>
 </li>
 <li>
-<p>The users will be handle by a MongoDB database because we believe it is a very powerful database and would be great to know for our careers.</p>
+<p>User data and game history are persisted in <strong>MongoDB</strong>, whose document-oriented model fits naturally with the nested, variable-length structure of game states and move histories. It also integrates well with the Node.js ecosystem via Mongoose. See ADR for full rationale.</p>
 </li>
 <li>
-<p>Github will be used as the cloud platform to work due to constraints</p>
+<p><strong>GitHub</strong> is used for version control and CI/CD (course requirement).</p>
 </li>
 <li>
-<p>Docker will be used to deploy the application due to constraints</p>
+<p><strong>Docker Compose</strong> is used for local and production deployment, orchestrating all four containers with a single command (course requirement).</p>
+</li>
+<li>
+<p><strong>Microsoft Azure</strong> (Azure VM) hosts the production environment, chosen for its "Azure for Students" credits and native GitHub Actions integration. See ADR for full rationale.</p>
 </li>
 </ul>
 </div>
@@ -1041,59 +1044,21 @@ If needed you can subdivide them into technical constraints, organizational and 
 <div class="ulist">
 <ul>
 <li>
-<p>Maintainability of the code is achieved through the architectural pattern chosen to split different sections of the project</p>
+<p><strong>Maintainability</strong> is achieved by decomposing the system into three independent services (webapp, users, gamey) that communicate only via HTTP/JSON contracts, allowing each to be updated independently.</p>
 </li>
 <li>
-<p>Reliability again is achieved through the layered structure, as the persistence layer with the database ensures it</p>
+<p><strong>Reliability</strong> is ensured by the MongoDB persistence layer — all game sessions and moves are persisted immediately, so the system can recover from service restarts without data loss.</p>
 </li>
 <li>
-<p>Security will be handled through strict user validation during the login</p>
+<p><strong>Performance</strong> is handled by the Rust engine, which runs move validation and win detection in under 2ms using a Union-Find algorithm with path compression.</p>
 </li>
 <li>
-<p>Usability will be achieved through the clear implementation of the user interface and a variety of options to choose from when playing</p>
+<p><strong>Security</strong> is enforced through bcrypt password hashing, JWT authentication with 24-hour expiry, and input validation on all endpoints.</p>
+</li>
+<li>
+<p><strong>Usability</strong> is achieved through a clear React UI with immediate visual feedback, a replay feature for past games, and accessible design.</p>
 </li>
 </ul>
-</div>
-<div class="sidebarblock arc42help">
-<div class="content">
-<div class="paragraph">
-<div class="title">Contents</div>
-<p>A short summary and explanation of the fundamental decisions and solution strategies, that shape system architecture. It includes</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>technology decisions</p>
-</li>
-<li>
-<p>decisions about the top-level decomposition of the system, e.g. usage of an architectural pattern or design pattern</p>
-</li>
-<li>
-<p>decisions on how to achieve key quality goals</p>
-</li>
-<li>
-<p>relevant organizational decisions, e.g. selecting a development process or delegating certain tasks to third parties.</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>These decisions form the cornerstones for your architecture. They are the foundation for many other detailed decisions or implementation rules.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Keep the explanations of such key decisions short.</p>
-</div>
-<div class="paragraph">
-<p>Motivate what was decided and why it was decided that way,
-based upon problem statement, quality goals and key constraints.
-Refer to details in the following sections.</p>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-4/">Solution Strategy</a> in the arc42 documentation.</p>
-</div>
-</div>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
@@ -1144,15 +1109,15 @@ Refer to details in the following sections.</p>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>webapp</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend web application. Renders the user interface, handles form submissions (like RegisterForm), and communicates with backend services to display data.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Frontend single-page application. Renders the game board, handles user registration and login, displays statistics, match history, leaderboard, and replay. Communicates exclusively with the users service via HTTP REST.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>users</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Backend REST API service. Currently responsible for handling user registration requests and returning welcome messages.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Backend REST API service. Handles user registration, authentication (JWT + bcrypt), game creation and management, move orchestration, statistics tracking, leaderboard, and game history. Acts as the single gateway to MongoDB and delegates game logic to the gamey engine.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>gamey</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Core game engine and bot service. Responsible for managing the game state, board coordinates, valid actions, notations, and bot logic.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Core game engine and bot service written in Rust. Responsible for move computation, win condition detection (Union-Find), bot AI strategy dispatch (random, defensive, MCTS, Gemini), and YEN notation serialization. Stateless; no database connection.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1189,11 +1154,23 @@ Refer to details in the following sections.</p>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>App.tsx</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The root React component that serves as the entry point for the frontend application.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Root React component; sets up routing and global state.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>RegisterForm.tsx</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A specific UI component that renders the registration form, captures user input (username), and sends the HTTP POST request to the users service API.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Game board components</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Renders the triangular hexagonal board using YEN state, handles cell selection and move submission.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Auth components</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Registration and login forms; stores JWT token for authenticated requests.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>History and replay components</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Displays past games and drives the step-by-step move replay using <code>GET /games/:id/moves</code>.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Leaderboard component</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fetches and displays the ranked player list from <code>GET /leaderboard</code>.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1225,7 +1202,31 @@ Refer to details in the following sections.</p>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>users-service.js</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The main Express server file. It defines the API endpoints, specifically the /createuser route. It currently simulates a database delay (1000ms) and processes the JSON response sent back to the client.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Main Express server entry point. Mounts all route modules and connects to MongoDB via Mongoose.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>authRoutes</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles <code>POST /createuser</code> and <code>POST /login</code>; bcrypt password hashing and JWT signing.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>userRoutes</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles <code>GET /users/:id</code> and <code>GET /users/:id/history</code>; returns profile and game history.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>gameRoutes</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Handles game lifecycle: <code>POST /games</code>, <code>GET /games/:id</code>, <code>POST /games/:id/move</code>, <code>GET /games/:id/play</code>, <code>PUT /games/:id/finish</code>, <code>POST /games/:id/undo</code>, <code>GET /games/:id/moves</code>, <code>GET /games/options</code>.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>playRoute</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Public <code>POST /play</code> endpoint; proxies directly to Gamey without requiring authentication or an internal game ID.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>leaderBoardRoute</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>GET /leaderboard</code>; returns overall and per-strategy ranked player lists.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MongoUserRepository</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data access layer implementing the repository pattern. Encapsulates all MongoDB queries for users, games, and statistics.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1585,14 +1586,14 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 <td class="tableblock halign-left valign-top"><p class="tableblock">Webapp Container</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">React + TypeScript + Vite</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">80</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Users (3000), Gamey (4000)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Users (3000)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">User Management &amp; Persistence</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Users Container</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Node.js + Express</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">3000</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB (27017)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MongoDB (27017), Gamey (4000)</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Game Logic &amp; Bot</p></td>
@@ -1613,7 +1614,7 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 <div class="sect3">
 <h4 id="_container_descriptions">7.1.1. Container Descriptions</h4>
 <div class="paragraph">
-<p><strong>Webapp Container</strong> — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It talks to the <code>users</code> service for everything related to the player (registration, login, stats, history) and to the <code>gamey</code> service for all game actions (creating a game, submitting a move, querying board state).</p>
+<p><strong>Webapp Container</strong> — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It communicates exclusively with the <code>users</code> service for all operations: authentication, game creation, move submission, statistics, history, and leaderboard. It never calls the <code>gamey</code> engine directly.</p>
 </div>
 <div class="paragraph">
 <p><strong>Users Container</strong> — Manages player accounts, authentication, statistics, and game history. It is the only service that connects to MongoDB, acting as the single gateway for all persistent data. When a game finishes, the result is reported here so it can be stored and reflected in player stats.</p>
@@ -1673,13 +1674,13 @@ cross-cutting concepts. Therefore, there is a need to know the infrastructure.</
 </div>
 </div>
 <div class="paragraph">
-<p>The Users container is a lightweight Node.js/Express service. It exposes a REST endpoint (<code>POST /createuser</code>) that the React frontend calls during user registration. In the current implementation, user records are kept in-memory within the process; no external database is required. This service is designed to be replaced or extended with a persistent store in later development phases.</p>
+<p>The Users container is a Node.js/Express service that acts as the main backend for the platform. It handles user registration, authentication (JWT + bcrypt), game lifecycle management, statistics tracking, leaderboard, and the public bot API. It is the only service that connects to MongoDB (via Mongoose) and the only service that calls the Gamey engine internally — the frontend never reaches Gamey directly. Routes are split into independent modules: <code>authRoutes</code>, <code>userRoutes</code>, <code>gameRoutes</code>, <code>playRoute</code>, and <code>leaderBoardRoute</code>, all backed by a <code>MongoUserRepository</code> implementing the repository pattern.</p>
 </div>
 </div>
 <div class="sect3">
 <h4 id="_webapp_container">7.2.3. Webapp Container</h4>
 <div class="paragraph">
-<p>The Webapp container serves the React single-page application compiled by Vite. It is served via a static file server on port 80. All game interactions are handled client-side in the browser, with REST calls made to the <code>users</code> service (port 3000) and the <code>gamey</code> service (port 4000). There is no server-side rendering; the container&#8217;s only role is to deliver the compiled JavaScript and assets to the browser.</p>
+<p>The Webapp container serves the React single-page application compiled by Vite. It is served via nginx on port 80, configured with <code>try_files $uri /index.html</code> to support client-side routing without 404s on page reload. All interactions are handled client-side, with REST calls made exclusively to the <code>users</code> service (port 3000). There is no server-side rendering and no direct connection to the <code>gamey</code> engine.</p>
 </div>
 </div>
 <div class="sect3">
@@ -2065,16 +2066,10 @@ They can include many different topics, such as</p>
 <div class="sect2">
 <h3 id="_game_variants">8.8. Game Variants</h3>
 <div class="paragraph">
-<p>Game variants are optional rule modifiers that extend the standard Y game. They are represented as an enum (<code>GameVariant</code>) in the Rust engine and encoded in the <code>variants</code> array of the YEN state. Both variants require a minimum board size of 7.</p>
+<p>Game variants are optional rule modifiers that extend the standard Y game. They are represented as an enum (<code>GameVariant</code>) in the Rust engine and encoded in the <code>variants</code> array of the YEN state. Variant <code>Explosions</code> require a minimum board size of 7.</p>
 </div>
 <div class="paragraph">
 <p><strong>Explosions (Bomb Mode)</strong>: At game initialization, one or more bomb cells are randomly placed on the board. Their positions are encoded in the YEN <code>e</code> field as a comma-separated list of flat cell indices. A bomb cell looks empty to players — they can choose it as a move. When a player lands on a bomb cell: (1) the player&#8217;s piece is placed normally, (2) the bomb is consumed, and (3) all occupied neighbour cells are cleared back to empty via a BFS chain-detonation (adjacent bombs also detonate). After detonation, the union-find structure is fully rebuilt from surviving pieces to maintain win-detection integrity. Chain detonation means a cluster of adjacent bombs all explode together when the first one is triggered.</p>
-</div>
-<div class="paragraph">
-<p><strong>Double Turn</strong>: Each player places <strong>two pieces per turn</strong> instead of one. The <code>turn</code> field in YEN advances only after both moves of a turn are submitted. This variant changes the pace of the game significantly — players can build connected chains faster, requiring the opponent to respond more aggressively.</p>
-</div>
-<div class="paragraph">
-<p>Both variants can be active simultaneously, creating a "CHAOS" mode that combines the explosive board and the accelerated turn structure.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2098,52 +2093,10 @@ They can include many different topics, such as</p>
 <div class="sect1">
 <h2 id="section-design-decisions">9. Architecture Decisions</h2>
 <div class="sectionbody">
-<div class="sidebarblock arc42help">
-<div class="content">
 <div class="paragraph">
-<div class="title">Contents</div>
-<p>Important, expensive, large scale or risky architecture decisions including rationales.
-With "decisions" we mean selecting one alternative based on given criteria.</p>
-</div>
-<div class="paragraph">
-<p>Please use your judgement to decide whether an architectural decision should be documented
-here in this central section or whether you better document it locally
-(e.g. within the white box template of one building block).</p>
-</div>
-<div class="paragraph">
-<p>Avoid redundancy.
-Refer to section 4, where you already captured the most important decisions of your architecture.</p>
-</div>
-<div class="paragraph">
-<div class="title">Motivation</div>
-<p>Stakeholders of your system should be able to comprehend and retrace your decisions.</p>
-</div>
-<div class="paragraph">
-<div class="title">Form</div>
-<p>Various options:</p>
-</div>
-<div class="ulist">
-<ul>
-<li>
-<p>ADR (<a href="https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions">Documenting Architecture Decisions</a>) for every important decision</p>
-</li>
-<li>
-<p>List or table, ordered by importance and consequences or:</p>
-</li>
-<li>
-<p>more detailed in form of separate sections per decision</p>
-</li>
-</ul>
-</div>
-<div class="paragraph">
-<div class="title">Further Information</div>
-<p>See <a href="https://docs.arc42.org/section-9/">Architecture Decisions</a> in the arc42 documentation.
-There you will find links and examples about ADR.
-All project-specific architecture decisions are collected in one place.
-You can find them all in the wiki here: <a href="https://github.com/Arquisoft/yovi_en1b/wiki/Architectural-decisions">Architectural decisions</a>.
+<p>All project-specific architecture decisions are collected in one place.
+You can find them all in the wiki here: link: <a href="https://github.com/Arquisoft/yovi_en1b/wiki/Architectural-decisions" class="bare">https://github.com/Arquisoft/yovi_en1b/wiki/Architectural-decisions</a>.
 This page is the central reference for decisions made in the project.</p>
-</div>
-</div>
 </div>
 <div style="page-break-after: always;"></div>
 </div>
@@ -2343,16 +2296,16 @@ The frontend URL for the Users service API is embedded at Docker image build tim
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>1 — High</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Legacy bot strategy keys in MongoDB</strong>
-Early versions of the application stored bot strategy results under the keys <code>easy</code>, <code>medium</code>, and <code>hard</code> in the <code>statistics.vs_bot</code> subdocument. Current code uses <code>random</code>, <code>defensive</code>, <code>ai</code>, and <code>mcts</code>. Documents created before the schema change display corrupted statistics in the frontend (NaN% win rate, Unknown difficulty).</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Run the provided migration script (<code>migrate-vs-bot-keys.js</code>) on the production database, or wipe the database with <code>docker compose down -v</code> to start clean. Add a schema version field to user documents to detect and auto-migrate stale records on first access.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>1 — Resolved</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Legacy bot strategy keys in MongoDB</strong> (Fixed)
+Early versions stored bot results under <code>easy</code>, <code>medium</code>, <code>hard</code> in <code>statistics.vs_bot</code>. Current code uses <code>random</code>, <code>defensive</code>, <code>ai</code>, and <code>mcts</code>. The schema migration has been applied and the database is now consistent.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resolved. The migration script was run and the production database was wiped and restarted with <code>docker compose down -v</code>. No further action required.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — High</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Section 8 (Cross-cutting Concepts) not documented</strong>
-The arc42 cross-cutting concepts section remains empty. Security strategy, error handling conventions, logging approach, and the JWT authentication flow are implemented but not documented.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Document at minimum: authentication/authorisation flow, error handling conventions (HTTP status codes used), CORS policy, and the monitoring stack (Prometheus + Grafana metrics exposed).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — Resolved</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Section 8 (Cross-cutting Concepts) not documented</strong> (Fixed)
+The arc42 cross-cutting concepts section is now fully documented, covering the domain model, YEN notation, win detection algorithm, security concepts, inter-service communication, persistence model, bot AI strategy pattern, game variants, and error handling.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resolved.</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 — Medium</strong></p></td>
@@ -2367,10 +2320,10 @@ The public <code>GET /play</code> endpoint and the <code>POST /createuser</code>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Already partially addressed: <code>findGamesByPlayer</code> uses <code>.select('-moves')</code>. Verify all listing endpoints consistently exclude <code>moves</code> and only expose them via the dedicated <code>GET /games/:id/moves</code> endpoint.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>5 — Low</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>arc42 sections 9, 10, 11, 12 incomplete</strong>
-Architecture Decision Records (ADRs), quality scenarios, risks, and the glossary were not populated during early development sprints.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Complete sections 9 and 10 before the final course submission. Document at minimum: the decision to use Rust for the game engine, the MongoDB schema design choice, and the JWT authentication approach as ADRs.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>5 — Resolved</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>arc42 sections 9, 10, 11, 12 incomplete</strong> (Fixed)
+Architecture Decision Records, quality scenarios, risks, and the glossary have been completed. ADRs covering MongoDB, Azure, and JWT are documented in the project wiki.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resolved.</p></td>
 </tr>
 </tbody>
 </table>
@@ -2601,7 +2554,7 @@ Architecture Decision Records (ADRs), quality scenarios, risks, and the glossary
 <div id="footer">
 <div id="footer-text">
 Version 8.2 EN<br>
-Last updated 2026-03-16 10:40:01 +0100
+Last updated 2026-04-12 22:22:26 +0200
 </div>
 </div>
 </body>
