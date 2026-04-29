@@ -2302,28 +2302,16 @@ Early versions stored bot results under <code>easy</code>, <code>medium</code>, 
 <td class="tableblock halign-left valign-top"><p class="tableblock">Resolved. The migration script was run and the production database was wiped and restarted with <code>docker compose down -v</code>. No further action required.</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — Resolved</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Section 8 (Cross-cutting Concepts) not documented</strong> (Fixed)
-The arc42 cross-cutting concepts section is now fully documented, covering the domain model, YEN notation, win detection algorithm, security concepts, inter-service communication, persistence model, bot AI strategy pattern, game variants, and error handling.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Resolved.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>2 — Medium</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>No rate limiting on public endpoints</strong>
 The public <code>GET /play</code> endpoint and the <code>POST /createuser</code> endpoint have no rate limiting. A single client can flood the service with requests, exhausting Gamey connections or enabling user enumeration.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Integrate <code>express-rate-limit</code> middleware on unauthenticated routes. Apply stricter limits to <code>/createuser</code> (e.g., 10 req/min per IP) and <code>/play</code> (e.g., 60 req/min per IP).</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>4 — Medium</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>3 — Medium</strong></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Game moves array not excluded from history endpoint</strong>
 <code>GET /games/:id</code> returns the full game document including the <code>moves</code> array, which can be very large for long games and is not needed for listing purposes.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Already partially addressed: <code>findGamesByPlayer</code> uses <code>.select('-moves')</code>. Verify all listing endpoints consistently exclude <code>moves</code> and only expose them via the dedicated <code>GET /games/:id/moves</code> endpoint.</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>5 — Resolved</strong></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>arc42 sections 9, 10, 11, 12 incomplete</strong> (Fixed)
-Architecture Decision Records, quality scenarios, risks, and the glossary have been completed. ADRs covering MongoDB, Azure, and JWT are documented in the project wiki.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Resolved.</p></td>
 </tr>
 </tbody>
 </table>
