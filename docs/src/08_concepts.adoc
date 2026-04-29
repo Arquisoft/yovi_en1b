@@ -217,10 +217,6 @@ Game variants are optional rule modifiers that extend the standard Y game. They 
 
 *Explosions (Bomb Mode)*: At game initialization, one or more bomb cells are randomly placed on the board. Their positions are encoded in the YEN `e` field as a comma-separated list of flat cell indices. A bomb cell looks empty to players — they can choose it as a move. When a player lands on a bomb cell: (1) the player's piece is placed normally, (2) the bomb is consumed, and (3) all occupied neighbour cells are cleared back to empty via a BFS chain-detonation (adjacent bombs also detonate). After detonation, the union-find structure is fully rebuilt from surviving pieces to maintain win-detection integrity. Chain detonation means a cluster of adjacent bombs all explode together when the first one is triggered.
 
-*Double Turn*: Each player places **two pieces per turn** instead of one. The `turn` field in YEN advances only after both moves of a turn are submitted. This variant changes the pace of the game significantly — players can build connected chains faster, requiring the opponent to respond more aggressively.
-
-Both variants can be active simultaneously, creating a "CHAOS" mode that combines the explosive board and the accelerated turn structure.
-
 === Error Handling
 
 Error handling follows a **centralized, typed model** in the Rust engine and a **consistent HTTP status code** convention in the Node.js service.
