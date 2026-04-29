@@ -11,7 +11,7 @@ ifdef::arc42help[]
 .Content
 The deployment view describes:
 
- 1. technical infrastructure used to execute your system, with infrastructure elements like geographical locations, environments, computers, processors, channels and net topologies as well as other infrastructure elements and
+1. technical infrastructure used to execute your system, with infrastructure elements like geographical locations, environments, computers, processors, channels and net topologies as well as other infrastructure elements and
 
 2. mapping of (software) building blocks to that infrastructure elements.
 
@@ -108,15 +108,15 @@ Mapping of Building Blocks to Infrastructure::
 [options="header"]
 |===
 | Building Block | Container | Technology | Exposed Port | Connects to
-| User Interface | Webapp Container | React + TypeScript + Vite | 80 | Users (3000), Gamey (4000)
-| User Management & Persistence | Users Container | Node.js + Express | 3000 | MongoDB (27017)
+| User Interface | Webapp Container | React + TypeScript + Vite | 80 | Users (3000)
+| User Management & Persistence | Users Container | Node.js + Express | 3000 | MongoDB (27017), Gamey (4000)
 | Game Logic & Bot | Gamey Container | Rust (Cargo) | 4000 | —
 | Persistent Storage | MongoDB Container | MongoDB 7 | 27017 (internal) | —
 |===
 
 ==== Container Descriptions
 
-*Webapp Container* — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It talks to the `users` service for everything related to the player (registration, login, stats, history) and to the `gamey` service for all game actions (creating a game, submitting a move, querying board state).
+*Webapp Container* — Serves the React single-page application to the browser. It is the only container directly accessible from outside the Docker network. It communicates exclusively with the `users` service for all operations: authentication, game creation, move submission, statistics, history, and leaderboard. It never calls the `gamey` engine directly.
 
 *Users Container* — Manages player accounts, authentication, statistics, and game history. It is the only service that connects to MongoDB, acting as the single gateway for all persistent data. When a game finishes, the result is reported here so it can be stored and reflected in player stats.
 
@@ -177,11 +177,11 @@ ctrl --> store : Registers new user
 @enduml
 ----
 
-The Users container is a lightweight Node.js/Express service. It exposes a REST endpoint (`POST /createuser`) that the React frontend calls during user registration. In the current implementation, user records are kept in-memory within the process; no external database is required. This service is designed to be replaced or extended with a persistent store in later development phases.
+The Users container is a Node.js/Express service that acts as the main backend for the platform. It handles user registration, authentication (JWT + bcrypt), game lifecycle management, statistics tracking, leaderboard, and the public bot API. It is the only service that connects to MongoDB (via Mongoose) and the only service that calls the Gamey engine internally — the frontend never reaches Gamey directly. Routes are split into independent modules: `authRoutes`, `userRoutes`, `gameRoutes`, `playRoute`, and `leaderBoardRoute`, all backed by a `MongoUserRepository` implementing the repository pattern.
 
 ==== Webapp Container
 
-The Webapp container serves the React single-page application compiled by Vite. It is served via a static file server on port 80. All game interactions are handled client-side in the browser, with REST calls made to the `users` service (port 3000) and the `gamey` service (port 4000). There is no server-side rendering; the container's only role is to deliver the compiled JavaScript and assets to the browser.
+The Webapp container serves the React single-page application compiled by Vite. It is served via nginx on port 80, configured with `try_files $uri /index.html` to support client-side routing without 404s on page reload. All interactions are handled client-side, with REST calls made exclusively to the `users` service (port 3000). There is no server-side rendering and no direct connection to the `gamey` engine.
 
 ==== MongoDB Container
 

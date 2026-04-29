@@ -39,13 +39,13 @@ The system is decomposed into three main building blocks to separate concerns:
 | Name | Responsibility
 
 | *webapp*
-| Frontend web application. Renders the user interface, handles form submissions (like RegisterForm), and communicates with backend services to display data.
+| Frontend single-page application. Renders the game board, handles user registration and login, displays statistics, match history, leaderboard, and replay. Communicates exclusively with the users service via HTTP REST.
 
 | *users*
-| Backend REST API service. Currently responsible for handling user registration requests and returning welcome messages.
+| Backend REST API service. Handles user registration, authentication (JWT + bcrypt), game creation and management, move orchestration, statistics tracking, leaderboard, and game history. Acts as the single gateway to MongoDB and delegates game logic to the gamey engine.
 
 | *gamey*
-| Core game engine and bot service. Responsible for managing the game state, board coordinates, valid actions, notations, and bot logic.
+| Core game engine and bot service written in Rust. Responsible for move computation, win condition detection (Union-Find), bot AI strategy dispatch (random, defensive, MCTS, Gemini), and YEN notation serialization. Stateless; no database connection.
 |===
 
 === Level 2
@@ -75,10 +75,19 @@ form --> [External:\nusers service] : fetch(/createuser)
 | Name | Responsibility
 
 | *App.tsx*
-| The root React component that serves as the entry point for the frontend application.
+| Root React component; sets up routing and global state.
 
-| *RegisterForm.tsx*
-| A specific UI component that renders the registration form, captures user input (username), and sends the HTTP POST request to the users service API.
+| *Game board components*
+| Renders the triangular hexagonal board using YEN state, handles cell selection and move submission.
+
+| *Auth components*
+| Registration and login forms; stores JWT token for authenticated requests.
+
+| *History and replay components*
+| Displays past games and drives the step-by-step move replay using `GET /games/:id/moves`.
+
+| *Leaderboard component*
+| Fetches and displays the ranked player list from `GET /leaderboard`.
 |===
 
 
@@ -105,7 +114,25 @@ service --> [External:\nwebapp] : JSON Response
 | Name | Responsibility
 
 | *users-service.js*
-| The main Express server file. It defines the API endpoints, specifically the /createuser route. It currently simulates a database delay (1000ms) and processes the JSON response sent back to the client.
+| Main Express server entry point. Mounts all route modules and connects to MongoDB via Mongoose.
+
+| *authRoutes*
+| Handles `POST /createuser` and `POST /login`; bcrypt password hashing and JWT signing.
+
+| *userRoutes*
+| Handles `GET /users/:id` and `GET /users/:id/history`; returns profile and game history.
+
+| *gameRoutes*
+| Handles game lifecycle: `POST /games`, `GET /games/:id`, `POST /games/:id/move`, `GET /games/:id/play`, `PUT /games/:id/finish`, `POST /games/:id/undo`, `GET /games/:id/moves`, `GET /games/options`.
+
+| *playRoute*
+| Public `POST /play` endpoint; proxies directly to Gamey without requiring authentication or an internal game ID.
+
+| *leaderBoardRoute*
+| `GET /leaderboard`; returns overall and per-strategy ranked player lists.
+
+| *MongoUserRepository*
+| Data access layer implementing the repository pattern. Encapsulates all MongoDB queries for users, games, and statistics.
 |===
 
 
