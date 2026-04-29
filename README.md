@@ -39,11 +39,12 @@ YOVI is a full-stack strategy game built as a monorepo. It combines a React fron
 
 ```text
 yovi_en1b/
-├── webapp/       React + Vite + TypeScript
+├── webapp/       React + Vite + TypeScript + E2E tests
 ├── users/        Node.js + Express + MongoDB
 ├── gamey/        Rust game engine & bot
 ├── mongo-init/   JavaScript + MongoDB
-└── docs/         Arc42 architecture docs
+├── docs/         Arc42 architecture docs
+└── loas-tests/   Artillery
 ```
 
 ---
