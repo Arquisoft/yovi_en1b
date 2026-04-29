@@ -44,7 +44,7 @@ yovi_en1b/
 ├── gamey/        Rust game engine & bot
 ├── mongo-init/   JavaScript + MongoDB
 ├── docs/         Arc42 architecture docs
-└── loas-tests/   Artillery
+└── load-tests/   Artillery
 ```
 
 ---
