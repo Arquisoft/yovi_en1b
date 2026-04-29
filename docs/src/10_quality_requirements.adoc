@@ -9,23 +9,52 @@ The following mind map illustrates the primary quality goals for YOVI, breaking 
 
 [plantuml, quality_tree, png]
 ----
-@startmindmap
-* Quality
-** Maintainability
-*** Modularity: Services decoupled via REST (S1)
-** Reliability
-*** Fault Tolerance: Sessions survive restarts via MongoDB (S2)
-** Performance
-*** Efficiency: Rust engine computes moves in < 2ms (S3)
-*** Scalability: Handles peak load testing gracefully (S4)
-** Security
-*** Data Integrity: Protected by JWT & bcrypt (S5)
-** Usability
-*** Accessibility: Visual feedback & replay features (S6)
-** Testability
-*** E2E Automation: Flows verified via Playwright (S7)
-*** State Isolation: Endpoints for test cleanup (S8)
-@endmindmap
+@startuml
+!theme plain
+left to right direction
+skinparam defaultTextAlignment center
+skinparam rectangle {
+    Rounding 5
+}
+
+rectangle "Quality" as Q
+
+rectangle "Maintainability" as M
+rectangle "Reliability" as R
+rectangle "Performance" as P
+rectangle "Security" as S
+rectangle "Usability" as U
+rectangle "Testability" as T
+
+Q --> M
+Q --> R
+Q --> P
+Q --> S
+Q --> U
+Q --> T
+
+rectangle "Modularity:\nServices decoupled via REST (S1)" as S1
+M --> S1
+
+rectangle "Fault Tolerance:\nSessions survive restarts (S2)" as S2
+R --> S2
+
+rectangle "Efficiency:\nRust engine < 2ms (S3)" as S3
+rectangle "Scalability:\nPeak load testing (S4)" as S4
+P --> S3
+P --> S4
+
+rectangle "Data Integrity:\nJWT & bcrypt (S5)" as S5
+S --> S5
+
+rectangle "Accessibility:\nVisual feedback & replay (S6)" as S6
+U --> S6
+
+rectangle "E2E Automation:\nPlaywright tests (S7)" as S7
+rectangle "State Isolation:\nTest cleanup endpoints (S8)" as S8
+T --> S7
+T --> S8
+@enduml
 ----
 
 === Quality Scenarios
